@@ -1,8 +1,0 @@
-node_modules
-dist
-.astro
-.env
-*.log
-
-# the repository root ignores lib/ (Python build output); the site has a source folder with that name
-!src/lib/

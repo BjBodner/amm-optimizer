@@ -21,7 +21,9 @@ uv add amm-optimizer                 # or: uv pip install amm-optimizer
 pip install -e ".[dev]"              # from a checkout; add ",bench" for the COCO/bbob tooling
 ```
 
-Source, issues and the changelog: <https://github.com/BjBodner/amm-optimizer>. Upgrading from 0.2.0: the import
+Source, issues and the changelog: <https://github.com/BjBodner/amm-optimizer>. Results, limits and how it works:
+<https://bjbodner.github.io/amm-optimizer-site/> (the website has its own repository,
+[BjBodner/amm-optimizer-site](https://github.com/BjBodner/amm-optimizer-site)). Upgrading from 0.2.0: the import
 name changed to `amm_optimizer` (`import amm_optimizer as amm`). Upgrading from 0.3.0: `amm.minimize` now runs
 AMM by default and needs `bounds=`; the original ATM sampler is `config=amm.ATMConfig()`. See [CHANGELOG.md](CHANGELOG.md).
 
