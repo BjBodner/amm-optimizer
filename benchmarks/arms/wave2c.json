@@ -1,0 +1,32 @@
+{
+ "base": {
+  "config": ""
+ },
+ "composite": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=12"
+ },
+ "w2_early4": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=12,variant.early_accept=true,variant.early_min=4"
+ },
+ "w2_early6": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=12,variant.early_accept=true,variant.early_min=6"
+ },
+ "w2_early8": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=12,variant.early_accept=true,variant.early_min=8"
+ },
+ "w2_early4_p24": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=24,variant.early_accept=true,variant.early_min=4"
+ },
+ "w2_early4_p48": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=48,variant.early_accept=true,variant.early_min=4"
+ },
+ "w2_early4_p24_t15": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=24,variant.early_accept=true,variant.early_min=4,variant.sr_targets=0.1;0.15;0.2;0.3"
+ },
+ "w2_early4_p24_credit": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=24,variant.early_accept=true,variant.early_min=4,variant.allocation=credit"
+ },
+ "w2_early4_p24_eta3": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=24,variant.early_accept=true,variant.early_min=4,variant.sr_eta=3"
+ }
+}

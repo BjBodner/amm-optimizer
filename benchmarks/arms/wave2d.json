@@ -1,0 +1,20 @@
+{
+ "base": {
+  "config": ""
+ },
+ "composite": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.corner_clip=0.5,variant.pool_min=12"
+ },
+ "w2_e4_c100": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.early_accept=true,variant.corner_clip=1.0,variant.pool_min=12,variant.early_min=4"
+ },
+ "w2_e8_c100": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.early_accept=true,variant.corner_clip=1.0,variant.pool_min=12,variant.early_min=8"
+ },
+ "w2_e6_c75": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.early_accept=true,variant.corner_clip=0.75,variant.pool_min=12,variant.early_min=6"
+ },
+ "w2_e6_c100_p16": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.early_accept=true,variant.corner_clip=1.0,variant.pool_min=16,variant.early_min=6"
+ }
+}

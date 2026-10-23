@@ -1,0 +1,14 @@
+{
+ "base": {
+  "config": ""
+ },
+ "policy": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.9,variant.es_max_budget_per_dim=100"
+ },
+ "es11": {
+  "solver": "es11"
+ },
+ "w4_d15": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.9,variant.es_max_budget_per_dim=100,variant.scale_learning=diagonal"
+ }
+}

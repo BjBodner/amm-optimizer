@@ -1,0 +1,4 @@
+{
+ "es11r": {"solver": "es11r"},
+ "cma11r": {"solver": "cma11r"}
+}

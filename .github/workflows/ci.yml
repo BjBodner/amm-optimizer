@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1" # weekly: catches new NumPy / SciPy / ruff releases
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # One BLAS thread: a different thread count changes the last bits of some runs.
+  OPENBLAS_NUM_THREADS: "1"
+  OMP_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+  PYTHONUTF8: "1"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv venv && uv pip install -e ".[dev]"
+      - run: uv run --no-sync ruff check src tests tools benchmarks
+      - run: uv run --no-sync ruff format --check src tests tools benchmarks
+      - run: uv run --no-sync mypy
+
+  test:
+    needs: lint
+    name: test (${{ matrix.os }}, py${{ matrix.python }}${{ matrix.pins && ', pinned' || '' }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    # The gating legs run the portable tests (the bit-exact snapshots skip themselves
+    # when the environment differs, see tests/conftest.py). The pinned Windows 3.12 leg
+    # is the recorded snapshot environment, but GitHub's hosted runners differ in CPU
+    # generation (SIMD and BLAS kernels), which changes the last bits: it passed on one
+    # runner and failed on another with identical Python, NumPy and SciPy. It reports
+    # but does not gate; the bit-exact gate is `python tools/ci.py` on the recording
+    # machine.
+    continue-on-error: ${{ matrix.experimental }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The environment of tests/characterisation.json (report-only, see above).
+          - os: windows-latest
+            python: "3.12"
+            pins: "numpy==2.5.4 scipy==1.18.1"
+            experimental: true
+          # Latest releases: the behaviour must hold, the bits may differ.
+          - os: windows-latest
+            python: "3.13"
+            pins: ""
+            experimental: false
+          - os: ubuntu-latest
+            python: "3.12"
+            pins: ""
+            experimental: false
+          - os: ubuntu-latest
+            python: "3.14"
+            pins: ""
+            experimental: false
+          - os: macos-latest
+            python: "3.12"
+            pins: ""
+            experimental: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - name: Install
+        shell: bash
+        env:
+          PINS: ${{ matrix.pins }}
+        run: |
+          uv venv
+          # PINS is deliberately unquoted: it holds several requirements.
+          # shellcheck disable=SC2086
+          uv pip install -e ".[dev]" coco-experiment pytest-xdist "pytest-timeout!=2.5.0" $PINS
+      - name: Environment
+        shell: bash
+        run: uv run --no-sync python -c "import numpy, scipy, sys; print(sys.version); print('numpy', numpy.__version__, 'scipy', scipy.__version__)"
+      - name: "Tests (research tier, not slow and not merge)"
+        shell: bash
+        run: >
+          uv run --no-sync pytest -m "not slow and not merge" -n auto --timeout=900
+          -p no:cacheprovider -ra --cov=amm_optimizer --cov-branch --cov-report=term-missing:skip-covered
+
+  package:
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          python-version: "3.12"
+      - name: Build sdist and wheel
+        run: uv build
+      - name: Check metadata and size
+        run: |
+          uvx twine check --strict dist/*
+          sdist_bytes=$(stat -c%s dist/*.tar.gz)
+          echo "sdist: ${sdist_bytes} bytes"
+          # PyPI rejects files above 100 MiB; a lean sdist is about 0.5 MB.
+          test "${sdist_bytes}" -lt 5000000
+      - name: Smoke-test the wheel in a clean environment, away from the source tree
+        run: |
+          uv venv --python 3.12 "${RUNNER_TEMP}/smoke"
+          uv pip install --python "${RUNNER_TEMP}/smoke" dist/*.whl
+          cp tools/smoke_installed.py "${RUNNER_TEMP}/smoke_installed.py"
+          cd "${RUNNER_TEMP}" && "${RUNNER_TEMP}/smoke/bin/python" smoke_installed.py --dist amm-optimizer
+      - name: Smoke-test the sdist the same way
+        run: |
+          uv venv --python 3.12 "${RUNNER_TEMP}/smoke_sdist"
+          uv pip install --python "${RUNNER_TEMP}/smoke_sdist" dist/*.tar.gz
+          cd "${RUNNER_TEMP}" && "${RUNNER_TEMP}/smoke_sdist/bin/python" smoke_installed.py --dist amm-optimizer
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error

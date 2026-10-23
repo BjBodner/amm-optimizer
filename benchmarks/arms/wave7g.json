@@ -1,0 +1,5 @@
+{
+ "w7_final": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.covariance=rank_mu,variant.cov_rate=3,variant.cov_select=0.5,variant.es_phase=prefix,variant.es_fraction=0.9,variant.es_max_budget_per_dim=100,variant.local_method=nelder_mead,variant.refine_fraction=0.5,variant.es_small_dim=5,variant.refine_max_dim=10"
+ }
+}

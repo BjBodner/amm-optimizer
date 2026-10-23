@@ -1,0 +1,29 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+        exclude: '\.(json|gz|png|svg|info)$'
+      - id: trailing-whitespace
+        exclude: '\.(json|gz|png|svg|info|md)$'
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.1
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+  - repo: local
+    hooks:
+      # The research tier is the contributor loop; `python tools/ci.py` runs the same
+      # gate CI runs. The merge and slow tiers are for releases.
+      - id: pytest-research-tier
+        name: pytest (not slow, not merge)
+        entry: python -m pytest -q -m "not slow and not merge" -x
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

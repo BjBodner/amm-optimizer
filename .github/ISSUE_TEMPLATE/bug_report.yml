@@ -1,0 +1,25 @@
+name: Bug report
+description: Something crashes, returns a wrong result, or violates the budget or the box
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: A short script with a fixed `seed`, the dimension, the budget, the bounds and the configuration or preset you used.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Output of `python -c "import sys, numpy, scipy; print(sys.version, numpy.__version__, scipy.__version__)"`, the package version, and your operating system. State whether `OPENBLAS_NUM_THREADS` was set.
+    validations:
+      required: true

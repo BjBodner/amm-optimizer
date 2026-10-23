@@ -1,0 +1,20 @@
+{
+ "abl_no_crossover": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.9,variant.es_max_budget_per_dim=100,variant.covariance=rank_mu,variant.cov_rate=3,variant.cov_select=0.5,variant.crossover=none"
+ },
+ "abl_shared_width": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.9,variant.es_max_budget_per_dim=100,variant.covariance=rank_mu,variant.cov_rate=3,variant.cov_select=0.5,variant.width_mode=shared"
+ },
+ "fix_skip_starved": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.9,variant.es_max_budget_per_dim=100,variant.covariance=rank_mu,variant.cov_rate=3,variant.cov_select=0.5,variant.skip_starved=true"
+ },
+ "fix_ladder": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.9,variant.es_max_budget_per_dim=100,variant.covariance=rank_mu,variant.cov_rate=3,variant.cov_select=0.5,variant.width_mode=ladder"
+ },
+ "gauss_policy": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.9,variant.es_max_budget_per_dim=100,variant.noise=gaussian"
+ },
+ "gauss_diag_policy": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.9,variant.es_max_budget_per_dim=100,variant.noise=gaussian,variant.scale_learning=diagonal"
+ }
+}

@@ -1,0 +1,32 @@
+{
+ "base": {
+  "config": ""
+ },
+ "composite": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false"
+ },
+ "w3_es10": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.1"
+ },
+ "w3_es20": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.2"
+ },
+ "w3_es30": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.3"
+ },
+ "w3_es40": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.4"
+ },
+ "w3_es50": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.5"
+ },
+ "w3_es30_init2": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.3,variant.es_init_factor=2"
+ },
+ "w3_es30_init0": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.3,variant.es_init_factor=0"
+ },
+ "w3_es30_early6": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.3,variant.early_accept=true,variant.early_min=6"
+ }
+}

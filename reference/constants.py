@@ -1,0 +1,9 @@
+verbose = 1
+print_Cost = 0
+Total_Resources = 60
+Number_Of_Algorithms = 4
+Mass = 10
+Self_Spring_Constants = 10
+Interaction_Spring_Constants = 40
+Print_Two_Mode_Analytics = 0
+test_Optimization = 0

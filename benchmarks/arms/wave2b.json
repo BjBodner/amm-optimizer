@@ -1,0 +1,29 @@
+{
+ "base": {
+  "config": ""
+ },
+ "composite": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=12"
+ },
+ "w2_fixed8": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=8,variant.pool_max=8"
+ },
+ "w2_fixed12": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=12,variant.pool_max=12"
+ },
+ "w2_fixed16": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=16,variant.pool_max=16"
+ },
+ "w2_fixed24": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=24,variant.pool_max=24"
+ },
+ "w2_fixed12_credit": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=12,variant.pool_max=12,variant.allocation=credit"
+ },
+ "w2_fixed12_eq25": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=12,variant.pool_max=12,variant.sr_targets=0.25;0.25;0.25;0.25,variant.sr_widths=1;1;1;1"
+ },
+ "w2_max24_min8": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=8,variant.pool_max=24"
+ }
+}

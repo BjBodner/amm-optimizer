@@ -1,0 +1,5 @@
+{
+ "es11r_raw": {"solver": "es11r", "extra": ["--penalty", "raw"]},
+ "cma11r_raw": {"solver": "cma11r", "extra": ["--penalty", "raw"]},
+ "es11_raw": {"solver": "es11", "extra": ["--penalty", "raw"]}
+}

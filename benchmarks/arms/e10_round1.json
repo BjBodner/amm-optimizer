@@ -1,0 +1,12 @@
+{
+  "base": {"config": ""},
+  "sr2": {"config": "variant.amplitude_control=success_rate_targeted"},
+  "sr2_U": {"config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform"},
+  "sr2_F": {"config": "variant.amplitude_control=success_rate_targeted,variant.bounds=fold,variant.corner_clip=0.25"},
+  "sr2_P24": {"config": "variant.amplitude_control=success_rate_targeted,variant.pool_rule=budget,variant.pool_min=24"},
+  "sr2_P12": {"config": "variant.amplitude_control=success_rate_targeted,variant.pool_rule=budget,variant.pool_min=12"},
+  "sr2_N": {"config": "variant.amplitude_control=success_rate_targeted,variant.reevaluate_incumbent=false"},
+  "sr2_UFPN": {"config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=24,variant.reevaluate_incumbent=false"},
+  "sr_UFPN": {"config": "variant.amplitude_control=success_rate,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=24,variant.reevaluate_incumbent=false"},
+  "legacy_stack": {"config": "variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=24,variant.reevaluate_incumbent=false,variant.targeted_gate=any,variant.targeted_amplitude=loguniform,variant.reset_on_success=false"}
+}

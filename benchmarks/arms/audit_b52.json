@@ -1,0 +1,28 @@
+{
+ "qn12": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.9,variant.es_max_budget_per_dim=100,variant.covariance=rank_mu,variant.cov_rate=3,variant.cov_select=0.5,variant.es_kind=cma,variant.cma_handoff=0.2,iterations_per_hyperparameter_set=1000000,variant.cma_model=quadratic,variant.cma_active=true,variant.cma_warm_start=true,variant.cma_restart_rule=short,variant.cma_handoff_cap_per_dim=60,variant.cma_local=then_ipop,variant.cma_local_min_dim=2,variant.pop_gate_per_dim=100,variant.pop_active=true,variant.pop_lambda=fixed2,variant.cma_model_high=diagonal,variant.sep_probe=true,variant.nm_max_dim=2,variant.nm_stage=qnprefix30,variant.pop_switch_per_dim=150,variant.pop_switch_start=incumbent,variant.pop_protect=true,variant.pop_switch_min_dim=10,variant.es_kind=slsqplq10h,variant.es_lq_nonsep=true,variant.es_lq_min_budget_per_dim=100,variant.cma_probe_at_per_dim=30,variant.cma_probe_beta=1.3,variant.cma_probe_min_dim=5,variant.cma_local_nonsep=qn12",
+  "extra": [
+   "--instances",
+   "4-7",
+   "--seeds",
+   "2",
+   "--multipliers",
+   "300,1000",
+   "--dims",
+   "5,10,20"
+  ]
+ },
+ "qn12_d40": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.9,variant.es_max_budget_per_dim=100,variant.covariance=rank_mu,variant.cov_rate=3,variant.cov_select=0.5,variant.es_kind=cma,variant.cma_handoff=0.2,iterations_per_hyperparameter_set=1000000,variant.cma_model=quadratic,variant.cma_active=true,variant.cma_warm_start=true,variant.cma_restart_rule=short,variant.cma_handoff_cap_per_dim=60,variant.cma_local=then_ipop,variant.cma_local_min_dim=2,variant.pop_gate_per_dim=100,variant.pop_active=true,variant.pop_lambda=fixed2,variant.cma_model_high=diagonal,variant.sep_probe=true,variant.nm_max_dim=2,variant.nm_stage=qnprefix30,variant.pop_switch_per_dim=150,variant.pop_switch_start=incumbent,variant.pop_protect=true,variant.pop_switch_min_dim=10,variant.es_kind=slsqplq10h,variant.es_lq_nonsep=true,variant.es_lq_min_budget_per_dim=100,variant.cma_probe_at_per_dim=30,variant.cma_probe_beta=1.3,variant.cma_probe_min_dim=5,variant.cma_local_nonsep=qn12",
+  "extra": [
+   "--instances",
+   "4-7",
+   "--seeds",
+   "2",
+   "--multipliers",
+   "300,1000",
+   "--dims",
+   "40"
+  ]
+ }
+}

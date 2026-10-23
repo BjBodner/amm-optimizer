@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7 # let a new release age a week before it is proposed
+    groups:
+      actions:
+        patterns: ["*"]
+  # No pip updater on purpose: the dependency ranges in pyproject.toml are minimum
+  # supported versions of a library (as open as possible), and Dependabot would raise
+  # them to the newest release. Vulnerability alerts still arrive as Dependabot alerts.

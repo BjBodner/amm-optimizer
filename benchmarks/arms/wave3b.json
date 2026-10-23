@@ -1,0 +1,20 @@
+{
+ "base": {
+  "config": ""
+ },
+ "composite": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false"
+ },
+ "w3_es60": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.6"
+ },
+ "w3_es75": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.75"
+ },
+ "w3_es90": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.9"
+ },
+ "w3_es99": {
+  "config": "variant.amplitude_control=success_rate_targeted,variant.bounds=fold,variant.corner_clip=0.5,variant.pool_rule=budget,variant.pool_min=12,variant.reevaluate_incumbent=false,variant.es_phase=prefix,variant.es_fraction=0.99"
+ }
+}

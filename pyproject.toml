@@ -1,0 +1,85 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "amm-optimizer"
+version = "0.3.0"
+description = "Adaptive Multi Mode (AMM): budget-aware routing of derivative-free optimizers by online landscape probes (import amm_optimizer)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Benjy Bodner" }]
+keywords = ["black-box optimization", "derivative-free", "COCO", "BBOB", "CMA-ES", "algorithm selection"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Scientific/Engineering :: Mathematics",
+  "Typing :: Typed",
+]
+# SciPy: SLSQP, L-BFGS-B and Nelder-Mead stages of the research presets (c25 on),
+# and the lq2 surrogate. 1.16 ported SLSQP to C, which changed some exit statuses;
+# c32's fallback routes on them and was calibrated with 1.18. SciPy 1.16.0 fails 11
+# pinned tests (trajectories differ, two behavioural), so the floor is the version the
+# results were recorded with. SciPy 1.18 needs Python >= 3.12 and NumPy >= 2.0. Widen
+# only after a CI cell at the lower bound passes.
+dependencies = ["numpy>=2.0", "scipy>=1.18"]
+
+[project.urls]
+Homepage = "https://github.com/BjBodner/amm-optimizer"
+Source = "https://github.com/BjBodner/amm-optimizer"
+Issues = "https://github.com/BjBodner/amm-optimizer/issues"
+Changelog = "https://github.com/BjBodner/amm-optimizer/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov", "hypothesis", "ruff", "mypy", "coco-experiment"]
+bench = ["coco-experiment", "cocopp"]
+
+# The repository holds hundreds of MB of benchmark results; PyPI files may not exceed 100 MB.
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src", "/tests", "/reference", "/tools",
+  "/README.md", "/LICENSE", "/CHANGELOG.md", "/CITATION.cff", "/pyproject.toml", "/conftest.py",
+  "/docs/FREEZE_2026-10-22.md", "/docs/DEVIATIONS.md",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/amm_optimizer"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+  "slow: the full tier (nightly / release): every named config and recorded arm",
+  "merge: the merge tier, deselected in the research tier (-m \"not slow and not merge\")",
+  "snapshot: bit-exact or trajectory-pinned; valid only in the environment of tests/characterisation.json (skipped elsewhere, see tests/conftest.py)",
+]
+filterwarnings = ["error::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 88
+src = ["src", "tests"]
+extend-exclude = ["reference"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "SIM", "NPY"]
+
+[tool.ruff.lint.per-file-ignores]
+# The golden/parity tests drive the legacy global stream on purpose.
+"tests/golden/*" = ["NPY002"]
+"tests/test_parity.py" = ["NPY002"]
+"tests/test_minimize.py" = ["NPY002"]
+"tests/test_determinism.py" = ["NPY002"]
+"tests/test_rng_ledger.py" = ["NPY002"]
+"benchmarks/*" = ["NPY002", "E402"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src/amm_optimizer"]

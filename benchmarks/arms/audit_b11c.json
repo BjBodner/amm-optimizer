@@ -1,0 +1,50 @@
+{
+ "cma_ipop": {
+  "solver": "cma_ipop",
+  "config": "",
+  "extra": [
+   "--instances",
+   "4-7",
+   "--seeds",
+   "2",
+   "--dims",
+   "5,10,20",
+   "--multipliers",
+   "300,1000",
+   "--penalty",
+   "raw"
+  ]
+ },
+ "popcma_ipop": {
+  "solver": "popcma_ipop",
+  "config": "",
+  "extra": [
+   "--instances",
+   "4-7",
+   "--seeds",
+   "2",
+   "--dims",
+   "5,10,20",
+   "--multipliers",
+   "300,1000",
+   "--penalty",
+   "raw"
+  ]
+ },
+ "popcma_ipop_active": {
+  "solver": "popcma_ipop_active",
+  "config": "",
+  "extra": [
+   "--instances",
+   "4-7",
+   "--seeds",
+   "2",
+   "--dims",
+   "5,10,20",
+   "--multipliers",
+   "300,1000",
+   "--penalty",
+   "raw"
+  ]
+ }
+}
