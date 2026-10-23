@@ -11,7 +11,20 @@ import Stat from '../../components/Stat.astro';
 import TrustStrip from '../../components/TrustStrip.astro';
 import Figure from '../../components/Figure.astro';
 import Legend from '../../components/Legend.astro';
+import RaceHero from '../../components/RaceHero.astro';
 import ft1Ecdf from '../../assets/figures/ft1_ecdf_by_dim.png';
+
+<RaceHero />
+
+<nav class="amm-links not-content" aria-label="On this site">
+  <a class="amm-link-pill primary" href="/get-started/">Get started</a>
+  <a class="amm-link-pill" href="/how-it-works/">How it works</a>
+  <a class="amm-link-pill" href="/results/">Results</a>
+  <a class="amm-link-pill" href="/limits/">Where it loses</a>
+  <a class="amm-link-pill" href="/reproduce/">Reproduce</a>
+  <a class="amm-link-pill" href="/paper/">Paper and cite</a>
+  <a class="amm-link-pill" href="/atlas/">Landscape Atlas</a>
+</nav>
 
 <div class="amm-hero">
   <p class="amm-eyebrow">Adaptive Multi Mode · derivative-free black-box optimization</p>
@@ -23,11 +36,6 @@ import ft1Ecdf from '../../assets/figures/ft1_ecdf_by_dim.png';
     <code id="amm-install-cmd">pip install amm-optimizer</code>
     <button type="button" id="amm-copy" aria-label="Copy the install command">Copy</button>
     <span class="amm-note">PyPI: <Claim id="release.pypi" />.</span>
-  </div>
-  <div class="amm-cta">
-    <a class="amm-btn primary" href="/get-started/">Get started</a>
-    <a class="amm-btn" href="/results/">See the results</a>
-    <a class="amm-btn" href="/limits/">Where it loses</a>
   </div>
 </div>
 

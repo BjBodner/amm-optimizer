@@ -1,0 +1,65 @@
+/* The 24 bbob functions: group names, pill categories, names, pills and one-line descriptions.
+   Shared by the Atlas and the Optimizer Race. Sources: the bbob function definitions
+   (Hansen, Finck, Ros, Auger 2009, INRIA RR-6829). */
+window.BBOB_META = (() => {
+"use strict";
+const GROUPS = {
+  1: ["Separable", "Separable functions"],
+  2: ["Low or moderate conditioning", "Functions with low or moderate conditioning"],
+  3: ["High conditioning, unimodal", "Unimodal functions with high conditioning"],
+  4: ["Multimodal, adequate structure", "Multimodal functions with adequate global structure"],
+  5: ["Multimodal, weak structure", "Multimodal functions with weak global structure"],
+};
+const CATS = { mod: "Modality", sep: "Separability", loc: "Local surface", cond: "Conditioning", glob: "Global structure" };
+const META = [
+  { name: "Sphere", group: 1, pills: [["mod", "Unimodal"], ["sep", "Separable"], ["loc", "Smooth"], ["cond", "Conditioning 1"], ["glob", "Isotropic"]],
+    text: "The easiest case: a round bowl that looks the same in every direction." },
+  { name: "Separable Ellipsoidal", group: 1, pills: [["mod", "Unimodal"], ["sep", "Separable"], ["loc", "Smooth"], ["cond", "Conditioning ≈ 10<sup>6</sup>"]],
+    text: "A bowl whose curvature differs a million-fold between the two axes, with small smooth irregularities." },
+  { name: "Rastrigin", group: 1, pills: [["mod", "Highly multimodal"], ["sep", "Separable"], ["loc", "Regular local optima"], ["glob", "Adequate global structure"], ["cond", "Conditioning ≈ 10"]],
+    text: "An egg-crate: a regular grid of about 10<sup>D</sup> local minima laid over a bowl." },
+  { name: "Büche-Rastrigin", group: 1, pills: [["mod", "Highly multimodal"], ["sep", "Separable"], ["loc", "Regular local optima"], ["glob", "Asymmetric"], ["cond", "Conditioning ≈ 10"]],
+    text: "Rastrigin with the odd-indexed coordinates skewed, so the egg-crate is lopsided instead of symmetric." },
+  { name: "Linear Slope", group: 1, pills: [["mod", "Unimodal"], ["sep", "Separable"], ["loc", "Linear"], ["glob", "Optimum on the boundary"]],
+    text: "A tilted plane. The best point lies on the edge of the domain, in the corner the slope runs down to." },
+  { name: "Attractive Sector", group: 2, pills: [["mod", "Unimodal"], ["sep", "Non-separable"], ["glob", "Highly asymmetric"], ["cond", "Conditioning ≈ 10"]],
+    text: "Only one cone-shaped sector around the optimum slopes gently; outside it the function rises a hundred times more steeply." },
+  { name: "Step Ellipsoidal", group: 2, pills: [["mod", "Unimodal"], ["sep", "Non-separable"], ["loc", "Plateaus"], ["cond", "Conditioning ≈ 100"]],
+    text: "An ellipsoid rounded into terraces: the gradient is zero almost everywhere except at the step edges." },
+  { name: "Rosenbrock, original", group: 2, pills: [["mod", "Unimodal in 2-D"], ["sep", "Non-separable"], ["loc", "Smooth"], ["glob", "Curved valley"]],
+    text: "Rosenbrock's banana: a long, curved, nearly flat valley that leads slowly to the minimum." },
+  { name: "Rosenbrock, rotated", group: 2, pills: [["mod", "Unimodal in 2-D"], ["sep", "Non-separable"], ["loc", "Smooth"], ["glob", "Curved valley"]],
+    text: "The same banana-shaped valley, rotated so that it no longer follows the coordinate axes." },
+  { name: "Ellipsoidal", group: 3, pills: [["mod", "Unimodal"], ["sep", "Non-separable"], ["loc", "Smooth"], ["cond", "Conditioning ≈ 10<sup>6</sup>"]],
+    text: "The ill-conditioned bowl of f2, rotated, so the stretched direction is no longer an axis." },
+  { name: "Discus", group: 3, pills: [["mod", "Unimodal"], ["sep", "Non-separable"], ["loc", "Smooth"], ["cond", "Conditioning ≈ 10<sup>6</sup>"], ["glob", "One sensitive direction"]],
+    text: "One direction is a thousand times more sensitive than every other." },
+  { name: "Bent Cigar", group: 3, pills: [["mod", "Unimodal"], ["sep", "Non-separable"], ["loc", "Smooth"], ["cond", "Conditioning ≈ 10<sup>6</sup>"], ["glob", "Narrow ridge"]],
+    text: "A single long, very narrow valley that has to be followed to the minimum, bent away from a pure quadratic shape." },
+  { name: "Sharp Ridge", group: 3, pills: [["mod", "Unimodal"], ["sep", "Non-separable"], ["loc", "Non-smooth"], ["glob", "Sharp ridge"]],
+    text: "Like the bent cigar, but the floor of the valley is a sharp crease where the gradient does not point to the optimum." },
+  { name: "Different Powers", group: 3, pills: [["mod", "Unimodal"], ["sep", "Non-separable"], ["cond", "Conditioning grows near the optimum"]],
+    text: "Each coordinate enters with a different exponent, so the relative sensitivities change as the search closes in." },
+  { name: "Rastrigin, rotated", group: 4, pills: [["mod", "Highly multimodal"], ["sep", "Non-separable"], ["loc", "Regular local optima"], ["glob", "Adequate global structure"], ["cond", "Conditioning ≈ 10"]],
+    text: "Rastrigin rotated and made irregular, so its lattice of local minima no longer lines up with the axes." },
+  { name: "Weierstrass", group: 4, pills: [["mod", "Highly multimodal"], ["sep", "Non-separable"], ["loc", "Rugged"], ["glob", "Repetitive"], ["cond", "Conditioning ≈ 100"]],
+    text: "A sum of cosines over many frequencies: rough at every scale, repetitive, with no unique global minimum. The 0.05 grid hides the finest ripples." },
+  { name: "Schaffer's F7", group: 4, pills: [["mod", "Highly multimodal"], ["sep", "Non-separable"], ["loc", "Ripples"], ["glob", "Adequate global structure"], ["cond", "Conditioning ≈ 10"]],
+    text: "Ripples whose frequency and amplitude change with the distance from the optimum, on an asymmetric base." },
+  { name: "Schaffer's F7, ill-conditioned", group: 4, pills: [["mod", "Highly multimodal"], ["sep", "Non-separable"], ["loc", "Ripples"], ["glob", "Adequate global structure"], ["cond", "Conditioning ≈ 1000"]],
+    text: "Schaffer's F7 stretched to a conditioning of about 1000." },
+  { name: "Composite Griewank-Rosenbrock", group: 4, pills: [["mod", "Highly multimodal"], ["sep", "Non-separable"], ["loc", "Bumpy"], ["glob", "Adequate global structure"]],
+    text: "Griewank's ripples on top of Rosenbrock's valley: the large-scale shape is a valley, the small-scale shape is bumpy." },
+  { name: "Schwefel x·sin(x)", group: 5, pills: [["mod", "Multimodal"], ["sep", "Non-separable"], ["loc", "Smooth"], ["glob", "Deceptive"], ["glob", "Weak global structure"]],
+    text: "Outside a box the function is a steep penalty; inside it, the most prominent 2<sup>D</sup> minima sit near the box corners, far from one another, which misleads local search." },
+  { name: "Gallagher's 101 Peaks", group: 5, pills: [["mod", "Multimodal · 101 peaks"], ["sep", "Non-separable"], ["loc", "Smooth basins"], ["glob", "Weak global structure"], ["cond", "Conditioning ≈ 30"]],
+    text: "101 Gaussian peaks with random positions and heights: there is no global trend to follow." },
+  { name: "Gallagher's 21 Peaks", group: 5, pills: [["mod", "Multimodal · 21 peaks"], ["sep", "Non-separable"], ["loc", "Smooth basins"], ["glob", "Weak global structure"], ["cond", "Conditioning ≈ 1000"]],
+    text: "21 sharper, more stretched Gaussian peaks with random positions and heights." },
+  { name: "Katsuura", group: 5, pills: [["mod", "Highly multimodal"], ["sep", "Non-separable"], ["loc", "Rugged"], ["glob", "Repetitive"], ["glob", "Weak global structure"]],
+    text: "A product of fractal sawtooth terms: rugged at every scale, with more than 10<sup>D</sup> global minima. The 0.05 grid hides the finest structure." },
+  { name: "Lunacek bi-Rastrigin", group: 5, pills: [["mod", "Highly multimodal"], ["sep", "Non-separable"], ["glob", "Deceptive funnels"], ["glob", "Weak global structure"], ["cond", "Conditioning ≈ 100"]],
+    text: "Two Rastrigin funnels. The decoy funnel covers about 70% of the domain; the global minimum is in the other one." },
+];
+return { GROUPS, CATS, META };
+})();

@@ -22,6 +22,7 @@
 	--m-tpe: var(--oi-blue);
 	--m-ngopt: var(--oi-orange);
 	--m-hcma: #666666;
+	--m-nm: var(--oi-yellow); /* Nelder-Mead, in the optimizer race only */
 
 	/* Claim status */
 	--st-dev: var(--oi-orange);
@@ -177,6 +178,43 @@
 .amm-note {
 	font-size: 0.82rem;
 	color: var(--sl-color-gray-3);
+}
+
+/* ---------- Page links under the race ---------- */
+.amm-links {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.55rem;
+	margin: 0 0 1.6rem;
+	font-family: var(--sl-font);
+}
+.amm-link-pill {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.42rem 1rem;
+	border-radius: 999px;
+	border: 1px solid var(--sl-color-gray-4);
+	color: var(--sl-color-white);
+	font-size: 0.9rem;
+	font-weight: 600;
+	text-decoration: none;
+	white-space: nowrap;
+}
+.amm-link-pill:hover {
+	background: var(--sl-color-gray-6);
+}
+.amm-link-pill.primary {
+	background: var(--sl-color-accent);
+	border-color: var(--sl-color-accent);
+	color: #fff;
+}
+:root:not([data-theme='light']) .amm-link-pill.primary {
+	color: #06121b;
+}
+.amm-link-pill:focus-visible {
+	outline: 3px solid var(--sl-color-accent-high);
+	outline-offset: 2px;
 }
 
 /* ---------- Stat row ---------- */

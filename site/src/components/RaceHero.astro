@@ -1,0 +1,113 @@
+---
+// Optimizer Race: the home page's centre piece. Recorded 2-D runs of six optimizers (AMM, HCMA,
+// SLSQP, Nelder-Mead, NGOpt, CMA-BIPOP) replayed together on the bbob landscapes, with a race
+// track of each one's best f - f_opt and the finish line at 1e-8. Code and data are copied from the
+// bbob-landscapes repository into public/race/ by tools/sync_race.py (see RACE_PRD.md).
+// Without JavaScript the visitor sees a static picture of one finished race.
+import { withBase } from '../lib/base';
+import { SHOW_AUTHOR } from '../lib/flags';
+
+const base = withBase('/race/');
+const note = `The <a href="${withBase('/results/')}">Results page</a> has the 600-cell comparison.`;
+// The source link names the author's account, so it follows the author switch.
+const source = SHOW_AUTHOR ? 'https://github.com/BjBodner/bbob-landscapes' : '';
+---
+
+<section class="amm-race not-content" aria-label="Optimizer race on the bbob functions in two dimensions">
+	<div class="amm-race-stage" id="amm-race" data-base={base} data-note={note} data-source={source}>
+		<noscript>
+			<figure class="amm-race-poster">
+				<img
+					src={withBase('/race/poster.png')}
+					width="1280"
+					height="800"
+					alt="The optimizer race on f8, Rosenbrock, in two dimensions: a grey landscape with the last samples of AMM, SLSQP and HCMA drawn as coloured crosses and their best points as rings, and a race track above it on which SLSQP has crossed the finish line at 10 to the minus 8."
+				/>
+				<figcaption>Turn on JavaScript to watch the optimizers race.</figcaption>
+			</figure>
+		</noscript>
+	</div>
+</section>
+
+<link rel="stylesheet" href={withBase('/race/race.css')} />
+<script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script is:inline src={withBase('/race/bbob-meta.js')}></script>
+<script is:inline src={withBase('/race/landscape.js')}></script>
+<script is:inline src={withBase('/race/race.js')}></script>
+<script is:inline>
+	(() => {
+		// 100vw counts the scrollbar; the window's inner width without it is measured instead.
+		const fit = () => document.documentElement.style.setProperty('--amm-vw', document.documentElement.clientWidth + 'px');
+		fit();
+		if (window.ResizeObserver) new ResizeObserver(fit).observe(document.documentElement);   // also when a scrollbar appears
+		else addEventListener('resize', fit);
+		const el = document.getElementById('amm-race');
+		if (!el || !window.BBOBRace) return;
+		window.BBOBRace.mount(el, {
+			base: el.dataset.base,
+			keys: 'local',
+			note: el.dataset.note,
+			source: el.dataset.source || undefined,
+		});
+	})();
+</script>
+
+<style is:global>
+	/* Full width of the window and 80% of its height, whatever column the page puts it in. */
+	.amm-race {
+		position: relative;
+		width: var(--amm-vw, 100vw);
+		margin-inline: calc(50% - var(--amm-vw, 100vw) / 2);
+		margin-block: 0 1.25rem;
+		border-bottom: 1px solid var(--sl-color-gray-5);
+	}
+	/* The race sits right under the site header: the page title stays in the page for screen
+	   readers and search engines, but takes no room. */
+	main:has(.amm-race) .content-panel:has(h1#_top) {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		padding: 0;
+		border: 0;
+		white-space: nowrap;
+	}
+	main:has(.amm-race) .content-panel:has(.amm-race) {
+		padding-top: 0;
+		border-top: 0;
+	}
+	.amm-race-stage {
+		height: 80vh;
+		height: 80svh;
+		min-height: 34rem;
+	}
+	.amm-race .bbob-race {
+		--font-ui: var(--sl-font);
+		--font-data: var(--sl-font-mono);
+		--font-math: var(--amm-serif);
+		--m-nm: var(--oi-yellow);
+	}
+	.amm-race .bbob-race h2,
+	.amm-race .bbob-race h3 {
+		margin: 0;
+		border: 0;
+		padding: 0;
+	}
+	.amm-race-poster {
+		margin: 0;
+		padding: 1rem;
+	}
+	.amm-race-poster img {
+		width: 100%;
+		height: auto;
+		max-height: 72vh;
+		object-fit: contain;
+	}
+	@media (max-width: 760px) {
+		.amm-race-stage {
+			height: auto;
+			min-height: 0;
+		}
+	}
+</style>
