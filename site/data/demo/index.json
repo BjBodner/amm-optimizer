@@ -1,0 +1,29 @@
+[
+ {
+  "id": "f8",
+  "file": "f8_d2_b600_s1.json",
+  "poster": "f8_d2_b600_s1.svg",
+  "title": "f8 Rosenbrock",
+  "note": "smooth, a narrow curved valley",
+  "D": 2,
+  "budget": 600
+ },
+ {
+  "id": "f15",
+  "file": "f15_d2_b600_s1.json",
+  "poster": "f15_d2_b600_s1.svg",
+  "title": "f15 Rastrigin",
+  "note": "rugged, many regularly placed local optima",
+  "D": 2,
+  "budget": 600
+ },
+ {
+  "id": "f21",
+  "file": "f21_d2_b600_s1.json",
+  "poster": "f21_d2_b600_s1.svg",
+  "title": "f21 Gallagher 101-me",
+  "note": "several smooth basins of different depth",
+  "D": 2,
+  "budget": 600
+ }
+]

@@ -1,0 +1,443 @@
+---
+// Interactive routing map: dimension (rows) by budget multiplier (columns).
+// Data: data/F2_routing_map.json, a dry run of the configuration's own control flow with forced
+// probe outcomes (paper_draft_v1/FIGURES.md, F2). The map is for preset c43, not for the frozen c46.
+// Without JavaScript the grid is a table of links to the rows of the text table below it.
+// With JavaScript: hover, focus or tap a cell to see its default stage list and the routes that
+// are possible there; arrow keys move between cells.
+import map from '../../data/F2_routing_map.json';
+import { withBase } from '../lib/base';
+
+interface Stage {
+	stage: string;
+	[k: string]: unknown;
+}
+interface Cell {
+	dim: number;
+	multiplier: number;
+	first: string;
+	path: string;
+	family: string;
+	routes: Record<string, boolean>;
+	default: Stage[];
+	after_separable_step: Stage[];
+}
+const cells = map.cells as unknown as Cell[];
+const dims = [...new Set(cells.map((c) => c.dim))].sort((a, b) => a - b);
+const mults = [...new Set(cells.map((c) => c.multiplier))].sort((a, b) => a - b);
+const at = (d: number, m: number) => cells.find((c) => c.dim === d && c.multiplier === m)!;
+
+// Default-path families of the data. letter + pattern + colour: never colour alone.
+const families: Record<string, { letter: string; label: string; colour: string; cls: string }> = {
+	cobyqa: { letter: 'C', label: 'COBYQA spends the whole budget', colour: 'var(--oi-purple)', cls: 'f-c' },
+	'prefix-descent': { letter: 'D', label: 'prefix: one SLSQP descent, then (1+1)-CMA-ES', colour: 'var(--oi-yellow)', cls: 'f-d' },
+	'prefix-beta': { letter: 'B', label: 'prefix with the curvature probe (SLSQP or CMA-ES)', colour: 'var(--oi-sky)', cls: 'f-b' },
+	'prefix-nm': { letter: 'N', label: 'prefix with Nelder–Mead (D = 2)', colour: 'var(--oi-green)', cls: 'f-n' },
+	'atm-local': { letter: 'L', label: 'ATM stage, STEP, then local tests (D ≥ 5)', colour: 'var(--oi-orange)', cls: 'f-l' },
+	'atm-finish': { letter: 'F', label: 'ATM stage, STEP, then the finisher (D = 2–3)', colour: 'var(--oi-vermillion)', cls: 'f-f' },
+};
+const firstShort: Record<string, string> = { COBYQA: 'COBYQA', prefix: 'prefix', 'pair test': 'pair', 'basin reading': 'basin' };
+const firstLong: Record<string, string> = {
+	COBYQA: 'COBYQA (whole-budget gate)',
+	prefix: 'the prefix',
+	'pair test': 'the pair test',
+	'basin reading': 'the basin reading',
+};
+
+const stageText = (s: Stage, c: Cell): string => {
+	const ev = s.evaluations as number | null | undefined;
+	switch (s.stage) {
+		case 'COBYQA':
+			return 'restarted COBYQA, whole budget';
+		case 'pair test':
+			return `pair test, ${3 * c.dim + 1} evaluations (3D+1); default reading: not separable`;
+		case 'basin reading':
+			return `basin reading: Sobol design and a local reading; several smooth basins go to MLSL, ${
+				(s.descents as number) > 0 ? 'one smooth basin gets one SLSQP descent' : 'no descent at this budget'
+			}`;
+		case 'SLSQP descent':
+			return `SLSQP descent, ${s.count} (default path: one smooth basin)`;
+		case 'prefix': {
+			const kind = s.kind as string;
+			const step = (s.step_share as number) > 0 ? 'STEP on half of the evaluations left; ' : '';
+			const body: Record<string, string> = {
+				slsqpdes: 'one SLSQP descent from the design’s best point, then (1+1)-CMA-ES; no probe',
+				slsqplq:
+					s.rugged_kind === 'lq2'
+						? 'curvature probe β (24 evaluations): smooth gives restarted SLSQP, rugged gives lq2 populations'
+						: 'curvature probe β (24 evaluations): smooth gives restarted SLSQP, rugged gives (1+1)-CMA-ES',
+				slsqplqc: 'curvature probe β with 2 directions (12 evaluations): smooth gives restarted SLSQP, rugged gives (1+1)-CMA-ES',
+				slsqpnm: 'one SLSQP descent, then Nelder–Mead restarts',
+				nm: 'Nelder–Mead restarts',
+			};
+			return `prefix, whole budget (${ev} evaluations): uniform design; ${step}${body[kind] ?? kind}`;
+		}
+		case 'ATM sampler':
+			return `ATM sampler, ${ev} evaluations (a fifth of the budget; at most 60D from D = 10)`;
+		case 'STEP':
+			return `STEP, ${ev} evaluations, then ${
+				s.check === 'stall' ? 'a two-axis separability check once STEP stalls (from 1000D)' : 'a one-axis separability check'
+			}`;
+		case 'local tests':
+			return 'local tests (non-separable reading only): plateau probe, then curvature probe β; plateau, rugged and smooth readings each pick an engine';
+		case 'finisher':
+			return 'finisher: restarted (1+1)-CMA-ES, IPOP-aCMA-ES on stalls';
+		default:
+			return s.stage;
+	}
+};
+const routeNames: [string, string][] = [
+	['STEP restarts', 'the pair test reads separable'],
+	['coordinate search', 'the pair test reads a chain and the band check passes'],
+	['MLSL', 'the basin reading finds several basins'],
+];
+const sepDiffers = (c: Cell) => JSON.stringify(c.default) !== JSON.stringify(c.after_separable_step);
+const id = (c: Cell) => `rm-${c.dim}-${c.multiplier}`;
+const budget = (c: Cell) => c.dim * c.multiplier;
+const famOf = (c: Cell) => families[c.family] ?? { letter: '?', label: c.family, colour: 'var(--oi-black)', cls: 'f-c' };
+const ariaLabel = (c: Cell) =>
+	`D = ${c.dim}, budget ${c.multiplier} times D, ${budget(c)} evaluations. Runs first: ${firstLong[c.first] ?? c.first}. Default path: ${famOf(c).label}.`;
+---
+
+<div class="rm" data-rm>
+	<div class="rm-scroll">
+		<table class="rm-grid">
+			<caption>
+				Routing map of preset c43. Rows: dimension D. Columns: budget as a multiple of D. Each cell shows what runs first and, by
+				letter, pattern and colour, the default path.
+			</caption>
+			<thead>
+				<tr>
+					<th scope="col" class="rm-corner"><span>D \ B</span></th>
+					{mults.map((m) => (<th scope="col">{m}&times;D</th>))}
+				</tr>
+			</thead>
+			<tbody>
+				{dims.map((d) => (
+					<tr>
+						<th scope="row">D = {d}</th>
+						{mults.map((m) => {
+							const c = at(d, m);
+							const f = famOf(c);
+							return (
+								<td>
+									<a
+										class={`rm-cell ${f.cls}`}
+										href={`#${id(c)}`}
+										data-cell={id(c)}
+										aria-label={ariaLabel(c)}
+										style={`--fam:${f.colour}`}
+									>
+										<span class="rm-first">{firstShort[c.first] ?? c.first}</span>
+										<span class="rm-badge" aria-hidden="true">{f.letter}</span>
+									</a>
+								</td>
+							);
+						})}
+					</tr>
+				))}
+			</tbody>
+		</table>
+	</div>
+
+	<ul class="rm-legend" aria-label="Default path of each cell: letter, pattern and colour">
+		{Object.entries(families).map(([key, f]) => (
+			<li>
+				<span class={`rm-swatch ${f.cls}`} style={`--fam:${f.colour}`} aria-hidden="true">{f.letter}</span>
+				{f.label}
+			</li>
+		))}
+	</ul>
+	<p class="rm-note">
+		The word in a cell is the first stage that spends evaluations: <strong>COBYQA</strong>, the <strong>prefix</strong>, the <strong>pair</strong> test or the <strong>basin</strong> reading. The colours mark paths, not methods.
+	</p>
+
+	<div class="rm-panel" data-panel aria-live="polite" hidden>
+		<p class="rm-hint">Hover, focus or tap a cell for its default stage list. Arrow keys move between cells.</p>
+	</div>
+
+	<details class="rm-text" open>
+		<summary>Text version: all {cells.length} cells</summary>
+		<div class="rm-scroll">
+			<table class="rm-table">
+				<caption>Default stage list and possible whole-budget routes of every cell, in the order a run meets them.</caption>
+				<thead>
+					<tr><th scope="col">D</th><th scope="col">Budget</th><th scope="col">Default stages (no route fires)</th><th scope="col">Whole-budget routes possible here</th></tr>
+				</thead>
+				<tbody>
+					{cells.map((c) => (
+						<tr id={id(c)} data-row={id(c)}>
+							<th scope="row">{c.dim}</th>
+							<td>{c.multiplier}&times;D = {budget(c)}</td>
+							<td>
+								<ol>
+									{c.default.map((s) => (<li>{stageText(s, c)}</li>))}
+								</ol>
+								{sepDiffers(c) && (
+									<p class="rm-sep">If STEP&rsquo;s separability check reads separable, the local tests are skipped and the finisher follows.</p>
+								)}
+							</td>
+							<td>
+								<ul data-routes>
+									{routeNames.map(([name, cond]) => (
+										<li data-on={String(c.routes[name])}>
+											{name}: {c.routes[name] ? `possible, if ${cond}` : 'not available'}
+										</li>
+									))}
+								</ul>
+							</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
+		</div>
+	</details>
+	<p class="rm-prov">
+		Source: dry run of the configuration&rsquo;s own control flow with the probe outcomes forced, configuration <code>c{map.version.replace(/^c/, '')}</code>,
+		hash <code>{map.config_hash}</code>. Evaluation counts are the dry run&rsquo;s allocations.
+	</p>
+</div>
+
+<style is:global>
+	.rm {
+		font-family: var(--sl-font);
+		font-size: 0.86rem;
+		margin: 1.4rem 0;
+	}
+	.rm-scroll {
+		overflow-x: auto;
+	}
+	.rm .rm-grid {
+		display: table;
+		border-collapse: separate;
+		border-spacing: 3px;
+		width: 100%;
+		max-width: 46rem;
+		table-layout: fixed;
+		margin: 0;
+	}
+	.rm-grid caption,
+	.rm-table caption {
+		caption-side: top;
+		text-align: left;
+		font-size: 0.82rem;
+		color: var(--sl-color-gray-3);
+		padding-bottom: 0.4rem;
+	}
+	.rm-grid th,
+	.rm-grid td {
+		padding: 0;
+		border: 0;
+		background: none;
+		text-align: center;
+	}
+	.rm-grid thead th {
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: var(--sl-color-gray-2);
+		padding: 0 0 0.15rem;
+	}
+	.rm-grid tbody th {
+		font-size: 0.72rem;
+		font-weight: 600;
+		text-align: right;
+		padding-right: 0.3rem;
+		width: 3.3rem;
+		white-space: nowrap;
+		color: var(--sl-color-gray-2);
+	}
+	.rm-corner {
+		width: 3.3rem;
+	}
+	.rm-corner span {
+		font-weight: 400;
+		font-size: 0.66rem;
+	}
+	/* a cell: tinted by the path colour, with a pattern per path and a letter badge */
+	.rm-cell {
+		--tint: color-mix(in srgb, var(--fam) 34%, var(--sl-color-black));
+		--ink: color-mix(in srgb, var(--fam) 75%, var(--sl-color-white));
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 2.9rem;
+		padding: 0.2rem 0.15rem;
+		border: 2px solid var(--ink);
+		border-radius: 6px;
+		background-color: var(--tint);
+		color: var(--sl-color-white);
+		text-decoration: none;
+		font-size: 0.68rem;
+		font-weight: 700;
+		line-height: 1.1;
+		overflow-wrap: anywhere;
+	}
+	.rm-first {
+		position: relative;
+		z-index: 1;
+		background: color-mix(in srgb, var(--sl-color-black) 55%, transparent);
+		border-radius: 3px;
+		padding: 0.05rem 0.2rem;
+	}
+	.rm-badge {
+		position: absolute;
+		right: 2px;
+		bottom: 1px;
+		font-size: 0.6rem;
+		font-weight: 800;
+		line-height: 1;
+		z-index: 1;
+		background: var(--sl-color-white);
+		color: var(--sl-color-black);
+		border-radius: 3px;
+		padding: 0.08rem 0.18rem;
+	}
+	.f-c {
+		border-style: solid;
+	}
+	.f-d {
+		background-image: repeating-linear-gradient(45deg, color-mix(in srgb, var(--fam) 70%, transparent) 0 2px, transparent 2px 7px);
+		border-style: solid;
+	}
+	.f-b {
+		background-image: radial-gradient(color-mix(in srgb, var(--fam) 80%, transparent) 1.3px, transparent 1.8px);
+		background-size: 7px 7px;
+		border-style: dotted;
+	}
+	.f-n {
+		background-image:
+			repeating-linear-gradient(45deg, color-mix(in srgb, var(--fam) 70%, transparent) 0 1.5px, transparent 1.5px 7px),
+			repeating-linear-gradient(-45deg, color-mix(in srgb, var(--fam) 70%, transparent) 0 1.5px, transparent 1.5px 7px);
+		border-style: solid;
+	}
+	.f-l {
+		background-image: repeating-linear-gradient(0deg, color-mix(in srgb, var(--fam) 70%, transparent) 0 2px, transparent 2px 6px);
+		border-style: dashed;
+	}
+	.f-f {
+		background-image: repeating-linear-gradient(90deg, color-mix(in srgb, var(--fam) 70%, transparent) 0 2px, transparent 2px 6px);
+		border-style: double;
+		border-width: 4px;
+	}
+	.rm-cell:hover,
+	.rm-cell[aria-current='true'] {
+		outline: 2px solid var(--sl-color-white);
+		outline-offset: 1px;
+	}
+	.rm-cell:focus-visible {
+		outline: 3px solid var(--sl-color-accent-high);
+		outline-offset: 2px;
+	}
+	.rm-legend {
+		list-style: none;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem 1rem;
+		padding: 0;
+		margin: 0.8rem 0 0.3rem;
+		font-size: 0.78rem;
+	}
+	.rm-legend li {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin: 0;
+	}
+	.rm-swatch {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.6rem;
+		height: 1.3rem;
+		border-radius: 4px;
+		border: 2px solid color-mix(in srgb, var(--fam) 75%, var(--sl-color-white));
+		background-color: color-mix(in srgb, var(--fam) 34%, var(--sl-color-black));
+		font-size: 0.66rem;
+		font-weight: 800;
+		color: var(--sl-color-white);
+	}
+	.rm-swatch.f-f {
+		border-width: 3px;
+	}
+	.rm-note,
+	.rm-prov {
+		font-size: 0.8rem;
+		color: var(--sl-color-gray-3);
+		margin: 0.4rem 0;
+	}
+	.rm-panel {
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 8px;
+		padding: 0.7rem 0.9rem;
+		margin: 0.8rem 0;
+		min-height: 9rem;
+	}
+	.rm-panel h4 {
+		margin: 0 0 0.3rem;
+		font-size: 0.95rem;
+	}
+	.rm-panel ol,
+	.rm-panel ul,
+	.rm-table ol,
+	.rm-table ul {
+		margin: 0.2rem 0 0.4rem;
+		padding-left: 1.2rem;
+	}
+	.rm-panel li,
+	.rm-table li {
+		margin: 0.15rem 0;
+		max-width: none;
+	}
+	.rm-hint {
+		margin: 0;
+		color: var(--sl-color-gray-3);
+	}
+	.rm-sep,
+	.rm-panel .rm-sep {
+		margin: 0.2rem 0;
+		font-size: 0.8rem;
+		color: var(--sl-color-gray-2);
+	}
+	li[data-on='false'] {
+		color: var(--sl-color-gray-3);
+	}
+	.rm .rm-table {
+		display: table;
+		width: 100%;
+		font-size: 0.78rem;
+		min-width: 34rem;
+	}
+	.rm-table th,
+	.rm-table td {
+		vertical-align: top;
+		padding: 0.4rem 0.5rem;
+	}
+	.rm-table tr:target {
+		outline: 3px solid var(--sl-color-accent-high);
+	}
+	.rm-text summary {
+		cursor: pointer;
+		padding: 0.5rem 0;
+		min-height: 1.5rem;
+		color: var(--sl-color-accent-high);
+	}
+	@media (max-width: 30rem) {
+		.rm-grid tbody th {
+			width: 2.6rem;
+			font-size: 0.64rem;
+		}
+		.rm-corner {
+			width: 2.6rem;
+		}
+		.rm-cell {
+			font-size: 0.55rem;
+			min-height: 2.7rem;
+		}
+		.rm-grid {
+			border-spacing: 2px;
+		}
+	}
+</style>
+
+<script is:inline src={withBase("/demo/routing-map.js")}></script>

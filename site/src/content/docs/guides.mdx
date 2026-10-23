@@ -1,0 +1,153 @@
+---
+title: Guides
+description: "Practical notes on using AMM: choosing a budget, setting bounds, seeds and restarts, parallel evaluation, wrapping your objective, and what to check when something goes wrong."
+---
+
+import Claim from '../../components/Claim.astro';
+
+Every statement here is taken from the code or documentation of version <Claim id="pkg.version_public" /> in the public
+repository (<Claim id="repo.public_url" />, commit <Claim id="repo.commit_public" />), or from a small test run on the code of the time and labelled as such.
+The examples use `import amm_optimizer` and pass `config=amm_optimizer.presets.get("c46")`
+explicitly, because the default configuration of `minimize` is <Claim id="pkg.default_config" />. See [Get started](/get-started/).
+
+## Choosing budget and dimension
+
+AMM needs to know the budget in advance, because it uses it to decide what to run: which engines,
+for how long, and when to hand over. The dimension is the length of `x0`.
+
+- **Think in multiples of D.** The benchmarks use 10, 30, 100, 300 and 1000 x D evaluations on
+  dimensions 2, 5, 10, 20 and 40. Inside that grid the [results](/results/) apply. Outside it, nothing
+  has been measured.
+- **Give the true budget.** A budget you cannot afford to spend is a budget AMM will plan for. If
+  you will stop early anyway, set the budget to the number you expect to use.
+- **Small budgets are where it loses most often.** In the in-sample comparison, <Claim id="field.behind_le30" />
+  of the <Claim id="field.behind" /> cells where AMM is behind the best competitor are at 10 or 30 x D.
+  See the [limits](/limits/) page.
+- **More than about 40 variables is untested.** The code accepts any D, and a one-variable problem
+  runs. Quality there is unmeasured.
+- **A budget is not a time limit.** AMM does its own computation between evaluations, and that time
+  is not counted in the budget. For a very cheap objective it can dominate the run time. It was not
+  measured for this page; `profile=True` gives you the figure for your own problem as
+  `result.timings.overhead_s`. For an expensive objective it is small next to the evaluations.
+
+## Bounds
+
+`bounds=(lower, upper)` is required by `c46` and by every other preset. Each element is a scalar
+(the same for all coordinates) or a sequence with one value per coordinate:
+
+```python
+amm_optimizer.minimize(f, x0=x0, budget=2000, bounds=(-5, 5), config=cfg)
+amm_optimizer.minimize(f, x0=x0, budget=2000, bounds=([0, 0, -1], [10, 3, 1]), config=cfg)
+```
+
+What the code does with them:
+
+- The bounds must be finite, with every lower bound below its upper bound; otherwise `minimize`
+  raises `ValueError`.
+- In the ATM sampler, samples that fall outside the box are **folded back in**: reflected at the
+  walls, with a 25% chance per sample of being clipped onto the wall instead, so that optima in a
+  corner stay reachable (`amm_optimizer/bounds.py`). The README states that, for the `improved()` preset, the
+  function only ever sees points inside the box. For `c46` the other stages handle the box in their
+  own way, so check it: in a small test with `c46` (boxes of different shapes, budget 300) every
+  evaluated point was inside the box.
+- A start point outside the box did not raise in a test, and the run proceeded normally.
+- `c46` maps any box onto the bbob box [-5, 5] in each coordinate and runs there (the option
+  `box_normalize`), so the same relative settings apply to a box such as [0, 10].
+- If the true optimum lies outside the box, you get the best point inside it. In a test where the
+  optimum was at (8, 8, 8) and the box was [-5, 5], the result was the corner (5, 5, 5).
+- The box is a search region, **not a constraint set**. Other constraints are not supported.
+
+Choose the box as tight as you honestly can. The benchmarks use the box [-5, 5] in every dimension.
+A box much larger than the region you care about gives the optimizer more space to search; what that
+costs AMM was not measured.
+
+## Restarts and seeds
+
+**Seeds.** `seed=` fixes the random stream. In a test, the same seed gave identical `x` and `fun`,
+and different seeds gave different results. A result from one seed is one draw. The benchmark
+numbers use one seed per instance, so they say nothing about the spread across seeds on one
+function.
+
+**Restarts inside a run.** AMM restarts stalled searches itself, within your budget. The count is in
+`result.nrestarts`. You do not need to restart it.
+
+**Several runs.** If you want several independent attempts, split the budget and keep the best. Whether
+several short runs beat one long run was not studied, so treat it as an experiment on your problem.
+
+```python
+import amm_optimizer
+
+cfg = amm_optimizer.presets.get("c46")
+runs = [
+    amm_optimizer.minimize(f, x0=x0, budget=1000, bounds=(-5, 5), seed=s, config=cfg)
+    for s in range(4)
+]
+best = min(runs, key=lambda r: r.fun)
+```
+
+The result also depends on `x0`: in a small test a different start gave a different final value.
+
+## Parallel evaluation
+
+**AMM does not evaluate in parallel.** In the code, `minimize` calls your function with one point at
+a time, in sequence. There is no batch interface and no ask-and-tell loop, and the engines it
+routes between decide each next point from the last results.
+
+What you can do:
+
+- **Run independent seeds in separate processes.** Use `multiprocessing` or `concurrent.futures`
+  with processes. The code keeps some module-level state (for example `amm_optimizer.qn_phase` stores a box-step
+  unit at each call), so use processes rather than threads. Threads were not tested.
+- **Parallelise inside your objective** if one evaluation can use several cores.
+- **Keep BLAS threads in mind.** The benchmark harness forces one BLAS thread. A different thread count
+  changes the last digits of some results, which matters if you compare runs bit for bit.
+
+If you need many evaluations in flight at once, AMM is not the right tool today.
+
+## Wrapping your objective
+
+**The contract.** `fun` takes a NumPy array of length D and returns a number. The return value goes
+through `float(...)`, so a scalar or a zero-dimensional array works.
+
+```python
+def objective(x):
+    value = my_simulation(x)          # your code
+    return float(value)
+
+result = amm_optimizer.minimize(objective, x0=x0, budget=500, bounds=(-5, 5),
+                      config=amm_optimizer.presets.get("c46"))
+```
+
+- **Deterministic.** The same input must give the same output. The README requires it for every
+  preset.
+- **Minimisation only.** To maximise, return the negative.
+- **Do not keep `x`.** The array passed to `fun` can be a view into an internal array. Copy it if
+  you store it (`x.copy()`).
+- **Failures: return NaN or infinity.** According to the README and `docs/DEVIATIONS.md`, a NaN or
+  infinite value is treated as a failed evaluation: the failed point is given the worst finite cost
+  of its batch (or the incumbent's cost), so it can never win. A made-up large constant is not
+  recognised as a failure, so use NaN or infinity. The *starting* point must be finite, or
+  `minimize` raises `ValueError`. In one small test (D = 3, budget 300, NaN on every seventh call) `c46`
+  returned a normal result, and SciPy emitted overflow warnings from its finite-difference code. That
+  is one function, so do not read it as a guarantee.
+- **Noise is not supported.** The method was tested on noiseless functions only. `result.fun` is the
+  best value *seen*, so with noise it is biased low: in a small test with noise of standard deviation
+  0.01 on a function whose minimum is 0, `result.fun` was negative. If you must use AMM on a noisy
+  function, re-evaluate `result.x` several times to estimate its real value.
+- **Gradients cost evaluations.** Some stages (SLSQP, L-BFGS-B and a BFGS variant) estimate
+  gradients by finite differences. Those calls count against `budget`.
+- **Integers and categories** are untested. Results beyond the bbob suite are <Claim id="beyond.bbob" />.
+
+## When something goes wrong
+
+| Symptom | Cause and what to do |
+|---|---|
+| `ValueError: this variant needs bounds=(lower, upper)` | You passed a preset without `bounds`. Add `bounds=(lower, upper)`. |
+| `ValueError: budget must be at least 1` | `budget` was 0 or negative. |
+| `ValueError: bounds must be finite` or `every lower bound must be below its upper bound` | Fix the bounds. Infinite or equal bounds are not accepted. |
+| `ValueError: the objective must be finite at the starting point` | `fun(x0)` returned NaN or infinity. Choose a different `x0`. |
+| `ValueError: unknown preset` | The name is not in `amm_optimizer.presets.names()`. |
+| The result is the original ATM, not AMM | You left out `config=amm_optimizer.presets.get("c46")`. The default configuration is the original sampler. |
+| `RuntimeWarning` from SciPy about overflow | Seen with an objective that returned NaN on some calls. The run still returned a result. Filter the warning or fix the objective. |
+| Results change between machines | The BLAS thread count and the versions of NumPy and SciPy can change the last digits. See [Reproduce](/reproduce/). |
+| Poor result | Check that the objective is deterministic, the box is not far larger than needed, and the budget is at least about 10 x D. Then compare with a simple baseline. AMM is behind other methods in some cells, listed on the [limits](/limits/) page. |

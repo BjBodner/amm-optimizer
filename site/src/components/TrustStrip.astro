@@ -1,0 +1,33 @@
+---
+// Verifiable facts instead of logos. Every value comes from data/claims.json.
+import Claim from './Claim.astro';
+const items: [string, string][] = [
+	['version', 'pkg.version_public'],
+	['config hash', 'freeze.config_hash'],
+	['licence', 'pkg.license'],
+	['repository', 'repo.public_url'],
+	['PyPI', 'release.pypi'],
+	['research archive DOI', 'archive.doi'],
+];
+---
+
+<dl class="amm-trust" aria-label="Reproducibility facts">
+	{
+		items.map(([label, id]) => (
+			<div>
+				<dt>{label}</dt>
+				<dd>
+					<Claim id={id} />
+				</dd>
+			</div>
+		))
+	}
+	<div>
+		<dt>checks</dt>
+		<dd>local gate <code>tools/ci.py</code>, 100% coverage, golden-master tests</dd>
+	</div>
+	<div>
+		<dt>preregistered</dt>
+		<dd><a href="/research-log/">yes, documents are in the research archive</a></dd>
+	</div>
+</dl>

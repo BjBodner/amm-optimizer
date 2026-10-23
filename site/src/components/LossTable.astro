@@ -1,0 +1,274 @@
+---
+// Every bbob function x D x budget cell where AMM is behind the best competitor by more than 0.02.
+// Built at build time from data/dev/field_cells.json: no client script.
+// Development data, in-sample, ids 61-70 (see data/dev/README.md). Not a final result.
+import '../styles/limits.css';
+import data from '../../data/dev/field_cells.json';
+
+interface Cell {
+	function: string;
+	f: number;
+	D: number;
+	budget_mult: number;
+	values: Record<string, number | null>;
+	best_competitor: string;
+	best_competitor_value: number;
+	delta: number;
+	status: string;
+}
+interface Props {
+	/** Show the full list of cells (default) or only the summary tables. */
+	list?: boolean;
+}
+const { list = true } = Astro.props;
+
+const MINUS = '−';
+const cells = data.cells as Cell[];
+const behind = cells
+	.filter((c) => c.status === 'behind')
+	.sort((a, b) => a.f - b.f || a.D - b.D || a.budget_mult - b.budget_mult);
+
+const dims = [2, 5, 10, 20, 40];
+const budgets = [10, 30, 100, 300, 1000];
+const competitorOrder = ['SLSQP', 'NGOpt', 'HCMA', 'IPOP', 'TPE', 'DE', 'BIPOP'];
+const competitors = Object.keys(data.method_names).filter((m) => m !== 'c46');
+const display: Record<string, [string, string]> = {
+	IPOP: ['pycma IPOP', 'var(--m-ipop)'],
+	BIPOP: ['pycma BIPOP', 'var(--m-bipop)'],
+	SLSQP: ['SLSQP', 'var(--m-slsqp)'],
+	DE: ['DE', 'var(--m-de)'],
+	TPE: ['TPE (Optuna)', 'var(--m-tpe)'],
+	NGOpt: ['NGOpt (Nevergrad)', 'var(--m-ngopt)'],
+	HCMA: ['HCMA (archive)', 'var(--m-hcma)'],
+};
+const names: Record<number, string> = {
+	1: 'Sphere',
+	2: 'Ellipsoidal, separable',
+	3: 'Rastrigin, separable',
+	4: 'Bueche-Rastrigin',
+	5: 'Linear slope',
+	6: 'Attractive sector',
+	7: 'Step ellipsoidal',
+	8: 'Rosenbrock',
+	9: 'Rosenbrock, rotated',
+	10: 'Ellipsoidal',
+	11: 'Discus',
+	12: 'Bent cigar',
+	13: 'Sharp ridge',
+	14: 'Different powers',
+	15: 'Rastrigin',
+	16: 'Weierstrass',
+	17: 'Schaffers F7',
+	18: 'Schaffers F7, ill-conditioned',
+	19: 'Griewank-Rosenbrock',
+	20: 'Schwefel',
+	21: 'Gallagher, 101 peaks',
+	22: 'Gallagher, 21 peaks',
+	23: 'Katsuura',
+	24: 'Lunacek bi-Rastrigin',
+};
+const groups: { label: string; fs: number[] }[] = [
+	{ label: 'Group 1: separable (f1 to f5)', fs: [1, 2, 3, 4, 5] },
+	{ label: 'Group 2: low or moderate conditioning (f6 to f9)', fs: [6, 7, 8, 9] },
+	{ label: 'Group 3: high conditioning, unimodal (f10 to f14)', fs: [10, 11, 12, 13, 14] },
+	{ label: 'Group 4: multimodal, adequate global structure (f15 to f19)', fs: [15, 16, 17, 18, 19] },
+	{ label: 'Group 5: multimodal, weak global structure (f20 to f24)', fs: [20, 21, 22, 23, 24] },
+];
+
+// Counts
+const byCompetitor = new Map<string, { total: number; perBudget: Record<number, number> }>();
+for (const m of competitorOrder) byCompetitor.set(m, { total: 0, perBudget: Object.fromEntries(budgets.map((b) => [b, 0])) });
+for (const c of behind) {
+	const row = byCompetitor.get(c.best_competitor)!;
+	row.total += 1;
+	row.perBudget[c.budget_mult] += 1;
+}
+const countFD = (f: number, D: number) => behind.filter((c) => c.f === f && c.D === D).length;
+const countF = (f: number) => behind.filter((c) => c.f === f).length;
+const countD = (D: number) => behind.filter((c) => c.D === D).length;
+const budgetsPerDim = budgets.length;
+const total = behind.length;
+const allCells = cells.length;
+
+const fmt = (x: number) => x.toFixed(3);
+const fmtDelta = (x: number) => (x < 0 ? MINUS : '+') + Math.abs(x).toFixed(3);
+const missing = (c: Cell) =>
+	competitors.filter((m) => c.values[m] === null || c.values[m] === undefined).map((m) => display[m]?.[0] ?? m);
+const rowsFor = (f: number) => behind.filter((c) => c.f === f);
+const listed = [...new Set(behind.map((c) => c.f))];
+---
+
+<div class="amm-loss">
+	<p class="ll-label">
+		<span class="amm-pill" data-status="dev">development, in-sample, ids 61-70</span>
+		<span
+			>{total} of {allCells} cells where AMM (frozen configuration c46) is behind the best competitor by more than 0.02
+			in the share of targets reached. One seed per instance, ten instances per cell.</span
+		>
+	</p>
+
+	<h3>By the competitor that leads</h3>
+	<table>
+		<caption>Behind cells by the leading competitor and by budget (evaluations per dimension)</caption>
+		<thead>
+			<tr>
+				<th scope="col">Leading competitor</th>
+				<th scope="col" class="num">All</th>
+				{budgets.map((b) => <th scope="col" class="num">{b} x D</th>)}
+			</tr>
+		</thead>
+		<tbody>
+			{
+				competitorOrder.map((m) => {
+					const r = byCompetitor.get(m)!;
+					return (
+						<tr>
+							<th scope="row">
+								<span class="ll-chip" style={`background:${display[m][1]}`} aria-hidden="true" />
+								{display[m][0]}
+							</th>
+							<td class="num">{r.total}</td>
+							{budgets.map((b) => (
+								<td class="num">{r.perBudget[b]}</td>
+							))}
+						</tr>
+					);
+				})
+			}
+		</tbody>
+		<tfoot>
+			<tr>
+				<th scope="row">All competitors</th>
+				<td class="num">{total}</td>
+				{budgets.map((b) => <td class="num">{behind.filter((c) => c.budget_mult === b).length}</td>)}
+			</tr>
+		</tfoot>
+	</table>
+
+	<h3>By function and dimension</h3>
+	<table>
+		<caption>
+			Behind cells per function and dimension. Each entry counts the budgets, out of {budgetsPerDim}, at which AMM is
+			behind; shading follows the count.
+		</caption>
+		<thead>
+			<tr>
+				<th scope="col">Function</th>
+				{dims.map((d) => <th scope="col" class="num">D = {d}</th>)}
+				<th scope="col" class="num">All</th>
+			</tr>
+		</thead>
+		{
+			groups.map((g) => (
+				<tbody>
+					<tr class="ll-group">
+						<th scope="colgroup" colspan={dims.length + 2}>
+							{g.label}
+						</th>
+					</tr>
+					{g.fs.map((f) => (
+						<tr>
+							<th scope="row" class="ll-fname">
+								f{f}
+								<span class="ll-fsub">{names[f]}</span>
+							</th>
+							{dims.map((d) => {
+								const n = countFD(f, d);
+								return (
+									<td class={`num ${n === 0 ? 'll-zero' : 'll-heat'}`} style={`--ll-n:${n / budgetsPerDim}`}>
+										{n}
+									</td>
+								);
+							})}
+							<td class="num">{countF(f)}</td>
+						</tr>
+					))}
+				</tbody>
+			))
+		}
+		<tfoot>
+			<tr>
+				<th scope="row">All functions</th>
+				{dims.map((d) => <td class="num">{countD(d)}</td>)}
+				<td class="num">{total}</td>
+			</tr>
+		</tfoot>
+	</table>
+
+	{
+		list && (
+			<details open>
+				<summary>All {total} cells, one row each</summary>
+				<table>
+					<caption>
+						Every cell where AMM is behind by more than 0.02. Values are the share of the 51 targets reached
+						(0 to 1), mean over ten instances. Delta is AMM minus the best competitor.
+					</caption>
+					<thead>
+						<tr>
+							<th scope="col">Function</th>
+							<th scope="col" class="num">D</th>
+							<th scope="col" class="num">Budget</th>
+							<th scope="col" class="num">AMM</th>
+							<th scope="col">Best competitor</th>
+							<th scope="col" class="num">Its value</th>
+							<th scope="col" class="num">Delta</th>
+							<th scope="col">No data for</th>
+						</tr>
+					</thead>
+					{listed.map((f) => {
+						const rows = rowsFor(f);
+						return (
+							<tbody>
+								{rows.map((c, i) => {
+									const miss = missing(c);
+									const disp = display[c.best_competitor] ?? [c.best_competitor, 'var(--m-hcma)'];
+									return (
+										<tr>
+											{i === 0 && (
+												<th scope="rowgroup" rowspan={rows.length} class="ll-fname">
+													f{f}
+													<span class="ll-fsub">{names[f]}</span>
+												</th>
+											)}
+											<td class="num">{c.D}</td>
+											<td class="num">{c.budget_mult} x D</td>
+											<td class="num">{fmt(c.values.c46 as number)}</td>
+											<td>
+												<span class="ll-chip" style={`background:${disp[1]}`} aria-hidden="true" />
+												{disp[0]}
+											</td>
+											<td class="num">{fmt(c.best_competitor_value)}</td>
+											<td class="num ll-delta">
+												{fmtDelta(c.delta)}
+												<span
+													class="ll-bar"
+													style={`width:${Math.min(100, (Math.abs(c.delta) / 0.4) * 100) * 0.06}rem`}
+													aria-hidden="true"
+												/>
+											</td>
+											<td class="ll-missing">{miss.length ? miss.join(', ') : 'none'}</td>
+										</tr>
+									);
+								})}
+							</tbody>
+						);
+					})}
+				</table>
+			</details>
+		)
+	}
+
+	<div class="ll-notes">
+		<p>
+			<strong>Read with care.</strong> Where a competitor has no data for a cell, the best competitor is the best of the others,
+			so those cells are easier to win and a missing competitor can hide a loss. HCMA has no D = 40 values and comes from the
+			COCO archive, on other instances. TPE ran a capped slice only. NGOpt has no D = 10 runs. The last column of the full list
+			names the competitors with no data in each cell.
+		</p>
+		<p>
+			The margin of 0.02 is a plotting threshold, not a significance test: there is one seed per instance and no interval.
+			Source: <code>data/dev/field_cells.json</code>, generated from the c46 field plots.
+		</p>
+	</div>
+</div>

@@ -1,0 +1,1867 @@
+{
+ "version": "c43",
+ "config_hash": "781edd1e0767c7e2",
+ "method": "AMM",
+ "cells": [
+  {
+   "dim": 2,
+   "multiplier": 10,
+   "first": "COBYQA",
+   "path": "cobyqa",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "COBYQA",
+     "whole": true,
+     "evaluations": null
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "COBYQA",
+     "whole": true,
+     "evaluations": null
+    }
+   ],
+   "family": "cobyqa",
+   "text": [
+    "COBYQA",
+    "(whole budget)"
+   ]
+  },
+  {
+   "dim": 2,
+   "multiplier": 30,
+   "first": "prefix",
+   "path": "prefix:slsqpnm",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqpnm",
+     "evaluations": 60,
+     "step_share": 0.5,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqpnm",
+     "evaluations": 60,
+     "step_share": 0.5,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-nm",
+   "text": [
+    "prefix: design, STEP",
+    "SLSQP descent, NM"
+   ]
+  },
+  {
+   "dim": 2,
+   "multiplier": 100,
+   "first": "basin reading",
+   "path": "prefix:nm",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": true
+   },
+   "default": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 1
+    },
+    {
+     "stage": "SLSQP descent",
+     "count": 1
+    },
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "nm",
+     "evaluations": 200,
+     "step_share": 0.5,
+     "rugged_kind": "lq2",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 1
+    },
+    {
+     "stage": "SLSQP descent",
+     "count": 1
+    },
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "nm",
+     "evaluations": 200,
+     "step_share": 0.5,
+     "rugged_kind": "lq2",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-nm",
+   "text": [
+    "basin [M] + descent",
+    "prefix: design, STEP",
+    "Nelder\u2013Mead"
+   ]
+  },
+  {
+   "dim": 2,
+   "multiplier": 300,
+   "first": "basin reading",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": true
+   },
+   "default": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 1
+    },
+    {
+     "stage": "SLSQP descent",
+     "count": 1
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 120
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 240,
+     "check": "axis"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 1
+    },
+    {
+     "stage": "SLSQP descent",
+     "count": 1
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 120
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 240,
+     "check": "axis"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-finish",
+   "text": [
+    "basin [M] + descent",
+    "ATM 60$D$, STEP 120$D$",
+    "$\\to$ finisher"
+   ]
+  },
+  {
+   "dim": 2,
+   "multiplier": 1000,
+   "first": "basin reading",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": true
+   },
+   "default": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 0
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 400
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 800,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 0
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 400
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 800,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-finish",
+   "text": [
+    "basin [M]",
+    "ATM 200$D$, STEP 400$D$",
+    "$\\to$ finisher"
+   ]
+  },
+  {
+   "dim": 2,
+   "multiplier": 3000,
+   "first": "basin reading",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": true
+   },
+   "default": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 0
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 1200
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 2400,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 0
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 1200
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 2400,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-finish",
+   "text": [
+    "basin [M]",
+    "ATM 600$D$, STEP 1200$D$",
+    "$\\to$ finisher"
+   ]
+  },
+  {
+   "dim": 3,
+   "multiplier": 10,
+   "first": "COBYQA",
+   "path": "cobyqa",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "COBYQA",
+     "whole": true,
+     "evaluations": null
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "COBYQA",
+     "whole": true,
+     "evaluations": null
+    }
+   ],
+   "family": "cobyqa",
+   "text": [
+    "COBYQA",
+    "(whole budget)"
+   ]
+  },
+  {
+   "dim": 3,
+   "multiplier": 30,
+   "first": "prefix",
+   "path": "prefix:slsqpdes",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqpdes",
+     "evaluations": 90,
+     "step_share": 0.5,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqpdes",
+     "evaluations": 90,
+     "step_share": 0.5,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-descent",
+   "text": [
+    "prefix: design, STEP",
+    "SLSQP descent, (1+1)"
+   ]
+  },
+  {
+   "dim": 3,
+   "multiplier": 100,
+   "first": "basin reading",
+   "path": "prefix:slsqplq",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": true
+   },
+   "default": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 1
+    },
+    {
+     "stage": "SLSQP descent",
+     "count": 1
+    },
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 300,
+     "step_share": 0.5,
+     "rugged_kind": "lq2",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 1
+    },
+    {
+     "stage": "SLSQP descent",
+     "count": 1
+    },
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 300,
+     "step_share": 0.5,
+     "rugged_kind": "lq2",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-beta",
+   "text": [
+    "basin [M] + descent",
+    "prefix: design, STEP",
+    "$\\beta$: SLSQP or lq2"
+   ]
+  },
+  {
+   "dim": 3,
+   "multiplier": 300,
+   "first": "basin reading",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": true
+   },
+   "default": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 1
+    },
+    {
+     "stage": "SLSQP descent",
+     "count": 1
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 180
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 360,
+     "check": "axis"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 1
+    },
+    {
+     "stage": "SLSQP descent",
+     "count": 1
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 180
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 360,
+     "check": "axis"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-finish",
+   "text": [
+    "basin [M] + descent",
+    "ATM 60$D$, STEP 120$D$",
+    "$\\to$ finisher"
+   ]
+  },
+  {
+   "dim": 3,
+   "multiplier": 1000,
+   "first": "basin reading",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": true
+   },
+   "default": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 0
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 600
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 1200,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 0
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 600
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 1200,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-finish",
+   "text": [
+    "basin [M]",
+    "ATM 200$D$, STEP 400$D$",
+    "$\\to$ finisher"
+   ]
+  },
+  {
+   "dim": 3,
+   "multiplier": 3000,
+   "first": "basin reading",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": true
+   },
+   "default": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 0
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 1800
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 3600,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "basin reading",
+     "routes": true,
+     "descents": 0
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 1800
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 3600,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-finish",
+   "text": [
+    "basin [M]",
+    "ATM 600$D$, STEP 1200$D$",
+    "$\\to$ finisher"
+   ]
+  },
+  {
+   "dim": 5,
+   "multiplier": 10,
+   "first": "prefix",
+   "path": "prefix:slsqpdes",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqpdes",
+     "evaluations": 50,
+     "step_share": 0.0,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqpdes",
+     "evaluations": 50,
+     "step_share": 0.0,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-descent",
+   "text": [
+    "prefix: design",
+    "SLSQP descent, (1+1)"
+   ]
+  },
+  {
+   "dim": 5,
+   "multiplier": 30,
+   "first": "prefix",
+   "path": "prefix:slsqpdes",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqpdes",
+     "evaluations": 150,
+     "step_share": 0.5,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqpdes",
+     "evaluations": 150,
+     "step_share": 0.5,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-descent",
+   "text": [
+    "prefix: design, STEP",
+    "SLSQP descent, (1+1)"
+   ]
+  },
+  {
+   "dim": 5,
+   "multiplier": 100,
+   "first": "pair test",
+   "path": "prefix:slsqplq",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 500,
+     "step_share": 0.5,
+     "rugged_kind": "lq2",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 500,
+     "step_share": 0.5,
+     "rugged_kind": "lq2",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-beta",
+   "text": [
+    "pair test [S]",
+    "prefix: design, STEP",
+    "$\\beta$: SLSQP or lq2"
+   ]
+  },
+  {
+   "dim": 5,
+   "multiplier": 300,
+   "first": "pair test",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": true,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 300
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 600,
+     "check": "axis"
+    },
+    {
+     "stage": "local tests",
+     "whole": true,
+     "route": "qn44"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 300
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 600,
+     "check": "axis"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-local",
+   "text": [
+    "pair test [S,C]",
+    "ATM 60$D$, STEP 120$D$",
+    "$\\to$ local tests"
+   ]
+  },
+  {
+   "dim": 5,
+   "multiplier": 1000,
+   "first": "pair test",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": true,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 1000
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 2000,
+     "check": "stall"
+    },
+    {
+     "stage": "local tests",
+     "whole": true,
+     "route": "qn44"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 1000
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 2000,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-local",
+   "text": [
+    "pair test [S,C]",
+    "ATM 200$D$, STEP 400$D$",
+    "$\\to$ local tests"
+   ]
+  },
+  {
+   "dim": 5,
+   "multiplier": 3000,
+   "first": "pair test",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": true,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 3000
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 6000,
+     "check": "stall"
+    },
+    {
+     "stage": "local tests",
+     "whole": true,
+     "route": "qn44"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 3000
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 6000,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-local",
+   "text": [
+    "pair test [S,C]",
+    "ATM 600$D$, STEP 1200$D$",
+    "$\\to$ local tests"
+   ]
+  },
+  {
+   "dim": 10,
+   "multiplier": 10,
+   "first": "prefix",
+   "path": "prefix:slsqpdes",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqpdes",
+     "evaluations": 100,
+     "step_share": 0.0,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqpdes",
+     "evaluations": 100,
+     "step_share": 0.0,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-descent",
+   "text": [
+    "prefix: design",
+    "SLSQP descent, (1+1)"
+   ]
+  },
+  {
+   "dim": 10,
+   "multiplier": 30,
+   "first": "prefix",
+   "path": "prefix:slsqplq",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 300,
+     "step_share": 0.5,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 300,
+     "step_share": 0.5,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-beta",
+   "text": [
+    "prefix: design, STEP",
+    "$\\beta$: SLSQP or (1+1)"
+   ]
+  },
+  {
+   "dim": 10,
+   "multiplier": 100,
+   "first": "pair test",
+   "path": "prefix:slsqplq",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 1000,
+     "step_share": 0.5,
+     "rugged_kind": "lq2",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 1000,
+     "step_share": 0.5,
+     "rugged_kind": "lq2",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-beta",
+   "text": [
+    "pair test [S]",
+    "prefix: design, STEP",
+    "$\\beta$: SLSQP or lq2"
+   ]
+  },
+  {
+   "dim": 10,
+   "multiplier": 300,
+   "first": "pair test",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": true,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 600
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 1200,
+     "check": "axis"
+    },
+    {
+     "stage": "local tests",
+     "whole": true,
+     "route": "qn44"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 600
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 1200,
+     "check": "axis"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-local",
+   "text": [
+    "pair test [S,C]",
+    "ATM 60$D$, STEP 120$D$",
+    "$\\to$ local tests"
+   ]
+  },
+  {
+   "dim": 10,
+   "multiplier": 1000,
+   "first": "pair test",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": true,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 600
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 4700,
+     "check": "stall"
+    },
+    {
+     "stage": "local tests",
+     "whole": true,
+     "route": "qn44"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 600
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 4700,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-local",
+   "text": [
+    "pair test [S,C]",
+    "ATM 60$D$, STEP 470$D$",
+    "$\\to$ local tests"
+   ]
+  },
+  {
+   "dim": 10,
+   "multiplier": 3000,
+   "first": "pair test",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": true,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 600
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 14700,
+     "check": "stall"
+    },
+    {
+     "stage": "local tests",
+     "whole": true,
+     "route": "qn44"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 600
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 14700,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-local",
+   "text": [
+    "pair test [S,C]",
+    "ATM 60$D$, STEP 1470$D$",
+    "$\\to$ local tests"
+   ]
+  },
+  {
+   "dim": 20,
+   "multiplier": 10,
+   "first": "prefix",
+   "path": "prefix:slsqplqc",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplqc",
+     "evaluations": 200,
+     "step_share": 0.0,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplqc",
+     "evaluations": 200,
+     "step_share": 0.0,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-beta",
+   "text": [
+    "prefix: design",
+    "$\\beta$ (2 dir.): SLSQP or (1+1)"
+   ]
+  },
+  {
+   "dim": 20,
+   "multiplier": 30,
+   "first": "prefix",
+   "path": "prefix:slsqplq",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 600,
+     "step_share": 0.5,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 600,
+     "step_share": 0.5,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-beta",
+   "text": [
+    "prefix: design, STEP",
+    "$\\beta$: SLSQP or (1+1)"
+   ]
+  },
+  {
+   "dim": 20,
+   "multiplier": 100,
+   "first": "pair test",
+   "path": "prefix:slsqplq",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 2000,
+     "step_share": 0.5,
+     "rugged_kind": "lq2",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 2000,
+     "step_share": 0.5,
+     "rugged_kind": "lq2",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-beta",
+   "text": [
+    "pair test [S]",
+    "prefix: design, STEP",
+    "$\\beta$: SLSQP or lq2"
+   ]
+  },
+  {
+   "dim": 20,
+   "multiplier": 300,
+   "first": "pair test",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": true,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 1200
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 2400,
+     "check": "axis"
+    },
+    {
+     "stage": "local tests",
+     "whole": true,
+     "route": "qn44"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 1200
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 2400,
+     "check": "axis"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-local",
+   "text": [
+    "pair test [S,C]",
+    "ATM 60$D$, STEP 120$D$",
+    "$\\to$ local tests"
+   ]
+  },
+  {
+   "dim": 20,
+   "multiplier": 1000,
+   "first": "pair test",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": true,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 1200
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 9400,
+     "check": "stall"
+    },
+    {
+     "stage": "local tests",
+     "whole": true,
+     "route": "qn44"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 1200
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 9400,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-local",
+   "text": [
+    "pair test [S,C]",
+    "ATM 60$D$, STEP 470$D$",
+    "$\\to$ local tests"
+   ]
+  },
+  {
+   "dim": 20,
+   "multiplier": 3000,
+   "first": "pair test",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": true,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 1200
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 29400,
+     "check": "stall"
+    },
+    {
+     "stage": "local tests",
+     "whole": true,
+     "route": "qn44"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 1200
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 29400,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-local",
+   "text": [
+    "pair test [S,C]",
+    "ATM 60$D$, STEP 1470$D$",
+    "$\\to$ local tests"
+   ]
+  },
+  {
+   "dim": 40,
+   "multiplier": 10,
+   "first": "prefix",
+   "path": "prefix:slsqplqc",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplqc",
+     "evaluations": 400,
+     "step_share": 0.0,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplqc",
+     "evaluations": 400,
+     "step_share": 0.0,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-beta",
+   "text": [
+    "prefix: design",
+    "$\\beta$ (2 dir.): SLSQP or (1+1)"
+   ]
+  },
+  {
+   "dim": 40,
+   "multiplier": 30,
+   "first": "prefix",
+   "path": "prefix:slsqplq",
+   "routes": {
+    "STEP restarts": false,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 1200,
+     "step_share": 0.5,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 1200,
+     "step_share": 0.5,
+     "rugged_kind": "cma",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-beta",
+   "text": [
+    "prefix: design, STEP",
+    "$\\beta$: SLSQP or (1+1)"
+   ]
+  },
+  {
+   "dim": 40,
+   "multiplier": 100,
+   "first": "pair test",
+   "path": "prefix:slsqplq",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": false,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 4000,
+     "step_share": 0.5,
+     "rugged_kind": "lq2",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "prefix",
+     "whole": true,
+     "kind": "slsqplq",
+     "evaluations": 4000,
+     "step_share": 0.5,
+     "rugged_kind": "lq2",
+     "lq_nonsep_only": true,
+     "simplex": false,
+     "sep_smooth_probe": true
+    }
+   ],
+   "family": "prefix-beta",
+   "text": [
+    "pair test [S]",
+    "prefix: design, STEP",
+    "$\\beta$: SLSQP or lq2"
+   ]
+  },
+  {
+   "dim": 40,
+   "multiplier": 300,
+   "first": "pair test",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": true,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 2400
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 4800,
+     "check": "axis"
+    },
+    {
+     "stage": "local tests",
+     "whole": true,
+     "route": "qn44"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 2400
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 4800,
+     "check": "axis"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-local",
+   "text": [
+    "pair test [S,C]",
+    "ATM 60$D$, STEP 120$D$",
+    "$\\to$ local tests"
+   ]
+  },
+  {
+   "dim": 40,
+   "multiplier": 1000,
+   "first": "pair test",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": true,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 2400
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 18800,
+     "check": "stall"
+    },
+    {
+     "stage": "local tests",
+     "whole": true,
+     "route": "qn44"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 2400
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 18800,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-local",
+   "text": [
+    "pair test [S,C]",
+    "ATM 60$D$, STEP 470$D$",
+    "$\\to$ local tests"
+   ]
+  },
+  {
+   "dim": 40,
+   "multiplier": 3000,
+   "first": "pair test",
+   "path": "atm",
+   "routes": {
+    "STEP restarts": true,
+    "coordinate search": true,
+    "MLSL": false
+   },
+   "default": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 2400
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 58800,
+     "check": "stall"
+    },
+    {
+     "stage": "local tests",
+     "whole": true,
+     "route": "qn44"
+    }
+   ],
+   "after_separable_step": [
+    {
+     "stage": "pair test",
+     "reading": "nonsep"
+    },
+    {
+     "stage": "ATM sampler",
+     "evaluations": 2400
+    },
+    {
+     "stage": "STEP",
+     "evaluations": 58800,
+     "check": "stall"
+    },
+    {
+     "stage": "finisher",
+     "whole": true,
+     "kind": "gated_then_ipop"
+    }
+   ],
+   "family": "atm-local",
+   "text": [
+    "pair test [S,C]",
+    "ATM 60$D$, STEP 1470$D$",
+    "$\\to$ local tests"
+   ]
+  }
+ ]
+}

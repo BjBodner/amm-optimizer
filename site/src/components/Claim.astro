@@ -1,0 +1,20 @@
+---
+// Renders one number from data/claims.json with its status. The data-* attributes are read by
+// integrations/amm-guards.mjs after the build; keep their order.
+import { getClaim } from '../lib/claims';
+
+interface Props {
+	id: string;
+}
+const { id } = Astro.props;
+const c = getClaim(id);
+---
+
+<span
+	class="claim"
+	data-claim-id={id}
+	data-claim-status={c.status}
+	data-claim-final-required={String(c.requiresFinal)}
+	title={`${c.label}. Source: ${c.source}`}
+	>{c.value}{c.status !== 'final' && <span class="claim-badge" data-status={c.status}>{c.status === 'dev' ? 'in-sample' : 'pending'}</span>}</span
+>

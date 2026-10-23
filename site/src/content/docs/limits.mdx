@@ -1,0 +1,280 @@
+---
+title: Limits and honesty
+description: "Where AMM loses in the preregistered final test, what it was built for and what it was not tested on, what is not claimed, how many variants were tried, and how the in-sample development numbers differ from the final test."
+---
+
+import Claim from '../../components/Claim.astro';
+import Stat from '../../components/Stat.astro';
+import Legend from '../../components/Legend.astro';
+import LossTable from '../../components/LossTable.astro';
+import FT1LossTable from '../../components/FT1LossTable.astro';
+
+:::note[Two sets of numbers on this page]
+The **primary evidence** is the preregistered final test (FT1): the frozen configuration run once on bbob instance ids
+<Claim id="ids.final" />, which no design decision used, with every competitor at every dimension it was planned for
+(NGOpt at <Claim id="ft1.ngopt_dims" />). The **development context** further down uses ids
+<Claim id="ids.dev" />, which were used while AMM was being built (in-sample). The two use different rules for a
+"behind" cell and their counts must not be compared with each other.
+:::
+
+This page says what AMM does not do well, what it was and was not tested on, and what the project does not claim. It is
+meant to be read before the [results](/results/), not after.
+
+## 1. In the final test (ids 101-110)
+
+The frozen configuration (preset <Claim id="freeze.preset" />, config hash
+<Claim id="freeze.config_hash" />) was run once on bbob instance ids <Claim id="ids.final" />: 24 functions, dimensions
+2, 5, 10, 20 and 40, budgets of 10, 30, 100, 300 and 1000 evaluations per dimension, ten instances per cell, one run
+per cell and instance. That is <Claim id="ft1.cells" /> cells and <Claim id="ft1.runs" /> runs of AMM. The field is
+pycma IPOP and BIPOP, restarted SLSQP, SciPy differential evolution, Optuna's TPE (a capped slice of the grid),
+Nevergrad's NGOpt and HCMA as COCO archive levels (its own instances, D 2 to 20 only, labelled as such).
+
+### Credibly behind: the rule
+
+A cell counts as **credibly behind** if some competitor leads AMM by more than 0.02 in the share of targets reached
+with posterior probability above 0.9 over the ten paired runs. This is the preregistered rule F2, taken from the
+project's field ledger. It is not the plotting rule of the development section below. Cell-level intervals of this kind
+were found to be about 25% too narrow in earlier work, so the counts are counts and not significance statements.
+
+<Stat id="ft1.f2_behind" label="cells where AMM is credibly behind some competitor, of 600 (final test)" />
+
+That is <Claim id="hero.behind_pct" /> of the cells. In <Claim id="ft1.f3_ahead_all" /> cells AMM is credibly ahead of
+every competitor that ran the cell, and in <Claim id="hero.highest" /> cells ("<Claim id="hero.highest_pct" />") it has
+the highest mean share of targets, ties included. The three counts answer different questions and overlap only in part:
+a cell can be neither credibly behind nor credibly ahead.
+
+### The cells, listed
+
+All <Claim id="ft1.f2_behind" /> cells are listed below with the competitor that leads in each. The tables are built from the
+final-test data file, and a build fails if they disagree with the counts quoted on this site.
+
+<FT1LossTable />
+
+### The pattern, by type
+
+Read from the list above. Each type names functions and conditions; the table gives the deltas. A cell where several
+competitors have the same delta is counted for each of them, so the per-competitor counts add up to more than
+<Claim id="ft1.f2_behind" />.
+
+- **Restarted SLSQP, <Claim id="ft1.behind_slsqp" /> cells.** Small budgets on smooth functions: f2, f8, f10, f11, f12,
+  f13 and f14, at 10 to 30 evaluations per dimension, in dimensions 2 to 10. The largest gaps of the whole list are in
+  this group: f10 at D 5 with 30 x D, and f12 at D 2 with 30 x D. One SLSQP cell sits outside the pattern: f13 at D 40
+  and 100 x D, with a small gap.
+- **HCMA's archive levels, <Claim id="ft1.behind_hcma" /> cells.** On f7 at D 10 (100 x D) and D 20 (300 x D); the second
+  is one of the larger gaps in the list. On f19 at D 10 at every budget from 10 to 300 x D, with small gaps. On f13 at
+  D 2 with 300 x D and at D 20 with 10 x D, on f24 at D 2 with 1000 x D, and on f14 at D 2 (300 x D) and D 20
+  (1000 x D), where IPOP and BIPOP have the same delta. HCMA values come from the COCO archive on other instances, so
+  these cells say that AMM is below an archive level, not that HCMA wins a paired run.
+- **IPOP, <Claim id="ft1.behind_ipop" /> cells, and BIPOP, <Claim id="ft1.behind_bipop" /> cells.** Almost always
+  together. Larger gaps at D 2 on f12 and f14 (300 x D); BIPOP alone on f18 at D 2 (1000 x D). Small gaps on f14 at D 20
+  and 40 (1000 x D) and on f17 and f18 at D 20 to 40 (30 x D).
+- **NGOpt, <Claim id="ft1.behind_ngopt" /> cells.** Two are on f9 at 10 x D (D 5 and D 10), two on f17 at D 5 (100 x D and 300 x D), one on f20 at D 40 (10 x D) and one on
+  f23 at D 40 (10 x D). None of these gaps is among the largest of the list; the largest is f17 at D 5 with 300 x D.
+  None of the six is at D 2 or D 20.
+- **TPE, <Claim id="ft1.behind_tpe" /> cells.** f17 and f18 at D 5 with 30 x D.
+- **Differential evolution, <Claim id="ft1.behind_de" /> cells.** It leads in none.
+
+By dimension the counts are <Claim id="ft1.f2_D2" />, <Claim id="ft1.f2_D5" />, <Claim id="ft1.f2_D10" />,
+<Claim id="ft1.f2_D20" /> and <Claim id="ft1.f2_D40" /> at D 2, 5, 10, 20 and 40. By budget they are
+<Claim id="ft1.f2_B10" />, <Claim id="ft1.f2_B30" />, <Claim id="ft1.f2_B100" />, <Claim id="ft1.f2_B300" /> and
+<Claim id="ft1.f2_B1000" /> at 10, 30, 100, 300 and 1000 x D. Over the full grid, AMM is credibly ahead of every
+competitor that ran the cell in <Claim id="ft1.f3_D2" />, <Claim id="ft1.f3_D5" />, <Claim id="ft1.f3_D10" />,
+<Claim id="ft1.f3_D20" /> and <Claim id="ft1.f3_D40" /> cells by dimension, and in <Claim id="ft1.f3_B10" />,
+<Claim id="ft1.f3_B30" />, <Claim id="ft1.f3_B100" />, <Claim id="ft1.f3_B300" /> and <Claim id="ft1.f3_B1000" /> cells
+by budget. The losses are where development had them: small budgets on smooth functions against restarted SLSQP,
+f7 and f19 against HCMA's levels, a few D 2 cells against IPOP and BIPOP at 300 to 1000 x D, and a handful of
+small-budget cells against NGOpt and TPE. Fewer cells are lost at 100 x D and above than at 10 and 30 x D, and fewer at D 20 and 40 than at D 2. This is a
+reading of a list of counts, not a test of a cause.
+
+### What was predicted
+
+The count of behind cells and the count of cells ahead of all were preregistered as ranges before any run. The
+falsifiers were also written down: more than 100 behind cells, or fewer than 50 ahead of all, would have meant that the
+development ledger was optimistic beyond the stated ranges.
+
+| Quantity | Predicted (preregistered) | Final test | Reading |
+|---|---|---|---|
+| Cells credibly behind some competitor (F2) | 30 to 75 of 600 | <Claim id="ft1.f2_behind" /> | Inside the range. Falsifier (above 100) not triggered. |
+| Cells credibly ahead of every competitor that ran the cell (F3) | 70 to 120 of 600 | <Claim id="ft1.f3_ahead_all" /> | Inside the range. Falsifier (below 50) not triggered. |
+
+Both counts are inside their ranges, and so are the ten comparisons with IPOP and SLSQP (F1, F4), which are on the
+[research log](/research-log/). Every preregistered prediction of the final test held. The research log records how the analysis was run and
+the deviations from the plan.
+
+The final test confirms the direction of the development result and does not prove that AMM wins on other problems: it
+is still the same 24 functions, on new instances. See "What is not claimed" below.
+
+## 2. Development context, in-sample ids 61-70
+
+:::caution[Development data, not the final test]
+Everything in this section is **in-sample**: bbob instance ids <Claim id="ids.dev" /> were used while AMM was being
+built, and steered about twenty composites. It uses the plotting rule below on one seed per instance, not the
+preregistered "credibly behind" rule of section 1. Do not compare the two counts.
+:::
+
+In the in-sample comparison of the frozen configuration (preset <Claim id="freeze.preset" />) against pycma IPOP and
+BIPOP, SLSQP, differential evolution, Optuna's TPE, Nevergrad's NGOpt and HCMA, there are
+<Claim id="hero.cells" /> cells, each one function at one dimension and one budget. The rule is fixed:
+
+- **ahead** if AMM's share of targets reached exceeds the best competitor's by more than 0.02: <Claim id="field.ahead" /> cells;
+- **level** if the difference is within 0.02: <Claim id="field.level" /> cells;
+- **behind** if the best competitor leads by more than 0.02: <Claim id="field.behind" /> cells.
+
+One seed per instance and ten instances per cell: there is no interval, so 0.02 is a plotting threshold and not a
+significance test. This is not the preregistered "credibly behind" count of section 1, which uses a posterior
+probability over the paired runs; the two counts are different and are not mixed here. The same cells appear on the
+[results](/results/) heatmap under this plotting rule.
+
+<Stat id="field.behind" label="cells where AMM is behind the best competitor by more than 0.02 (in-sample)" />
+
+<Legend />
+
+### The pattern in the behind cells
+
+The tables below list every behind cell. Reading them, in order of how clearly the data show it:
+
+- **Restarted SLSQP is the most frequent leader.** It leads where AMM is behind more often than any other
+  competitor, mostly at 10 to 100 evaluations per dimension, mainly on the unimodal functions with moderate or high
+  conditioning (f8 to f13) and on Gallagher's f21 and f22. The paper's development record found the same pattern early,
+  when SLSQP beat an early composite on smooth functions. This table does not establish the cause.
+- **Small budgets lose more cells than large ones.** More behind cells sit at 10 and 30 times the dimension than at
+  300 and 1000. Nevergrad's NGOpt leads mostly at 10 and 30 times the dimension; IPOP, BIPOP and differential
+  evolution lead mostly at 100 times the dimension and above.
+- **Dimension 2 has the most behind cells**, and D = 40 the fewest.
+- **Function groups.** Few separable-function cells (f1 to f5) are behind. The rest are spread over the moderate- and
+  high-conditioning groups, the adequately structured multimodal group and the weakly structured multimodal group. The
+  functions with the most behind cells are f8 and f9 (Rosenbrock, unrotated and rotated), then f7 (step ellipsoid), and
+  f10, f12, f13, f17 and f21.
+- **HCMA's leads are against archive data.** HCMA is not run in this harness: its values are the COCO archive's, on
+  other instances, and cover D 2 to 20 only. A cell where HCMA leads says that AMM is below an archive level, not that
+  HCMA beats AMM in a paired run.
+- **The paper's own section on losses describes an earlier configuration.** The section "Where AMM does not win" in
+  the paper draft was written for composite c43. Its largest gaps (f7 at D = 5 and 100 times the dimension, against
+  IPOP; f9 at D = 10 and 300 times the dimension, against SLSQP) have changed since: the f9 cell is unchanged and
+  still listed below, while the f7 cell is much smaller. The list in section 1 is the one to use.
+
+<LossTable />
+
+## 3. Problem classes the paper flags as risks
+
+These come from the paper's discussion of limitations. The final test measures bbob only, so none of them has been
+measured on it.
+
+- **Rotated separable problems.** Probes that read coordinate structure (the pair test, the coordinate-search route,
+  STEP restarts) cannot fire on a rotated separable function. AMM falls back to its general path and has paid for the probe.
+- **Anytime use.** AMM chooses its route from the budget, so a run stopped early returns the incumbent of a schedule
+  planned for the full budget. An anytime measure can rank AMM below its final-budget value. COCO's anytime ECDF
+  represents it only with one dataset per budget.
+- **Cheap objectives.** AMM is written in Python. Overhead per evaluation matters when the objective is fast and the
+  dimension is small. The only stored figure is for SciPy's COBYQA alone, <Claim id="limits.cobyqa_ms" /> per evaluation
+  at D 2 to 3, measured outside COCO's procedure. The figure for AMM as a whole is <Claim id="timing.per_eval" />.
+- **Probes outside their calibrated range.** In development, a separability route calibrated at 300 to 1000
+  evaluations per dimension misrouted rugged functions at 3000, with a loss of <Claim id="limits.sep_misroute" /> per
+  cell, and a fractal exemption lost <Claim id="limits.f16_loss" /> on f16. Validity ranges limit such failures; they
+  cannot rule out a misreading on a problem class unlike bbob's.
+- **Absolute constants.** The kink threshold, the restart tolerance and the finite-difference step are absolute, and the
+  probe scales are fixed fractions of the box width. Several probes are invariant to a positive affine map of f; the constants are not.
+
+## 4. Intended use and out of scope
+
+A model-card summary. "Tested" means exercised in the benchmark runs behind this site; "untested" means nothing was run
+and no claim is made either way.
+
+| | |
+|---|---|
+| **Intended use** | Minimising a noiseless, continuous objective in a box, with 2 to 40 variables, when the number of evaluations is known before the run and lies between 10 and 1000 times the number of variables. |
+| **Needs** | Exact function values (finite differences and ties rely on them), a box (bounds on every variable), a start point and a budget, and a seed for reproducibility. |
+| **Tested on** | The 24 noiseless bbob functions, five dimensions (2, 5, 10, 20, 40), five budgets (10, 30, 100, 300, 1000 times the dimension). The final test (ids <Claim id="ids.final" />) covers the same grid. The paper's plan also covers 3 variables and 3000 times the dimension; those results are pending. |
+| **Not an anytime method** | The route depends on the budget. Stopping a run early gives the incumbent of a plan made for the full budget. |
+| **Better tools exist when** | Gradients are cheap (use a gradient-based method), the budget is a handful of evaluations per variable with a smooth function (a restarted quasi-Newton method leads in some of the cells above), or each evaluation is so cheap that Python overhead dominates. |
+| **Out of scope, untested** | Noisy objectives, discrete or mixed-integer variables, constraints other than the box, multi-objective problems, more than 40 variables, budgets below 10 or above 1000 times the dimension (3000 pending), objectives that fail or return infinities as a rule. |
+| **Beyond bbob** | <Claim id="beyond.bbob" />. MA-BBOB: <Claim id="mabbob.result" />. Transformed bbob and real problems are not yet tested. |
+
+## 5. What is not claimed
+
+Taken from the paper's claim inventory: rows with status N (not supportable) or G (supportable only after a named gap
+closes). The site's own claim file marks any pending number, and a public build refuses to publish a pending one.
+
+| Statement | Status | Why, and what would change it |
+|---|---|---|
+| AMM beats every competitor in every cell, or is state of the art on bbob | Not claimed | The table above lists the cells where it does not. The paper does not use this wording. |
+| The ATM sampler drives AMM's gains | Not claimed | The paper argues the opposite: the routing, not the sampler, is the contribution. The sampler runs only above 100 times the dimension. |
+| AMM leads the field on never-used official instances | Tested once | The preregistered final test FT1 on ids <Claim id="ids.final" />: AMM has the highest mean in <Claim id="hero.highest" /> of <Claim id="ft1.cells" /> cells (ties included) and is credibly behind some competitor in <Claim id="ft1.f2_behind" />, all listed in section 1. This is bbob only, on the same 24 functions as the development, with new instances. |
+| The in-sample cell counts are a result | Not claimed | They come from ids that steered about twenty composites. They are development context only; the final test of section 1 is the evidence. |
+| The final-test counts F2 and F3 are significance statements | Not claimed | They are counts under a preregistered rule whose cell-level intervals are about 25% too narrow. The comparisons with IPOP and SLSQP (F1, F4) carry the intervals. |
+| AMM generalises beyond bbob's function identities | Pending | Needs MA-BBOB, transformed bbob and other problems: <Claim id="beyond.bbob" />. |
+| Every route (each probe-and-engine pair) pays its way in the final configuration | Pending | Needs the leave-one-route-out ablation: <Claim id="ablation.result" />. Earlier confirmations are add-one results against a predecessor on a target slice and do not measure the marginal value in the final configuration. |
+| The routing, not the solver pool, carries the gain | Pending | Needs the ladder of controls: each engine alone, fixed hand-overs, NgIohTuned, a greedy schedule of AMM's own engines. |
+| AMM beats a simple SLSQP-then-IPOP portfolio built from its own parts | Pending | Part of the same ladder. |
+| Routes fire on landscape properties and not on function fingerprints | Pending | Needs a firing table. The paper concedes that the chain route can be read as an f20 device. |
+| AMM is ahead of HCMA from some budget upward | Descriptive, FT1 | Against archive levels (D 2 to 20, other instances), not a paired run. AMM minus HCMA's level is <Claim id="ft1.hcma_30" /> at 30 x D, <Claim id="ft1.hcma_100" /> at 100, <Claim id="ft1.hcma_300" /> at 300 and <Claim id="ft1.hcma_1000" /> at 1000 x D. At 10 x D the margin is small (<Claim id="ft1.hcma_10" />), so the claim is stated from 30 x D. |
+| CPU cost per evaluation | Pending | <Claim id="timing.per_eval" />. |
+| Invariance to affine maps of f, end to end | Pending | True by construction for the listed probes; the end-to-end runs are not done. |
+| An installable release on PyPI | Pending | <Claim id="release.pypi" />. The code is public (<Claim id="repo.public_url" />) and installs from there. The preregistrations and FT1 data are in a research archive whose DOI is <Claim id="archive.doi" />. |
+
+## 6. How many variants and cycles were tried
+
+A rule set built on 24 functions invites the objection that it is a decision tree fitted to them. The design effort is
+therefore counted, not hidden.
+
+- **Cycles.** <Claim id="prereg.cycles" /> development cycles were logged when the paper draft was written, in
+  <Claim id="prereg.batches" /> numbered batches, with <Claim id="prereg.confirmations" /> holdout or fresh-id
+  confirmation runs and <Claim id="prereg.composites" /> promoted composites. The batch index has grown since: it
+  reaches cycle <Claim id="prereg.last_cycle" /> at the freeze. See the [research log](/research-log/) for the loop, the failed predictions and the freeze.
+- **Arms screened and CPU hours.** <Claim id="effort.arms_cpu" />. These are to be reconstructed from the arm files and run logs.
+- **Spent instance ids.** Every confirmation used a block of bbob instance ids that no earlier decision had used, and
+  that block is then spent. At the freeze: spent <Claim id="ids.spent" />, reserved and never used
+  <Claim id="ids.reserved" />, next free <Claim id="ids.next_free" />. The ledger is a file
+  (`docs/research/batches/spent_ids.json`) in the research archive (DOI: <Claim id="archive.doi" />, pending), not in the public code repository. The analysis code checks it before any claim is scored.
+- **Rejected and parked.** The log keeps rejected candidates, including some that passed the screen and failed the confirmation. [The research log](/research-log/) tabulates them.
+
+## 7. How the in-sample numbers differ from FT1
+
+| | Development field (in-sample, section 2) | Final test FT1 (section 1) |
+|---|---|---|
+| Instances | bbob ids <Claim id="ids.dev" /> | bbob ids <Claim id="ids.final" />, never used in any decision |
+| Use of the data | compared with the field after each composite; steered about twenty composites | run once on the frozen configuration |
+| Runs | one seed per instance, no interval | one run per cell and instance, seed 9000; the means over cells carry bootstrap intervals (F1, F4) |
+| Cell rule | ahead, level or behind by 0.02 on the mean, a plotting threshold | credibly behind if some competitor leads by more than 0.02 with posterior probability above 0.9 over the paired runs; credibly ahead against every competitor that ran the cell |
+| Configuration | a composite of c45 and c46 runs (section 8) | the frozen configuration itself |
+| Competitors | uneven coverage (section 8) | the same field; HCMA at D 2 to 20, TPE on a capped slice |
+| Behind cells | <Claim id="field.behind" /> of <Claim id="hero.cells" /> under the 0.02 rule | <Claim id="ft1.f2_behind" /> of <Claim id="ft1.cells" /> under the credible rule |
+
+The two behind counts answer different questions, because the rules differ. Neither is a forecast of the other, and a
+difference between them is not a measure of how much the development numbers overstated the result. The comparison that
+tests the development result is the one against the preregistered ranges in section 1 and on the
+[research log](/research-log/).
+
+## 8. Caveats about the development data
+
+1. **The c46 series is a composite.** <Claim id="data.c46_from_c45" /> of the <Claim id="hero.cells" /> cells come from
+   full-grid runs of the previous configuration c45. Only <Claim id="data.c46_literal" /> cells (D 10, 20 and 40 at 100
+   times the dimension) were run with the literal c46 configuration, which differs from c45 by one parameter from D = 10.
+   The other cells are assumed identical and were not rerun. The frozen configuration's hash is
+   <Claim id="freeze.config_hash" />; at the time of the in-sample runs it was <Claim id="data.c46_hash_run" />. The
+   config text is the same; the hash changed because the configuration schema gained an opt-in field.
+2. **Uneven competitor coverage.** HCMA has no D = 40 values. TPE ran a capped slice only. NGOpt has no D = 10 runs (the final test has NGOpt at every dimension). Where
+   a competitor is missing, the best competitor is the best of the others, so those cells are easier to win than a
+   seven-way comparison suggests. The list above names the missing competitors in each cell.
+3. **Run records.** Most run files were produced in development worktrees with uncommitted changes, and the Optuna and
+   Nevergrad versions and the hardware were not recorded. See the [reproduce page](/reproduce/).
+4. **Seed variance is not measured.** One seed per instance and ten instances give no estimate of run-to-run spread:
+   <Claim id="variance.seed" />.
+
+## 9. A no-free-lunch note
+
+No optimizer outperforms another when performance is averaged over all possible objective functions (Wolpert and
+Macready, 1997, "No free lunch theorems for optimization"). AMM's results are therefore claims about a class of
+problems, not about optimization in general. It uses structure that bbob functions have and that a random function
+does not: a known budget, locally smooth or separable or multi-basin structure that cheap probes can detect, and
+exact evaluations. Each probe has a default outcome so that a misreading costs evaluations and not the run, but a
+misreading is still possible on a class unlike bbob's, and the 24 functions it was developed on are also the 24 it was
+confirmed on, in new instances only. Whether the probes read mechanisms and not function identities is the question
+the problems beyond bbob are meant to test, and it is open: <Claim id="beyond.bbob" />.
+
+## Still pending on this page
+
+- per-evaluation overhead: <Claim id="timing.per_eval" />;
+- seed-to-seed variance: <Claim id="variance.seed" />;
+- the ablation: <Claim id="ablation.result" />;
+- results beyond bbob: <Claim id="beyond.bbob" />.

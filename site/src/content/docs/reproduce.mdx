@@ -1,0 +1,196 @@
+---
+title: Reproduce
+description: "What is pinned for the AMM results: configuration hash, package versions, the harness commands, the caveats of the in-sample series, what is in the public repository and what is in the research archive."
+---
+
+import Claim from '../../components/Claim.astro';
+
+This page lists what you need to rerun the benchmark numbers on this site, and what you cannot
+reproduce yet. The code is public: <Claim id="repo.public_url" /> (commit <Claim id="repo.commit_public" />, one squashed commit, version <Claim id="pkg.version_public" />).
+The preregistrations, the final-test data and outputs, the spent-instance ledger and the tagged development history are **not** in that
+repository. They are collected in a research archive on Zenodo (DOI: <Claim id="archive.doi" />), so paths below that start with
+`docs/research/` or `benchmarks/results/` are paths inside that archive. Each figure on the [results](/results/) page also carries its own reproduce block.
+
+:::caution[What is not available yet]
+- The research archive. Its DOI is <Claim id="archive.doi" />: it is not assigned yet. It will hold the preregistration documents, the FT1 data and outputs
+  (v1 and v2), the spent-instance ledger, and a git bundle of the full scrubbed history, which contains the tag <Claim id="freeze.tag" />.
+- A PyPI release of version 0.3.0. Release status: <Claim id="release.pypi" />. Install from the repository until then.
+- Downloadable figure data. The CSV and JSON files behind each figure, and a manifest with hashes, are **pending**.
+- Final-test data downloads. FT1 (ids <Claim id="ids.final" />) is complete, with NGOpt at <Claim id="ft1.ngopt_dims" />,
+  but its raw run files are in the archive only, not yet published. Figures labelled in-sample use ids <Claim id="ids.dev" /> and are
+  development data.
+:::
+
+## What is pinned
+
+| Item | Value |
+|---|---|
+| Preset | <Claim id="freeze.preset" />, as `amm_optimizer.presets.get("c46")` |
+| Config hash of the frozen configuration | <Claim id="freeze.config_hash" /> (`ATMConfig.config_hash()`) |
+| Config hash when the in-sample runs were made | <Claim id="freeze.config_hash_runtime" /> |
+| Public repository | <Claim id="repo.public_url" />, commit <Claim id="repo.commit_public" /> |
+| Package version in the repository | <Claim id="pkg.version_public" /> (the run files of the time record the development version <Claim id="pkg.version" />) |
+| Git tag and commit of the freeze | <Claim id="freeze.tag" />, commit <Claim id="freeze.commit" /> (before a history rewrite: <Claim id="freeze.commit_pre_rewrite" />); in the research archive, not in the public repository |
+| Licence | <Claim id="pkg.license" /> |
+| Development instance ids | <Claim id="ids.dev" /> (bbob, in-sample) |
+| Final-test instance ids | <Claim id="ids.final" /> (bbob, never used in a decision) |
+| Final-test seed | 9000 |
+
+The algorithm was frozen on 2026-10-22: from that point the algorithm does not change for the final
+test. The harness, the documentation and the analysis scripts may still change.
+
+### Check the frozen configuration
+
+The frozen configuration is identified by its config hash. In the public repository, `amm_optimizer.presets.get("c46").config_hash()`
+returns <Claim id="freeze.config_hash" />. That check needs only the public code. It does not need the tag or the archive.
+
+### Two hashes for one configuration
+
+The runs behind the in-sample figures recorded the hash <Claim id="freeze.config_hash_runtime" />. The frozen configuration
+reports <Claim id="freeze.config_hash" />. They differ because the hash covers the schema of the
+configuration, and the `Variant` class gained one opt-in field (`stage_extend_max_per_dim`) between the
+runs and the freeze. The behaviour did not change: characterisation snapshots in the repository pin it
+bit for bit. The configuration text of the runs is identical to `benchmarks/arms/c46_config.txt` in the repository
+(checked, with a SHA-256 in the provenance file). If you compute the hash yourself you get
+the frozen value, not the run-time one.
+
+## Software that was recorded
+
+The in-sample `c46` run files record these versions. The FT1 run files record their own; they have not been copied to
+this page.
+
+| Component | Version |
+|---|---|
+| Python | <Claim id="env.python" /> |
+| NumPy | <Claim id="env.numpy" /> |
+| SciPy | <Claim id="env.scipy" /> |
+| pycma | <Claim id="env.pycma" /> |
+| cocoex (COCO) | <Claim id="env.cocoex" /> |
+| atm (module name of the time) | <Claim id="pkg.version" /> |
+| Operating system | Windows 11 |
+| BLAS threads | 1 (the harness forces it) |
+
+SciPy matters more than for most packages. The `c46` stages call SLSQP, L-BFGS-B and COBYQA, and the
+package version <Claim id="pkg.version_public" /> declares <Claim id="pkg.requires" />. SciPy 1.16 changed some SLSQP exit statuses that the
+configuration's fallback routes read.
+
+**Not recorded:**
+
+- The versions of Optuna (TPE) and Nevergrad (NGOpt). The run files do not store them, and they could
+  not be read afterwards. They are unknown.
+- The hardware: CPU and RAM were not recorded. The run files hold only the platform string and the wall
+  time of each run.
+
+So the comparison with TPE and NGOpt cannot be reproduced to the version. Treat those two columns as
+approximate until the versions are pinned in the final test.
+
+## How the harness is run
+
+The benchmark harness is `benchmarks/quick_scan.py` in the repository. The recorded in-sample runs used this form (the
+runs were made with the code of the time, whose module was `atm`):
+
+```bash
+python benchmarks/quick_scan.py run --solver atm --config "<config text of c46>" \
+    --instance-ids 61-70 --seeds 1 --seed 9000 --penalty raw --jobs 2 \
+    --dims 2,5,10,20,40 --multipliers 10,30,100,300,1000 --out c46.json.gz
+```
+
+The solver names for the other methods are `cma_ipop`, `cma_bipop`, `slsqp`, `de`, `tpe` and `ngopt`.
+The harness also accepts `--config preset:c46` (the changelog lists `--config preset:NAME`, and a dry
+run accepted it). It should be equivalent to the config text, because a test checks that each preset
+equals its arms file. The recorded runs used the text form, so the preset form is untested against them.
+
+What the design is:
+
+- 24 bbob functions, instance ids 61-70, **one run per instance and budget**, seed offset 9000.
+- Dimensions 2, 5, 10, 20 and 40; budgets of 10, 30, 100, 300 and 1000 evaluations per dimension.
+- Fixed-budget runs, raw COCO evaluation (`--penalty raw`), cocoex <Claim id="env.cocoex" />.
+- Score per run: the fraction of 51 targets (10^2 down to 10^-8) reached within the budget. Per cell,
+  the mean over the 10 instances. Per curve, the unweighted mean over the 24 functions.
+- The harness enforces the budget, not the optimizer. COCO's own counter is the authority, and
+  start points are drawn uniformly inside the box.
+
+Instance ids that development has used are in a ledger (`docs/research/batches/spent_ids.json`) that is in the research archive, not in the
+public repository. The ids <Claim id="ids.final" /> were never used.
+
+## Reproducing the final test FT1
+
+The final test ran the frozen configuration once, with the choices below fixed before any run (the preregistration is
+described on the [research log](/research-log/#the-final-test-ft1) and its documents are in the research archive). The FT1 arms file, analysis scripts and
+outputs named below are in the archive; they are not in the public repository.
+
+| Item | Value |
+|---|---|
+| Configuration | <Claim id="freeze.preset" />, config hash <Claim id="freeze.config_hash" /> |
+| Data | bbob functions 1 to 24, dimensions 2, 5, 10, 20 and 40, budgets of 10, 30, 100, 300 and 1000 evaluations per dimension |
+| Instances | raw ids <Claim id="ids.final" /> (`--instance-ids 101-110`) |
+| Runs | one per function, dimension, instance and budget; seed 9000; <Claim id="ft1.runs" /> runs of the frozen configuration in <Claim id="ft1.cells" /> cells |
+| Arms file | `benchmarks/arms/final_ft1.json` |
+| Results directory | `benchmarks/results/scan/audit/final101/` |
+| Analysis | `final_ft1.py` with no arguments, in the batch folder `docs/research/batches/b095_final_ft1/` |
+| Figures | `ft1_plots.py`, as run for v2 (NGOpt at every dimension) |
+| Recorded outputs | `ft1_output_v2.txt` (the printed analysis) and `ft1_v2.json` (the numbers); the site reads the JSON |
+| Analysis run | v2 on 2026-10-23, after all 33 arms had finished |
+
+What to know before reproducing:
+
+- **v1 and v2.** The results on this site are v2, from `final_ft1.py` run with no arguments. An earlier analysis, v1, was
+  run with the option `--ngopt-dims=2`, before NGOpt's arms had finished; its outputs are kept as `ft1_output_v1.txt` and
+  `ft1_v1.json`. The two differ only in the counts that involve NGOpt (F2, F3 and the leader counts). The comparisons
+  with IPOP and SLSQP are the same. The [research log](/research-log/#the-final-test-ft1) has the numbers of both.
+- **The field.** The competitor arms are those of the in-sample field runs, with `--instance-ids 101-110`: pycma IPOP and
+  BIPOP, restarted SLSQP, SciPy differential evolution, Optuna's TPE (the capped slice) and Nevergrad's NGOpt. The
+  preregistration adds NGOpt at D 10, where the in-sample ledger lacked it. HCMA is not run: its values are the COCO
+  archive's, on its own instances, for D 2 to 20.
+- **Versions.** The competitor versions are those of the in-sample field runs. The Optuna and Nevergrad versions were not
+  recorded (see above), so the FT1 columns for TPE and NGOpt cannot be reproduced to the version either.
+- **Analysis options.** `--folder=` points the script at another results folder (it was used to dry-run it on development
+  data) and `--json=` writes the numbers as JSON. Neither changes F1 to F4.
+- **The analysis script.** It was written before any result was read, and v1 and v2 are two runs of the same script. The
+  deviations from the plan are on the research log.
+
+## The `c46` in-sample series is a composite
+
+The curve and heatmap labelled `c46` are **not one run**. They are assembled from per-dimension run
+files, overlaid in order. In the final composite:
+
+- <Claim id="composite.cells_c45" /> of the <Claim id="hero.cells" /> cells come from the full-grid run of the
+  previous configuration, `c45` (config hash `e39ae91b08a4d3b4`).
+- <Claim id="composite.cells_c46" /> cells (dimensions 10, 20 and 40 at 100 x D, all 24 functions) come from runs of the
+  literal `c46` configuration.
+- `c46` is `c45` plus one option (`prefix_low_beta=0.15`, from dimension 10). The other cells are
+  assumed to be identical under `c46` and were **not re-run** on this grid.
+
+This is an assumption, not a measurement. The final test (FT1) did not use this composite: it ran the frozen
+configuration itself.
+
+## Other caveats of the in-sample comparison
+
+These apply to the in-sample figures on ids <Claim id="ids.dev" />. The final test has one run per cell and instance, on
+ids <Claim id="ids.final" />, and its intervals are described on the [research log](/research-log/#the-final-test-ft1).
+
+- **One seed per instance, ten instances.** There are no confidence intervals. The 0.02 margin
+  that classifies a cell as ahead, level or behind is a plotting threshold, not a significance test.
+- **Unequal competitor coverage.** HCMA has no values at dimension 40, and its numbers are COCO archive
+  data on other instances, not the same harness. TPE ran a capped slice only (dimensions 2, 5 and 10 at
+  10 to 100 x D, dimension 20 at 10 and 30 x D, dimension 40 at 10 x D). NGOpt has no dimension-10
+  runs. Where a competitor is missing, the best competitor is the best of the others, so those cells
+  are easier to win than a seven-way comparison suggests.
+- **Dirty working trees.** Most run files record `git dirty: true`: they were produced in development
+  worktrees. The run-file hashes are in the provenance file.
+- **The plot command is inferred.** The exact command that drew the `c46` figures was not recorded. The
+  inferred one reproduced the cell counts shown on the results page.
+
+## Raw data
+
+The raw run files, including those of FT1 in `benchmarks/results/scan/audit/final101/`, are not in the public repository. They go into the
+research archive (DOI: <Claim id="archive.doi" />, pending). Some development files were never committed to git. When the archive is published, this page will
+link it, the SHA-256 values of the files and a manifest per figure.
+
+## A quick check of your install
+
+The home-page example, run with the `c46` preset, prints the output shown on
+[Get started](/get-started/) on the machine that wrote this site. If `fun` differs in its leading digits while `x` is the
+same, the usual cause is the BLAS thread count: the harness forces one thread, and a machine default of
+several threads gives a different value near 1e-13. Bit-exact agreement needs the same software versions
+and thread count as the table above.

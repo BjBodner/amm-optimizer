@@ -1,0 +1,117 @@
+AMM (c46) runs: 6000
+
+## F1 IPOP: AMM - IPOP per budget (6000 paired runs)
+      10 x D: +0.121 [+0.080, +0.168] over 120 cells, p = 0.0005, above 0 (Holm)
+      30 x D: +0.203 [+0.153, +0.254] over 120 cells, p = 0.0005, above 0 (Holm)
+     100 x D: +0.303 [+0.244, +0.361] over 120 cells, p = 0.0005, above 0 (Holm)
+     300 x D: +0.312 [+0.251, +0.375] over 120 cells, p = 0.0005, above 0 (Holm)
+    1000 x D: +0.222 [+0.170, +0.280] over 120 cells, p = 0.0005, above 0 (Holm)
+
+## F4 SLSQP: AMM - SLSQP per budget (6000 paired runs)
+      10 x D: +0.015 [+0.007, +0.022] over 120 cells, p = 0.0005, above 0 (Holm)
+      30 x D: +0.037 [+0.020, +0.053] over 120 cells, p = 0.0005, above 0 (Holm)
+     100 x D: +0.118 [+0.085, +0.156] over 120 cells, p = 0.0005, above 0 (Holm)
+     300 x D: +0.225 [+0.183, +0.276] over 120 cells, p = 0.0005, above 0 (Holm)
+    1000 x D: +0.302 [+0.246, +0.362] over 120 cells, p = 0.0005, above 0 (Holm)
+
+## F2 / F3 per competitor (credible: P > .9, gap > .02)
+    IPOP: credibly behind   6, credibly ahead 323 of 600 cells
+   BIPOP: credibly behind   7, credibly ahead 326 of 600 cells
+   SLSQP: credibly behind  11, credibly ahead 299 of 600 cells
+      DE: credibly behind   0, credibly ahead 455 of 600 cells
+     TPE: credibly behind   2, credibly ahead 149 of 288 cells
+   NGOpt: credibly behind   6, credibly ahead 346 of 600 cells
+    HCMA: credibly behind  11, credibly ahead 173 of 480 cells
+
+F2 credibly behind some competitor: 35 of 600 cells (predicted 30-75)
+F3 credibly ahead of every competitor that ran the cell: 110 (predicted 70-120)
+  D  2: behind  11, ahead of all  12
+  D  5: behind   7, ahead of all  21
+  D 10: behind   8, ahead of all  19
+  D 20: behind   4, ahead of all  20
+  D 40: behind   5, ahead of all  38
+      10 x D: behind  11, ahead of all   2
+      30 x D: behind  10, ahead of all  12
+     100 x D: behind   4, ahead of all  33
+     300 x D: behind   6, ahead of all  32
+    1000 x D: behind   4, ahead of all  31
+
+Every credibly-behind cell (function, D, budget: who leads, AMM - them):
+  f2 D2 10x: SLSQP -0.096
+  f2 D2 30x: SLSQP -0.086
+  f7 D10 100x: HCMA -0.076
+  f7 D20 300x: HCMA -0.267
+  f8 D10 30x: SLSQP -0.069
+  f9 D5 10x: NGOpt -0.065
+  f9 D10 10x: NGOpt -0.047
+  f10 D5 30x: SLSQP -0.310
+  f10 D10 30x: SLSQP -0.178
+  f11 D5 10x: SLSQP -0.078
+  f12 D2 10x: SLSQP -0.208
+  f12 D2 30x: SLSQP -0.259
+  f12 D2 300x: IPOP -0.143, BIPOP -0.143
+  f13 D2 10x: SLSQP -0.065
+  f13 D2 300x: HCMA -0.078
+  f13 D20 10x: HCMA -0.029
+  f13 D40 100x: SLSQP -0.025
+  f14 D2 10x: SLSQP -0.057
+  f14 D2 300x: IPOP -0.122, BIPOP -0.122, HCMA -0.122
+  f14 D20 1000x: IPOP -0.037, BIPOP -0.037, HCMA -0.037
+  f14 D40 1000x: IPOP -0.041, BIPOP -0.041
+  f17 D5 30x: TPE -0.059
+  f17 D5 100x: NGOpt -0.065
+  f17 D5 300x: NGOpt -0.090
+  f17 D40 30x: IPOP -0.025, BIPOP -0.025
+  f18 D2 1000x: BIPOP -0.153
+  f18 D5 30x: TPE -0.043
+  f18 D20 30x: IPOP -0.033, BIPOP -0.033
+  f19 D10 10x: HCMA -0.028
+  f19 D10 30x: HCMA -0.054
+  f19 D10 100x: HCMA -0.031
+  f19 D10 300x: HCMA -0.026
+  f20 D40 10x: NGOpt -0.035
+  f23 D40 10x: NGOpt -0.031
+  f24 D2 1000x: HCMA -0.037
+
+## Descriptive: per budget, cells where AMM has the highest mean (ties included), else who does
+      10 x D: AMM 57, IPOP 2, BIPOP 0, SLSQP 14, DE 1, TPE 10, NGOpt 23, HCMA 13, cells 120
+      30 x D: AMM 61, IPOP 6, BIPOP 0, SLSQP 23, DE 0, TPE 11, NGOpt 12, HCMA 7, cells 120
+     100 x D: AMM 79, IPOP 10, BIPOP 0, SLSQP 14, DE 0, TPE 0, NGOpt 11, HCMA 6, cells 120
+     300 x D: AMM 90, IPOP 8, BIPOP 1, SLSQP 5, DE 0, TPE 0, NGOpt 6, HCMA 10, cells 120
+    1000 x D: AMM 95, IPOP 9, BIPOP 2, SLSQP 5, DE 2, TPE 0, NGOpt 1, HCMA 6, cells 120
+
+## Descriptive: AMM - IPOP per D x budget (bootstrap over functions)
+  D  2     10 x D: +0.139 [+0.068, +0.232]
+  D  2     30 x D: +0.278 [+0.176, +0.391]
+  D  2    100 x D: +0.341 [+0.225, +0.464]
+  D  2    300 x D: +0.154 [+0.054, +0.259]
+  D  2   1000 x D: +0.110 [+0.038, +0.197]
+  D  5     10 x D: +0.119 [+0.038, +0.227]
+  D  5     30 x D: +0.222 [+0.117, +0.338]
+  D  5    100 x D: +0.322 [+0.189, +0.460]
+  D  5    300 x D: +0.233 [+0.126, +0.350]
+  D  5   1000 x D: +0.182 [+0.077, +0.313]
+  D 10     10 x D: +0.118 [+0.035, +0.234]
+  D 10     30 x D: +0.177 [+0.076, +0.296]
+  D 10    100 x D: +0.330 [+0.192, +0.471]
+  D 10    300 x D: +0.381 [+0.250, +0.513]
+  D 10   1000 x D: +0.231 [+0.112, +0.367]
+  D 20     10 x D: +0.115 [+0.028, +0.231]
+  D 20     30 x D: +0.170 [+0.069, +0.292]
+  D 20    100 x D: +0.275 [+0.150, +0.409]
+  D 20    300 x D: +0.407 [+0.253, +0.564]
+  D 20   1000 x D: +0.233 [+0.124, +0.359]
+  D 40     10 x D: +0.116 [+0.022, +0.238]
+  D 40     30 x D: +0.166 [+0.063, +0.288]
+  D 40    100 x D: +0.245 [+0.125, +0.387]
+  D 40    300 x D: +0.385 [+0.238, +0.534]
+  D 40   1000 x D: +0.353 [+0.215, +0.499]
+  D x budget cells with the interval above 0: 25 of 25
+
+## Descriptive: AMM - HCMA archive level per budget (D 2-20, its own instances)
+      10 x D: +0.016 over 96 cells
+      30 x D: +0.120 over 96 cells
+     100 x D: +0.174 over 96 cells
+     300 x D: +0.104 over 96 cells
+    1000 x D: +0.103 over 96 cells
+wrote <local-path>

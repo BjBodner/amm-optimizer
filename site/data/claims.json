@@ -1,0 +1,1113 @@
+{
+  "_comment": "Single source of truth for every number the site states. status: final = frozen run or plain fact; dev = in-sample development data (shown with an in-sample badge); pending = placeholder awaiting a result. requiresFinal: a public build fails while the claim is not final. Update from FT1 results, never by hand-editing prose.",
+  "claims": {
+    "hero.cells": {
+      "label": "function x dimension x budget cells in the final-test comparison",
+      "value": "600",
+      "status": "final",
+      "requiresFinal": true,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)",
+      "finalSlot": "ft1.cells"
+    },
+    "hero.behind_pct": {
+      "label": "share of cells where AMM is credibly behind some competitor, v2; 35/600 = 5.8%",
+      "value": "5.8%",
+      "status": "final",
+      "requiresFinal": true,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)",
+      "finalSlot": "ft1.behind_pct"
+    },
+    "field.ahead": {
+      "label": "cells where AMM is ahead of the best competitor by more than 0.02",
+      "value": "179",
+      "status": "dev",
+      "requiresFinal": false,
+      "source": "c46 field heatmap title, in-sample ids 61-70"
+    },
+    "field.behind": {
+      "label": "cells where AMM is behind the best competitor by more than 0.02",
+      "value": "108",
+      "status": "dev",
+      "requiresFinal": false,
+      "source": "c46 field heatmap title, in-sample ids 61-70"
+    },
+    "field.level": {
+      "label": "cells within 0.02 of the best competitor",
+      "value": "313",
+      "status": "dev",
+      "requiresFinal": false,
+      "source": "313 = 600 - 179 - 108, in-sample ids 61-70 (data/dev/field_cells.json)"
+    },
+    "ft1.lead_ipop": {
+      "label": "FT1 F1: AMM lead over pycma IPOP-CMA-ES, range of the five per-budget means; every budget above 0 under Holm",
+      "value": "+.12 to +.31 at every budget",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "release.pypi": {
+      "label": "PyPI release of amm-optimizer",
+      "value": "0.3.0 not yet on PyPI (0.2.0 is, and imports as amm or atm)",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "pypi.org/pypi/amm-optimizer/json lists only 0.2.0 on 2026-10-23; the repository is at 0.3.0. 0.2.0's default minimize is the original ATM sampler (f = 1.7 on the home-page example); decision: yank 0.2.0 and release 0.3.0 (the maintainer runs the release)"
+    },
+    "release.doi": {
+      "label": "Zenodo DOI of the first release",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "Zenodo, after the first public release"
+    },
+    "paper.arxiv": {
+      "label": "arXiv identifier",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "arXiv, after submission"
+    },
+    "freeze.tag": {
+      "label": "git tag of the frozen configuration",
+      "value": "freeze-2026-10-22",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "memory/atm-research-state-2026-10-22; <worktree>"
+    },
+    "freeze.commit": {
+      "label": "commit of the frozen configuration",
+      "value": "8c9d40f",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "commit of the frozen configuration in the scrubbed history (was 552777b before the 2026-10-22 history rewrite; see freeze.commit_pre_rewrite). Changes if the history is rewritten again."
+    },
+    "freeze.config_hash": {
+      "label": "config hash of c46",
+      "value": "2153948ebed51150",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "commit message of 552777b"
+    },
+    "freeze.preset": {
+      "label": "preset name of the frozen configuration",
+      "value": "c46",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "src/atm/presets.py at 552777b"
+    },
+    "ids.dev": {
+      "label": "bbob instance ids of the in-sample field comparison",
+      "value": "61-70",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "c46 field heatmap title"
+    },
+    "ids.final": {
+      "label": "bbob instance ids of the final test",
+      "value": "101-110",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/DECISIONS.md: ids 101-115 reserved for the final test"
+    },
+    "pkg.version": {
+      "label": "package version in the repository",
+      "value": "0.2.0.dev0",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "src/atm/__init__.py at 552777b"
+    },
+    "pkg.license": {
+      "label": "licence",
+      "value": "Apache-2.0",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "README.md, LICENSE"
+    },
+    "prereg.cycles": {
+      "label": "development cycles logged",
+      "value": "62",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md section 4: 'The development log of AMM lists 62 cycles'"
+    },
+    "beyond.bbob": {
+      "label": "result beyond the bbob suite (other benchmarks, real problems)",
+      "value": "not yet tested",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "paper_draft_v1/CLAIMS.md C10: gap 2, problems beyond bbob"
+    },
+    "prereg.held": {
+      "label": "preregistered predictions that held in the last twelve confirmations (c32 to c43)",
+      "value": "24 of 27",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/numbers_ledger.md row 1; paper_draft_v1/draft_v3.md section 4.1 and Appendix C"
+    },
+    "prereg.failed": {
+      "label": "preregistered predictions that failed in the same twelve confirmations",
+      "value": "3",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md Appendix C (kink route twice, plateau check once)"
+    },
+    "prereg.batches": {
+      "label": "numbered batches in the development log (counted for draft v3)",
+      "value": "74",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/numbers_ledger.md row 61; paper_draft_v1/draft_v3.md section 4.3 Crafting effort"
+    },
+    "prereg.confirmations": {
+      "label": "holdout or fresh-id confirmation runs (counted for draft v3)",
+      "value": "25",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/numbers_ledger.md row 61"
+    },
+    "prereg.composites": {
+      "label": "promoted composites in the code (counted for draft v3)",
+      "value": "21",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/numbers_ledger.md row 62 (presets.py)"
+    },
+    "prereg.last_cycle": {
+      "label": "last cycle number in the batch index at the freeze",
+      "value": "71",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "docs/research/batches/INDEX.md in worktree <worktree> (Batches 91-93 are cycle 71); differs from prereg.cycles, which draft v3 counted at Batch 74 (cycle 62)"
+    },
+    "ids.spent": {
+      "label": "bbob instance ids spent at the freeze",
+      "value": "1-100 and 116-769",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "docs/research/batches/spent_ids.json (next_free 770); docs/FREEZE_2026-10-22.md, Spent ids at the freeze"
+    },
+    "ids.reserved": {
+      "label": "bbob instance ids reserved for the final test, never used",
+      "value": "101-115",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "docs/research/batches/spent_ids.json reserved; FT1 uses 101-110 and keeps 111-115 back"
+    },
+    "ids.next_free": {
+      "label": "next unspent bbob instance id",
+      "value": "770",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "docs/research/batches/spent_ids.json next_free"
+    },
+    "conf.c32_ipop": {
+      "label": "c32 lead over pycma IPOP-CMA-ES on never-used ids 176-185, target share [95% CI], D 5-40, 30-1000 x D (validation data, intermediate configuration)",
+      "value": "+.208 [+.195, +.222]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/numbers_ledger.md; paper_draft_v1/draft_v3.md section 5.1 and Appendix C"
+    },
+    "conf.kink1": {
+      "label": "kink route v1 (smaller SLSQP step), f13 D 20-40 1000-3000 x D, ids 211-225: measured gain [95% CI]",
+      "value": "+.028 [−.011, +.069]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md Table 3 and Table A2; paper_draft_v1/numbers_ledger.md row 11"
+    },
+    "conf.kink1_pred": {
+      "label": "kink route v1: preregistered range of the gain",
+      "value": "+.04 to +.15",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/numbers_ledger.md row 81"
+    },
+    "conf.kink2": {
+      "label": "kink route v1 retested, ids 246-285: measured gain [95% CI]",
+      "value": "+.017 [−.006, +.039]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md Table 3; paper_draft_v1/numbers_ledger.md row 12"
+    },
+    "conf.kink2_pred": {
+      "label": "kink route retest: preregistered range of the gain",
+      "value": "+.02 to +.08",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/numbers_ledger.md row 82"
+    },
+    "conf.kink3": {
+      "label": "kink redesign (scaled BFGS), f13 D 10-40 1000 x D, ids 286-325: measured gain [95% CI]",
+      "value": "+.304 [+.280, +.328]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md Table 3; paper_draft_v1/numbers_ledger.md row 13"
+    },
+    "conf.kink3_pred": {
+      "label": "kink redesign: preregistered range of the gain",
+      "value": "+.10 to +.35",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/numbers_ledger.md row 83"
+    },
+    "conf.plateau": {
+      "label": "plateau check in the prefix, f7 D 5-40 100 x D, ids 286-325: measured gain [95% CI]",
+      "value": "+.008 [−.004, +.018]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md Table A2; paper_draft_v1/numbers_ledger.md row 13"
+    },
+    "conf.plateau_pred": {
+      "label": "plateau check: preregistered range of the gain (stated as little power, not blocking)",
+      "value": "+.000 to +.03",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "docs/research/audit_2026-10-17/PREREG.md, claim P of the cycle 48 confirmation (c37 against c36), about line 2240"
+    },
+    "conf.f20_chain": {
+      "label": "pair test chain reading to coordinate search, f20 D 5-40 300-3000 x D, ids 326-365: gain [95% CI]",
+      "value": "+.773 [+.758, +.786]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md Table A2 and section 5.1"
+    },
+    "conf.f3_step": {
+      "label": "pair test separable reading to STEP restarts, f3 D 5-40 100 x D, ids 326-365: gain [95% CI]",
+      "value": "+.711 [+.675, +.745]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md Table A2 and section 5.1"
+    },
+    "conf.f23_fractal": {
+      "label": "fractal reading to restarted SLSQP, f23 D 20-40 1000-3000 x D, ids 246-285: gain [95% CI]",
+      "value": "+.044 [+.036, +.053]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md Table A2 and section 5.1"
+    },
+    "conf.cobyqa_d2": {
+      "label": "D=2 at 10 x D routed to COBYQA, all functions, ids 366-399: gain [95% CI]",
+      "value": "+.026 [+.019, +.033]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md Table A2 (c43)"
+    },
+    "conf.c47_x": {
+      "label": "c47 claim X (sx capped at 300 x D), ids 730-769: measured gain [95% CI]",
+      "value": "+.007 [−.002, +.017]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "docs/FREEZE_2026-10-22.md; docs/research/batches/INDEX.md Batch 93 (p = .078): not confirmed, c46 stays frozen"
+    },
+    "conf.c47_pred": {
+      "label": "c47 claim X: preregistered range of the gain on f8 and f9, D 5-40, 300 x D",
+      "value": "+.003 to +.040",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "docs/research/batches/b093_fresh730/prereg.md line 22"
+    },
+    "conf.slsqp_pred": {
+      "label": "first quasi-Newton comparison: preregistered lead of c23 over restarted SLSQP",
+      "value": "+.10 to +.25",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md Appendix C, The first quasi-Newton comparison changed the design"
+    },
+    "conf.slsqp_actual": {
+      "label": "first quasi-Newton comparison: measured lead of SLSQP over c23 [95% CI], primary score",
+      "value": "0.032 [0.018, 0.047]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md Appendix C"
+    },
+    "round2.held": {
+      "label": "round 2 (2026-10-17) predictions that held",
+      "value": "12 of 16",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "docs/research/LESSONS.md lesson 7"
+    },
+    "calib.guardrail_null": {
+      "label": "failure rate of the no-group-loses-more-than-.02 guardrail when there is no true effect (A/A runs)",
+      "value": "about 59%",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/numbers_ledger.md row 56; paper_draft_v1/draft_v3.md Appendix C, Calibration with A/A runs"
+    },
+    "limits.sep_misroute": {
+      "label": "a separability route calibrated at 300-1000 x D, misrouting rugged functions at 3000 x D: loss per cell (development)",
+      "value": "−.18 to −.25",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md section 6, Probes outside their calibrated range"
+    },
+    "limits.f16_loss": {
+      "label": "fractal exemption: loss on f16 (development)",
+      "value": ".16",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md section 6"
+    },
+    "limits.cobyqa_ms": {
+      "label": "SciPy COBYQA alone, time per evaluation at D=2-3, measured outside COCO's timing procedure",
+      "value": "about 4.4 ms",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "paper_draft_v1/draft_v3.md section 5.6; paper_draft_v1/numbers_ledger.md row 64 (informal measurement of COBYQA only, not of AMM)"
+    },
+    "data.c46_from_c45": {
+      "label": "cells of the c46 field composite that come from full-grid c45 runs",
+      "value": "528",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "site/data/dev/README.md caveat 1"
+    },
+    "data.c46_literal": {
+      "label": "cells of the c46 field composite run with the literal c46 config (D 10, 20, 40 at 100 x D)",
+      "value": "72",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "site/data/dev/README.md caveat 1"
+    },
+    "data.c46_hash_run": {
+      "label": "config hash of c46 at the time of the in-sample runs",
+      "value": "9f570d51aa12852a",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "site/data/dev/README.md caveat 2 (the hash at the tag differs because the Variant schema gained a field)"
+    },
+    "timing.per_eval": {
+      "label": "AMM CPU time per evaluation under COCO's timing experiment",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "paper_draft_v1/draft_v3.md section 5.5, gap 7; not run"
+    },
+    "variance.seed": {
+      "label": "seed-to-seed variance of AMM's target share",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "one seed per instance in the development field; not measured"
+    },
+    "ablation.result": {
+      "label": "leave-one-route-out ablation, change in target share per route family",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "paper_draft_v1/draft_v3.md Table 6; post-freeze analysis on fresh ids from 770, prereg not yet approved (DECISIONS.md D21)"
+    },
+    "mabbob.result": {
+      "label": "AMM on MA-BBOB under the competition protocol",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "paper_draft_v1/draft_v3.md section 5.4; MA-BBOB rows 900-999 reserved"
+    },
+    "effort.arms_cpu": {
+      "label": "arms screened and CPU hours spent in development",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "paper_draft_v1/draft_v3.md section 4.3 Crafting effort (to be reconstructed from benchmarks/arms/ and run logs)"
+    },
+    "paper.pdf": {
+      "label": "link to the paper PDF",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "posted with the arXiv preprint"
+    },
+    "paper.year": {
+      "label": "year of the paper for citation",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "set when the preprint is posted"
+    },
+    "repo.public_url": {
+      "label": "public repository URL",
+      "value": "https://github.com/BjBodner/amm-optimizer",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "the public repository, created 2026-10-23 13:57 UTC (one commit, c4f0ab1, amm-optimizer 0.3.0)"
+    },
+    "contact.general": {
+      "label": "contact address for the project",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "not decided"
+    },
+    "contact.security": {
+      "label": "security-report contact",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "no SECURITY.md in the repository yet"
+    },
+    "ai.tool": {
+      "label": "name and version of the AI assistant used for drafting support",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "paper_draft_v1/draft_v3.md Acknowledgments (tool name and version are PENDING there too)"
+    },
+    "about.affiliation": {
+      "label": "author affiliation",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "not present in the repository or project notes; do not invent"
+    },
+    "writing.posts": {
+      "label": "published Medium or Towards Data Science posts about AMM",
+      "value": "none verified",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "no post about AMM found in C:/repos/medium_articles or the project docs"
+    },
+    "env.python": {
+      "label": "Python version recorded in the c46 run files",
+      "value": "3.12.10",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "site/data/dev/provenance.json, versions_recorded_in_run_files"
+    },
+    "env.numpy": {
+      "label": "NumPy version recorded in the c46 run files",
+      "value": "2.5.4",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "site/data/dev/provenance.json, versions_recorded_in_run_files"
+    },
+    "env.scipy": {
+      "label": "SciPy version recorded in the c46 run files",
+      "value": "1.18.1",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "site/data/dev/provenance.json, versions_recorded_in_run_files"
+    },
+    "env.pycma": {
+      "label": "pycma version recorded in the c46 run files",
+      "value": "4.5.0",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "site/data/dev/provenance.json, versions_recorded_in_run_files"
+    },
+    "env.cocoex": {
+      "label": "cocoex (COCO) version recorded in the c46 run files",
+      "value": "2.8.2",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "site/data/dev/provenance.json, versions_recorded_in_run_files"
+    },
+    "freeze.config_hash_runtime": {
+      "label": "config hash of c46 as recorded in the run files (before the opt-in stage_extend_max_per_dim field was added)",
+      "value": "9f570d51aa12852a",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "site/data/dev/README.md caveat 2; docs/FREEZE_2026-10-22.md at 552777b; c46_d10/d20/d40.json.gz"
+    },
+    "composite.cells_c45": {
+      "label": "cells of the in-sample c46 series that come from the full-grid c45 run",
+      "value": "528",
+      "status": "dev",
+      "requiresFinal": false,
+      "source": "site/data/dev/README.md caveat 1; provenance.json method.c46_composite; in-sample ids 61-70"
+    },
+    "composite.cells_c46": {
+      "label": "cells of the in-sample c46 series that come from runs of the literal c46 config (D 10, 20, 40 at 100 x D, 24 functions each)",
+      "value": "72",
+      "status": "dev",
+      "requiresFinal": false,
+      "source": "site/data/dev/README.md caveat 1; provenance.json method.c46_composite; in-sample ids 61-70"
+    },
+    "field.behind_slsqp": {
+      "label": "behind cells (delta < -0.02) where SLSQP is the best competitor",
+      "value": "40",
+      "status": "dev",
+      "requiresFinal": false,
+      "source": "site/data/dev/field_cells.json, best_competitor over the 108 behind cells; also data/dev/README.md; in-sample ids 61-70"
+    },
+    "field.behind_le30": {
+      "label": "behind cells (delta < -0.02) at budgets of 10 or 30 x D (25 at 10 x D plus 32 at 30 x D)",
+      "value": "57",
+      "status": "dev",
+      "requiresFinal": false,
+      "source": "site/data/dev/field_cells.json, budget_mult over the 108 behind cells: 25, 32, 21, 16, 14 for 10, 30, 100, 300, 1000 x D; in-sample ids 61-70"
+    },
+    "demo.runs": {
+      "label": "recorded demo runs: bbob f8, f15, f21 at D = 2, 600 evaluations, seed 1, instance 1",
+      "value": "3",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "site/data/demo/index.json; tools/record_run.py at commit 552777b"
+    },
+    "demo.budget": {
+      "label": "evaluations per recorded demo run",
+      "value": "600",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "site/data/demo/*.json header.budget"
+    },
+    "demo.payload_kb": {
+      "label": "total size of the demo JSON",
+      "value": "145 kB",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "sum of site/data/demo/*.json at recording time"
+    },
+    "freeze.commit_pre_rewrite": {
+      "label": "commit of the frozen configuration before the history rewrite (appears in the paper draft and research logs)",
+      "value": "552777b",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "git log of research-c75-freeze; old-to-new map in amm-clean-commit-map.txt (552777bb... -> 8c9d40f...)"
+    },
+    "hero.highest": {
+      "label": "cells where AMM has the highest mean share of targets reached (ties included), v2",
+      "value": "382",
+      "status": "final",
+      "requiresFinal": true,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "hero.highest_pct": {
+      "label": "share of cells where AMM has the highest mean (ties included), v2; 382/600 = 63.7%",
+      "value": "64%",
+      "status": "final",
+      "requiresFinal": true,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "hero.behind": {
+      "label": "cells where AMM is credibly behind some competitor (preregistered rule F2), v2",
+      "value": "35",
+      "status": "final",
+      "requiresFinal": true,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.cells": {
+      "label": "FT1 cells (6,000 runs of c46 over 24 functions x 5 dimensions x 5 budgets x 10 instances / 10 instances per cell)",
+      "value": "600",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.runs": {
+      "label": "FT1 runs of the frozen configuration",
+      "value": "6,000",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f2_behind": {
+      "label": "F2: cells credibly behind some competitor (v2)",
+      "value": "35",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f3_ahead_all": {
+      "label": "F3: cells credibly ahead of every competitor that ran the cell (v2)",
+      "value": "110",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.highest": {
+      "label": "cells where AMM has the highest mean (ties included), v2",
+      "value": "382",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.ngopt_dims": {
+      "label": "NGOpt dimensions included",
+      "value": "all dimensions (v2)",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.v2": {
+      "label": "FT1 v2: recount of F2, F3 and the leader counts with every NGOpt dimension",
+      "value": "done (NGOpt at every dimension)",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f1_10": {
+      "label": "F1: AMM minus pycma IPOP at 10 x D, mean over 120 cells, 95% bootstrap interval (Holm over five budgets, p = .0005)",
+      "value": "+.121 [+.080, +.168]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.f4_10": {
+      "label": "F4: AMM minus restarted SLSQP at 10 x D, mean over 120 cells, 95% bootstrap interval",
+      "value": "+.015 [+.007, +.022]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.hcma_10": {
+      "label": "AMM minus HCMA archive level at 10 x D (D 2-20, 96 cells)",
+      "value": "+.016",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.f1_30": {
+      "label": "F1: AMM minus pycma IPOP at 30 x D, mean over 120 cells, 95% bootstrap interval (Holm over five budgets, p = .0005)",
+      "value": "+.203 [+.153, +.254]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.f4_30": {
+      "label": "F4: AMM minus restarted SLSQP at 30 x D, mean over 120 cells, 95% bootstrap interval",
+      "value": "+.037 [+.020, +.053]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.hcma_30": {
+      "label": "AMM minus HCMA archive level at 30 x D (D 2-20, 96 cells)",
+      "value": "+.120",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.f1_100": {
+      "label": "F1: AMM minus pycma IPOP at 100 x D, mean over 120 cells, 95% bootstrap interval (Holm over five budgets, p = .0005)",
+      "value": "+.303 [+.244, +.361]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.f4_100": {
+      "label": "F4: AMM minus restarted SLSQP at 100 x D, mean over 120 cells, 95% bootstrap interval",
+      "value": "+.118 [+.085, +.156]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.hcma_100": {
+      "label": "AMM minus HCMA archive level at 100 x D (D 2-20, 96 cells)",
+      "value": "+.174",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.f1_300": {
+      "label": "F1: AMM minus pycma IPOP at 300 x D, mean over 120 cells, 95% bootstrap interval (Holm over five budgets, p = .0005)",
+      "value": "+.312 [+.251, +.375]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.f4_300": {
+      "label": "F4: AMM minus restarted SLSQP at 300 x D, mean over 120 cells, 95% bootstrap interval",
+      "value": "+.225 [+.183, +.276]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.hcma_300": {
+      "label": "AMM minus HCMA archive level at 300 x D (D 2-20, 96 cells)",
+      "value": "+.104",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.f1_1000": {
+      "label": "F1: AMM minus pycma IPOP at 1000 x D, mean over 120 cells, 95% bootstrap interval (Holm over five budgets, p = .0005)",
+      "value": "+.222 [+.170, +.280]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.f4_1000": {
+      "label": "F4: AMM minus restarted SLSQP at 1000 x D, mean over 120 cells, 95% bootstrap interval",
+      "value": "+.302 [+.246, +.362]",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.hcma_1000": {
+      "label": "AMM minus HCMA archive level at 1000 x D (D 2-20, 96 cells)",
+      "value": "+.103",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (identical to v1: these comparisons do not involve NGOpt); data/ft1/ft1_v2.json"
+    },
+    "ft1.highest_10": {
+      "label": "cells (of 120) where AMM has the highest mean at 10 x D, ties included, v2",
+      "value": "57",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.highest_30": {
+      "label": "cells (of 120) where AMM has the highest mean at 30 x D, ties included, v2",
+      "value": "61",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.highest_100": {
+      "label": "cells (of 120) where AMM has the highest mean at 100 x D, ties included, v2",
+      "value": "79",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.highest_300": {
+      "label": "cells (of 120) where AMM has the highest mean at 300 x D, ties included, v2",
+      "value": "90",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.highest_1000": {
+      "label": "cells (of 120) where AMM has the highest mean at 1000 x D, ties included, v2",
+      "value": "95",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.ahead_ipop": {
+      "label": "cells credibly ahead of pycma IPOP (F3 rule, flipped) among the cells it ran (v2)",
+      "value": "323",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): every NGOpt dimension included"
+    },
+    "ft1.ahead_bipop": {
+      "label": "cells credibly ahead of pycma BIPOP (F3 rule, flipped) among the cells it ran (v2)",
+      "value": "326",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): every NGOpt dimension included"
+    },
+    "ft1.ahead_slsqp": {
+      "label": "cells credibly ahead of restarted SLSQP (F3 rule, flipped) among the cells it ran (v2)",
+      "value": "299",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): every NGOpt dimension included"
+    },
+    "ft1.ahead_de": {
+      "label": "cells credibly ahead of SciPy differential evolution (F3 rule, flipped) among the cells it ran (v2)",
+      "value": "455",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): every NGOpt dimension included"
+    },
+    "ft1.ahead_tpe": {
+      "label": "cells credibly ahead of Optuna TPE (capped slice) (F3 rule, flipped) among the cells it ran (v2)",
+      "value": "149",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): every NGOpt dimension included"
+    },
+    "ft1.ahead_ngopt": {
+      "label": "F3 per competitor: cells credibly ahead of NGOpt, of 600 (v2)",
+      "value": "346",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.ahead_hcma": {
+      "label": "cells credibly ahead of HCMA's COCO archive levels (D 2-20, its own instances) (F3 rule, flipped) among the cells it ran (v2)",
+      "value": "173",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): every NGOpt dimension included"
+    },
+    "ft1.ran_tpe": {
+      "label": "cells of the 600 that Optuna TPE (capped slice) ran in FT1",
+      "value": "288",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): every NGOpt dimension included"
+    },
+    "ft1.ran_ngopt": {
+      "label": "cells NGOpt ran in FT1 v2",
+      "value": "600",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.ran_hcma": {
+      "label": "cells of the 600 covered by HCMA archive levels in FT1 (D 2 to 20 only)",
+      "value": "480",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): every NGOpt dimension included"
+    },
+    "ft1.behind_ipop": {
+      "label": "F2 per competitor: cells credibly behind IPOP (v2)",
+      "value": "6",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.behind_bipop": {
+      "label": "F2 per competitor: cells credibly behind BIPOP (v2)",
+      "value": "7",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.behind_slsqp": {
+      "label": "F2 per competitor: cells credibly behind SLSQP (v2)",
+      "value": "11",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.behind_de": {
+      "label": "F2 per competitor: cells credibly behind DE (v2)",
+      "value": "0",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.behind_tpe": {
+      "label": "F2 per competitor: cells credibly behind TPE (v2)",
+      "value": "2",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.behind_ngopt": {
+      "label": "F2 per competitor: cells credibly behind NGOPT (v2)",
+      "value": "6",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.behind_hcma": {
+      "label": "F2 per competitor: cells credibly behind HCMA (v2)",
+      "value": "11",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f2_D2": {
+      "label": "F2: credibly behind cells at D 2 (v2)",
+      "value": "11",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f2_D5": {
+      "label": "F2: credibly behind cells at D 5 (v2)",
+      "value": "7",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f2_D10": {
+      "label": "F2: credibly behind cells at D 10 (v2)",
+      "value": "8",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f2_D20": {
+      "label": "F2: credibly behind cells at D 20 (v2)",
+      "value": "4",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f2_D40": {
+      "label": "F2: credibly behind cells at D 40 (v2)",
+      "value": "5",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f2_B10": {
+      "label": "F2: credibly behind cells at 10 x D (v2)",
+      "value": "11",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f2_B30": {
+      "label": "F2: credibly behind cells at 30 x D (v2)",
+      "value": "10",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f2_B100": {
+      "label": "F2: credibly behind cells at 100 x D (v2)",
+      "value": "4",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f2_B300": {
+      "label": "F2: credibly behind cells at 300 x D (v2)",
+      "value": "6",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f2_B1000": {
+      "label": "F2: credibly behind cells at 1000 x D (v2)",
+      "value": "4",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f3_D2": {
+      "label": "F3: credibly ahead of all, D 2 (v2)",
+      "value": "12",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f3_D5": {
+      "label": "F3: credibly ahead of all, D 5 (v2)",
+      "value": "21",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f3_D10": {
+      "label": "F3: credibly ahead of all, D 10 (v2)",
+      "value": "19",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f3_D20": {
+      "label": "F3: credibly ahead of all, D 20 (v2)",
+      "value": "20",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f3_D40": {
+      "label": "F3: credibly ahead of all, D 40 (v2)",
+      "value": "38",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f3_B10": {
+      "label": "F3: credibly ahead of all, 10 x D (v2)",
+      "value": "2",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f3_B30": {
+      "label": "F3: credibly ahead of all, 30 x D (v2)",
+      "value": "12",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f3_B100": {
+      "label": "F3: credibly ahead of all, 100 x D (v2)",
+      "value": "33",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f3_B300": {
+      "label": "F3: credibly ahead of all, 300 x D (v2)",
+      "value": "32",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.f3_B1000": {
+      "label": "F3: credibly ahead of all, 1000 x D (v2)",
+      "value": "31",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v2 (data/ft1/ft1_v2.json, ft1_output_v2.txt): frozen c46 on bbob ids 101-110, 6,000 runs, seed 9000, every NGOpt dimension included; produced 2026-10-23 by running final_ft1.py with no arguments at research-final-ft1 commit 91e05e4c (outputs kept with the site data, not yet committed in the research branch)"
+    },
+    "ft1.v1_f2": {
+      "label": "FT1 v1 F2: cells credibly behind some competitor (NGOpt at D 2 only)",
+      "value": "29",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v1 (data/ft1/ft1_v1.json, ft1_output_v1.txt, analysis run 2026-10-22 19:27 with final_ft1.py --ngopt-dims=2): the first analysis, kept as history on the research log"
+    },
+    "ft1.v1_f3": {
+      "label": "FT1 v1 F3: cells credibly ahead of every competitor that ran the cell (NGOpt at D 2 only)",
+      "value": "122",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v1 (data/ft1/ft1_v1.json, ft1_output_v1.txt, analysis run 2026-10-22 19:27 with final_ft1.py --ngopt-dims=2): the first analysis, kept as history on the research log"
+    },
+    "ft1.v1_highest": {
+      "label": "FT1 v1: cells where AMM has the highest mean, ties included (NGOpt at D 2 only)",
+      "value": "409",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v1 (data/ft1/ft1_v1.json, ft1_output_v1.txt, analysis run 2026-10-22 19:27 with final_ft1.py --ngopt-dims=2): the first analysis, kept as history on the research log"
+    },
+    "ft1.v1_ngopt_ran": {
+      "label": "FT1 v1: cells NGOpt ran (D 2 only)",
+      "value": "120",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v1 (data/ft1/ft1_v1.json, ft1_output_v1.txt, analysis run 2026-10-22 19:27 with final_ft1.py --ngopt-dims=2): the first analysis, kept as history on the research log"
+    },
+    "ft1.v1_ngopt_behind": {
+      "label": "FT1 v1: cells credibly behind NGOpt",
+      "value": "0",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "FT1 v1 (data/ft1/ft1_v1.json, ft1_output_v1.txt, analysis run 2026-10-22 19:27 with final_ft1.py --ngopt-dims=2): the first analysis, kept as history on the research log"
+    },
+    "archive.doi": {
+      "label": "DOI of the research archive (preregistrations, FT1 data and outputs, id ledger, scrubbed history bundle)",
+      "value": "pending",
+      "status": "pending",
+      "requiresFinal": true,
+      "source": "Zenodo deposit prepared by the site work; the maintainer uploads it"
+    },
+    "repo.commit_public": {
+      "label": "commit of the public repository that contains the released code",
+      "value": "c4f0ab1",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "git log of github.com/BjBodner/amm-optimizer on 2026-10-23: one commit, 'amm-optimizer 0.3.0'"
+    },
+    "pkg.import_name": {
+      "label": "import name of the package in the repository (version 0.3.0)",
+      "value": "amm_optimizer",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "pyproject.toml and src/amm_optimizer of the public repository"
+    },
+    "pkg.default_config": {
+      "label": "what amm_optimizer.minimize runs without config=",
+      "value": "the original ATM sampler (not AMM)",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "checked 2026-10-23 on the 0.3.0 source and on PyPI 0.2.0: f = 1.7107 on the home-page example; AMM needs config=amm_optimizer.presets.get('c46') (f = 2.4585e-13)"
+    },
+    "pkg.version_public": {
+      "label": "package version in the public repository",
+      "value": "0.3.0",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "pyproject.toml and src/amm_optimizer/__init__.py of github.com/BjBodner/amm-optimizer, commit c4f0ab1 (checked 2026-10-23). pkg.version (0.2.0.dev0) is the development version at the freeze and stays for the run-file records."
+    },
+    "pkg.requires": {
+      "label": "runtime requirements declared by version 0.3.0",
+      "value": "Python 3.12 or newer, NumPy 2.0 or newer and SciPy 1.18 or newer",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "pyproject.toml of the public repository (requires-python >=3.12; dependencies numpy>=2.0, scipy>=1.18), checked 2026-10-23; CHANGELOG.md 0.3.0"
+    }
+  }
+}

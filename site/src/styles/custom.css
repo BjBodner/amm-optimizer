@@ -1,0 +1,337 @@
+/* AMM site design tokens.
+   Scientific-editorial: serif prose, sans UI, quiet colour. Okabe-Ito palette, and one fixed
+   colour per method used in every plot, diagram and link on the site. */
+
+:root {
+	/* Okabe-Ito */
+	--oi-black: #000000;
+	--oi-orange: #e69f00;
+	--oi-sky: #56b4e9;
+	--oi-green: #009e73;
+	--oi-yellow: #f0e442;
+	--oi-blue: #0072b2;
+	--oi-vermillion: #d55e00;
+	--oi-purple: #cc79a7;
+
+	/* Methods (match the paper figures: AMM thick black, competitors coloured) */
+	--m-amm: #111111;
+	--m-ipop: var(--oi-green);
+	--m-bipop: var(--oi-sky);
+	--m-slsqp: var(--oi-vermillion);
+	--m-de: var(--oi-purple);
+	--m-tpe: var(--oi-blue);
+	--m-ngopt: var(--oi-orange);
+	--m-hcma: #666666;
+
+	/* Claim status */
+	--st-dev: var(--oi-orange);
+	--st-pending: var(--oi-vermillion);
+
+	--sl-font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--amm-serif: Charter, 'Bitstream Charter', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+	--sl-font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+	--sl-content-width: 46rem;
+}
+
+:root[data-theme='light'] {
+	--sl-color-accent-low: #d8e9f4;
+	--sl-color-accent: #0072b2;
+	--sl-color-accent-high: #0b4f78;
+	--sl-color-white: #101418;
+	--sl-color-gray-1: #1f252b;
+	--sl-color-gray-2: #39424b;
+	--sl-color-gray-3: #5b6671;
+	--sl-color-gray-4: #8a949e;
+	--sl-color-gray-5: #c9d0d6;
+	--sl-color-gray-6: #eaeef1;
+	--sl-color-gray-7: #f5f7f8;
+	--sl-color-black: #fcfcfb;
+	--m-amm: #111111;
+}
+
+:root:not([data-theme='light']) {
+	--sl-color-accent-low: #0f2f45;
+	--sl-color-accent: #56b4e9;
+	--sl-color-accent-high: #a9d8f5;
+	--m-amm: #f2f2f2;
+	--m-hcma: #a0a0a0;
+}
+
+/* Prose in serif, interface in sans */
+.sl-markdown-content {
+	font-family: var(--amm-serif);
+	font-size: 1.06rem;
+	line-height: 1.7;
+}
+.sl-markdown-content :is(h1, h2, h3, h4, table, code, pre, summary, figcaption, .amm-ui) {
+	font-family: var(--sl-font);
+}
+.sl-markdown-content h2 {
+	margin-top: 2.6rem;
+	letter-spacing: -0.01em;
+}
+.sl-markdown-content :is(p, li) {
+	max-width: 68ch;
+}
+
+/* ---------- Claims ---------- */
+.claim {
+	font-variant-numeric: tabular-nums;
+	font-weight: 650;
+}
+.claim[data-claim-status='dev'] {
+	border-bottom: 2px dotted var(--st-dev);
+}
+.claim[data-claim-status='pending'] {
+	background: color-mix(in srgb, var(--st-pending) 16%, transparent);
+	border-bottom: 2px dashed var(--st-pending);
+	padding: 0 0.25em;
+	border-radius: 3px;
+}
+.claim-badge {
+	font-family: var(--sl-font);
+	font-size: 0.62rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	vertical-align: super;
+	margin-left: 0.25em;
+	padding: 0.05em 0.35em;
+	border-radius: 3px;
+	color: var(--sl-color-black);
+}
+.claim-badge[data-status='dev'] {
+	background: var(--st-dev);
+}
+.claim-badge[data-status='pending'] {
+	background: var(--st-pending);
+	color: #fff;
+}
+
+/* ---------- Hero ---------- */
+.amm-hero {
+	font-family: var(--sl-font);
+	margin: 1rem 0 2.2rem;
+}
+.amm-eyebrow {
+	font-size: 0.78rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--sl-color-gray-3);
+	margin: 0 0 0.4rem;
+}
+.amm-tagline {
+	font-family: var(--amm-serif);
+	font-size: clamp(1.25rem, 2.6vw, 1.55rem);
+	line-height: 1.45;
+	max-width: 36em;
+	margin: 0.6rem 0 1.2rem;
+	color: var(--sl-color-white);
+}
+.amm-install {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	flex-wrap: wrap;
+	margin: 1rem 0 0.4rem;
+}
+.amm-install code {
+	background: var(--sl-color-gray-6);
+	border: 1px solid var(--sl-color-gray-5);
+	border-radius: 6px;
+	padding: 0.45rem 0.75rem;
+	font-size: 0.95rem;
+}
+.amm-install button,
+.amm-btn {
+	font-family: var(--sl-font);
+	font-size: 0.9rem;
+	font-weight: 600;
+	border-radius: 6px;
+	padding: 0.45rem 0.9rem;
+	border: 1px solid var(--sl-color-gray-4);
+	background: transparent;
+	color: var(--sl-color-white);
+	cursor: pointer;
+	text-decoration: none;
+}
+.amm-btn.primary {
+	background: var(--sl-color-accent);
+	border-color: var(--sl-color-accent);
+	color: #fff;
+}
+:root:not([data-theme='light']) .amm-btn.primary {
+	color: #06121b;
+}
+.amm-btn:focus-visible,
+.amm-install button:focus-visible {
+	outline: 3px solid var(--sl-color-accent-high);
+	outline-offset: 2px;
+}
+.amm-cta {
+	display: flex;
+	gap: 0.7rem;
+	flex-wrap: wrap;
+	margin: 1.2rem 0 0;
+}
+.amm-note {
+	font-size: 0.82rem;
+	color: var(--sl-color-gray-3);
+}
+
+/* ---------- Stat row ---------- */
+.amm-stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+	gap: 0.9rem;
+	margin: 1.4rem 0;
+	font-family: var(--sl-font);
+}
+.amm-stat {
+	border: 1px solid var(--sl-color-gray-5);
+	border-radius: 8px;
+	padding: 0.8rem 1rem;
+}
+.amm-stat .num {
+	display: block;
+	font-size: 1.9rem;
+	font-weight: 700;
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+}
+.amm-stat .lbl {
+	font-size: 0.84rem;
+	color: var(--sl-color-gray-3);
+}
+
+/* ---------- Trust strip ---------- */
+.amm-trust {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem 1.1rem;
+	margin: 1.6rem 0;
+	padding: 0.7rem 0;
+	border-block: 1px solid var(--sl-color-gray-5);
+	font-family: var(--sl-font);
+	font-size: 0.82rem;
+}
+.amm-trust dt {
+	color: var(--sl-color-gray-3);
+	display: inline;
+}
+.amm-trust dd {
+	display: inline;
+	margin: 0 0 0 0.3em;
+	font-family: var(--sl-font-mono);
+	font-size: 0.8rem;
+}
+.amm-trust div {
+	white-space: nowrap;
+}
+
+/* ---------- Figures ---------- */
+figure.amm-figure {
+	margin: 2rem 0;
+}
+figure.amm-figure img {
+	width: 100%;
+	height: auto;
+	border: 1px solid var(--sl-color-gray-5);
+	border-radius: 6px;
+	background: #fcfcfb; /* figures are drawn on a light background in both themes */
+}
+figure.amm-figure figcaption {
+	font-size: 0.88rem;
+	color: var(--sl-color-gray-2);
+	margin-top: 0.5rem;
+}
+.amm-pill {
+	display: inline-block;
+	font-family: var(--sl-font);
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	padding: 0.1em 0.5em;
+	border-radius: 999px;
+	margin-right: 0.5em;
+	border: 1.5px solid currentColor;
+}
+.amm-pill[data-status='dev'] {
+	color: var(--oi-vermillion);
+}
+:root:not([data-theme='light']) .amm-pill[data-status='dev'] {
+	color: var(--oi-orange);
+}
+.amm-pill[data-status='diagram'] {
+	color: var(--sl-color-gray-3);
+}
+.amm-pill[data-status='final'] {
+	color: var(--oi-green);
+}
+details.amm-repro {
+	font-family: var(--sl-font);
+	font-size: 0.84rem;
+	margin-top: 0.4rem;
+}
+details.amm-repro summary {
+	cursor: pointer;
+	color: var(--sl-color-accent-high);
+}
+details.amm-repro dl {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 0.2rem 1rem;
+	margin: 0.5rem 0 0;
+}
+details.amm-repro dt {
+	color: var(--sl-color-gray-3);
+}
+details.amm-repro dd {
+	margin: 0;
+	font-family: var(--sl-font-mono);
+	font-size: 0.78rem;
+	overflow-wrap: anywhere;
+}
+
+/* ---------- Method legend (colour-blind safe, always paired with a dash/shape) ---------- */
+.amm-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.3rem 1rem;
+	font-family: var(--sl-font);
+	font-size: 0.82rem;
+	margin: 0.6rem 0;
+}
+.amm-legend i {
+	display: inline-block;
+	width: 1.6rem;
+	height: 0.28rem;
+	border-radius: 2px;
+	margin-right: 0.35rem;
+	vertical-align: middle;
+}
+
+/* ---------- Callout: when not to use ---------- */
+aside.amm-when-not {
+	border-left: 4px solid var(--st-dev);
+	background: var(--sl-color-gray-7);
+	padding: 0.8rem 1.1rem;
+	margin: 1.6rem 0;
+	border-radius: 0 6px 6px 0;
+	font-family: var(--sl-font);
+	font-size: 0.95rem;
+}
+aside.amm-when-not strong:first-child {
+	display: block;
+	margin-bottom: 0.2rem;
+}
+
+/* ---------- Motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+	* {
+		animation: none !important;
+		transition: none !important;
+		scroll-behavior: auto !important;
+	}
+}

@@ -1,0 +1,17 @@
+---
+// One fixed colour per method, used in every figure and diagram on the site.
+const methods: [string, string][] = [
+	['AMM (c46)', 'var(--m-amm)'],
+	['pycma IPOP', 'var(--m-ipop)'],
+	['pycma BIPOP', 'var(--m-bipop)'],
+	['SLSQP', 'var(--m-slsqp)'],
+	['DE', 'var(--m-de)'],
+	['TPE (Optuna)', 'var(--m-tpe)'],
+	['NGOpt (Nevergrad)', 'var(--m-ngopt)'],
+	['HCMA (COCO archive)', 'var(--m-hcma)'],
+];
+---
+
+<div class="amm-legend" role="list" aria-label="Method colours">
+	{methods.map(([name, colour]) => (<span role="listitem"><i style={`background:${colour}`}></i>{name}</span>))}
+</div>

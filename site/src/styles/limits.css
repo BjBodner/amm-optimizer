@@ -1,0 +1,117 @@
+/* Styles for LossTable.astro (the list of cells where AMM is behind).
+   Colour comes from the tokens in custom.css; nothing here sets a colour of its own except the
+   heat tint, which reuses --st-dev. */
+
+.amm-loss {
+	font-family: var(--sl-font);
+	margin: 1.6rem 0;
+}
+.amm-loss .ll-label {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.4rem 0.7rem;
+	font-size: 0.86rem;
+	color: var(--sl-color-gray-2);
+	margin: 0 0 0.6rem;
+}
+.amm-loss .ll-label .amm-pill {
+	margin-right: 0;
+}
+.amm-loss h3 {
+	font-size: 1.05rem;
+	margin: 1.8rem 0 0.4rem;
+}
+.amm-loss table {
+	font-size: 0.86rem;
+	font-variant-numeric: tabular-nums;
+	margin: 0.5rem 0 1rem;
+}
+.amm-loss caption {
+	caption-side: top;
+	text-align: left;
+	font-weight: 650;
+	color: var(--sl-color-white);
+	padding: 0 0 0.4rem;
+}
+.amm-loss th,
+.amm-loss td {
+	padding: 0.3rem 0.55rem;
+}
+.amm-loss td.num,
+.amm-loss th.num {
+	text-align: right;
+}
+.amm-loss thead th {
+	white-space: nowrap;
+}
+.amm-loss tfoot th,
+.amm-loss tfoot td {
+	font-weight: 700;
+	border-top: 2px solid var(--sl-color-gray-4);
+}
+.amm-loss tr.ll-group th {
+	background: var(--sl-color-gray-6);
+	font-size: 0.78rem;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+	color: var(--sl-color-gray-2);
+}
+.amm-loss td.ll-heat {
+	background: color-mix(in srgb, var(--st-dev) calc(var(--ll-n, 0) * 55%), transparent);
+}
+.amm-loss td.ll-zero {
+	color: var(--sl-color-gray-4);
+}
+.amm-loss .ll-chip {
+	display: inline-block;
+	width: 0.7rem;
+	height: 0.7rem;
+	border-radius: 50%;
+	margin-right: 0.4em;
+	vertical-align: -0.05em;
+	border: 1px solid var(--sl-color-gray-3);
+}
+.amm-loss td.ll-delta {
+	white-space: nowrap;
+}
+.amm-loss .ll-bar {
+	display: inline-block;
+	height: 0.5rem;
+	margin-left: 0.5em;
+	vertical-align: middle;
+	border-radius: 2px;
+	background: var(--st-dev);
+}
+.amm-loss .ll-missing {
+	font-size: 0.78rem;
+	color: var(--sl-color-gray-3);
+}
+.amm-loss .ll-fname {
+	font-weight: 650;
+	white-space: nowrap;
+}
+.amm-loss .ll-fsub {
+	display: block;
+	font-weight: 400;
+	font-size: 0.76rem;
+	color: var(--sl-color-gray-3);
+	white-space: normal;
+}
+.amm-loss details > summary {
+	cursor: pointer;
+	font-weight: 650;
+	color: var(--sl-color-accent-high);
+	margin: 1rem 0 0.3rem;
+}
+.amm-loss .ll-notes {
+	font-size: 0.86rem;
+	color: var(--sl-color-gray-2);
+	border-left: 3px solid var(--st-dev);
+	padding: 0.1rem 0 0.1rem 0.9rem;
+	margin: 1rem 0 0;
+}
+.amm-loss .ll-notes p {
+	margin: 0.4rem 0;
+	max-width: 68ch;
+}

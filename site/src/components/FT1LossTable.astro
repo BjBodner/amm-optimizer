@@ -1,0 +1,306 @@
+---
+// Every function x D x budget cell of the final test FT1 (bbob ids 101-110) where AMM is credibly behind
+// some competitor (the preregistered F2 rule). Built at build time from data/ft1/ft1_v2.json: no client script.
+// v2: NGOpt ran at every dimension. Every summary count below is computed from the JSON cell list and
+// checked against the claims, so a partial update cannot ship.
+import '../styles/limits.css';
+import '../styles/ft1.css';
+import Claim from './Claim.astro';
+import ft1 from '../../data/ft1/ft1_v2.json';
+import claimsFile from '../../data/claims.json';
+
+interface Props {
+	/** Show the full list of cells (default) or only the summary tables. */
+	list?: boolean;
+}
+const { list = true } = Astro.props;
+
+const mainClaims = claimsFile.claims as Record<string, any>;
+const claimRecord = (id: string) => {
+	const r = mainClaims[id];
+	if (!r) throw new Error(`FT1LossTable: unknown claim id "${id}"`);
+	return r;
+};
+
+const MINUS = '−';
+interface Cell {
+	f: number;
+	D: number;
+	budget: number;
+	who: [string, number][];
+}
+const cells = (ft1.F2.cells_behind as Cell[])
+	.slice()
+	.sort((a, b) => a.f - b.f || a.D - b.D || a.budget - b.budget);
+const total = cells.length;
+
+// Guard: the list, the JSON summary and the claims must agree, so a partial update cannot ship.
+const byDJson = ft1.F2.by_D as Record<string, number>;
+const byBudgetJson = ft1.F2.by_budget as Record<string, number>;
+if (total !== ft1.F2.behind) throw new Error(`FT1LossTable: ${total} listed cells but F2.behind = ${ft1.F2.behind}`);
+if (String(total) !== claimRecord('ft1.f2_behind').value)
+	throw new Error(`FT1LossTable: claim ft1.f2_behind is ${claimRecord('ft1.f2_behind').value}, the data have ${total}`);
+
+const dims = [2, 5, 10, 20, 40];
+const budgets = [10, 30, 100, 300, 1000];
+for (const d of dims) {
+	const n = cells.filter((c) => c.D === d).length;
+	if (n !== byDJson[String(d)]) throw new Error(`FT1LossTable: by_D mismatch at D ${d}`);
+	if (String(n) !== claimRecord(`ft1.f2_D${d}`).value) throw new Error(`FT1LossTable: claim ft1.f2_D${d} disagrees with the cells`);
+}
+for (const b of budgets) {
+	const n = cells.filter((c) => c.budget === b).length;
+	if (n !== byBudgetJson[b.toFixed(1)]) throw new Error(`FT1LossTable: by_budget mismatch at ${b}`);
+	if (String(n) !== claimRecord(`ft1.f2_B${b}`).value) throw new Error(`FT1LossTable: claim ft1.f2_B${b} disagrees with the cells`);
+}
+
+const competitorOrder = ['SLSQP', 'HCMA', 'IPOP', 'BIPOP', 'TPE', 'NGOpt', 'DE'];
+const display: Record<string, [string, string]> = {
+	IPOP: ['pycma IPOP', 'var(--m-ipop)'],
+	BIPOP: ['pycma BIPOP', 'var(--m-bipop)'],
+	SLSQP: ['SLSQP', 'var(--m-slsqp)'],
+	DE: ['DE', 'var(--m-de)'],
+	TPE: ['TPE (Optuna)', 'var(--m-tpe)'],
+	NGOpt: ['NGOpt (Nevergrad)', 'var(--m-ngopt)'],
+	HCMA: ['HCMA (archive)', 'var(--m-hcma)'],
+};
+// Per competitor: credibly behind (computed from the cells), credibly ahead and cells run (claims).
+const aheadId: Record<string, string> = {
+	IPOP: 'ft1.ahead_ipop',
+	BIPOP: 'ft1.ahead_bipop',
+	SLSQP: 'ft1.ahead_slsqp',
+	DE: 'ft1.ahead_de',
+	TPE: 'ft1.ahead_tpe',
+	NGOpt: 'ft1.ahead_ngopt',
+	HCMA: 'ft1.ahead_hcma',
+};
+const ranId: Record<string, string> = {
+	IPOP: 'ft1.cells',
+	BIPOP: 'ft1.cells',
+	SLSQP: 'ft1.cells',
+	DE: 'ft1.cells',
+	TPE: 'ft1.ran_tpe',
+	NGOpt: 'ft1.ran_ngopt',
+	HCMA: 'ft1.ran_hcma',
+};
+const note: Record<string, string> = {
+	TPE: 'capped slice of the grid',
+	HCMA: 'D 2-20, its own instances',
+};
+const behindId: Record<string, string> = {
+	IPOP: 'ft1.behind_ipop',
+	BIPOP: 'ft1.behind_bipop',
+	SLSQP: 'ft1.behind_slsqp',
+	DE: 'ft1.behind_de',
+	TPE: 'ft1.behind_tpe',
+	NGOpt: 'ft1.behind_ngopt',
+	HCMA: 'ft1.behind_hcma',
+};
+const behindBy = (m: string) => cells.filter((c) => c.who.some(([w]) => w === m)).length;
+const rows = competitorOrder.map((m) => ({ m, behind: behindBy(m) }));
+for (const { m, behind } of rows) {
+	if (String(behind) !== claimRecord(behindId[m]).value)
+		throw new Error(`FT1LossTable: claim ${behindId[m]} is ${claimRecord(behindId[m]).value}, the cells give ${behind} for ${m}`);
+}
+
+const names: Record<number, string> = {
+	1: 'Sphere',
+	2: 'Ellipsoidal, separable',
+	3: 'Rastrigin, separable',
+	4: 'Bueche-Rastrigin',
+	5: 'Linear slope',
+	6: 'Attractive sector',
+	7: 'Step ellipsoidal',
+	8: 'Rosenbrock',
+	9: 'Rosenbrock, rotated',
+	10: 'Ellipsoidal',
+	11: 'Discus',
+	12: 'Bent cigar',
+	13: 'Sharp ridge',
+	14: 'Different powers',
+	15: 'Rastrigin',
+	16: 'Weierstrass',
+	17: 'Schaffers F7',
+	18: 'Schaffers F7, ill-conditioned',
+	19: 'Griewank-Rosenbrock',
+	20: 'Schwefel',
+	21: 'Gallagher, 101 peaks',
+	22: 'Gallagher, 21 peaks',
+	23: 'Katsuura',
+	24: 'Lunacek bi-Rastrigin',
+};
+
+const count = (d: number, b: number) => cells.filter((c) => c.D === d && c.budget === b).length;
+const gridMax = Math.max(...dims.flatMap((d) => budgets.map((b) => count(d, b))));
+const fmtDelta = (x: number) => (x < 0 ? MINUS : '+') + Math.abs(x).toFixed(3);
+const listed = [...new Set(cells.map((c) => c.f))];
+const rowsFor = (f: number) => cells.filter((c) => c.f === f);
+---
+
+<div class="amm-loss amm-ft1">
+	<p class="ll-label">
+		<span class="amm-pill" data-status="final">final test FT1, NGOpt at every dimension</span>
+		<span
+			><Claim id="ft1.f2_behind" /> of <Claim id="ft1.cells" /> cells where AMM (frozen configuration c46) is credibly behind
+			some competitor, on bbob ids 101-110. One run per cell and instance, ten instances per cell.</span
+		>
+	</p>
+
+	<h3>By dimension and budget</h3>
+	<div class="ft1-scroll" tabindex="0" role="region" aria-label="Credibly behind cells by dimension and budget">
+		<table>
+			<caption>
+				Credibly behind cells by dimension and budget (evaluations per dimension). Each entry counts the functions, out of
+				24, in that cell of the grid.
+			</caption>
+			<thead>
+				<tr>
+					<th scope="col">Dimension</th>
+					{budgets.map((b) => <th scope="col" class="num">{b} x D</th>)}
+					<th scope="col" class="num">All</th>
+				</tr>
+			</thead>
+			<tbody>
+				{
+					dims.map((d) => (
+						<tr>
+							<th scope="row">D = {d}</th>
+							{budgets.map((b) => {
+								const n = count(d, b);
+								return (
+									<td class={`num ${n === 0 ? 'll-zero' : 'll-heat'}`} style={`--ll-n:${n / gridMax}`}>
+										{n}
+									</td>
+								);
+							})}
+							<td class="num">{byDJson[String(d)]}</td>
+						</tr>
+					))
+				}
+			</tbody>
+			<tfoot>
+				<tr>
+					<th scope="row">All dimensions</th>
+					{budgets.map((b) => <td class="num">{byBudgetJson[b.toFixed(1)]}</td>)}
+					<td class="num">{total}</td>
+				</tr>
+			</tfoot>
+		</table>
+	</div>
+
+	<h3>By competitor</h3>
+	<div class="ft1-scroll" tabindex="0" role="region" aria-label="Credibly behind and credibly ahead cells by competitor">
+		<table>
+			<caption>
+				For each competitor: cells where it is among the credible leaders over AMM, cells where AMM is credibly ahead of it,
+				and the cells it ran. A cell with a tie between competitors counts for each of them.
+			</caption>
+			<thead>
+				<tr>
+					<th scope="col">Competitor</th>
+					<th scope="col" class="num">Credibly behind it</th>
+					<th scope="col" class="num">Credibly ahead of it</th>
+					<th scope="col" class="num">Cells it ran</th>
+				</tr>
+			</thead>
+			<tbody>
+				{
+					rows.map(({ m, behind }) => (
+						<tr>
+							<th scope="row">
+								<span class="ll-chip" style={`background:${display[m][1]}`} aria-hidden="true" />
+								{display[m][0]}
+								{note[m] && <span class="ft1-sub"> ({note[m]})</span>}
+							</th>
+							<td class="num">{behind}</td>
+							<td class="num">
+								<Claim id={aheadId[m]} />
+							</td>
+							<td class="num">
+								<Claim id={ranId[m]} />
+							</td>
+						</tr>
+					))
+				}
+			</tbody>
+		</table>
+	</div>
+
+	{
+		list && (
+			<details open>
+				<summary>All {total} cells, grouped by function</summary>
+				<div class="ft1-scroll" tabindex="0" role="region" aria-label="Every credibly behind cell of the final test">
+					<table>
+						<caption>
+							Every cell where AMM is credibly behind some competitor. Delta is AMM minus the leading competitor in the
+							mean share of the 51 targets reached (ten instances); it is negative in every row. Where a row names
+							several competitors, they have the same delta in the data.
+						</caption>
+						<thead>
+							<tr>
+								<th scope="col">Function</th>
+								<th scope="col" class="num">D</th>
+								<th scope="col" class="num">Budget</th>
+								<th scope="col" class="num">Delta</th>
+								<th scope="col">Leading competitor</th>
+							</tr>
+						</thead>
+						{listed.map((f) => {
+							const group = rowsFor(f);
+							return (
+								<tbody>
+									{group.map((c, i) => (
+										<tr>
+											{i === 0 && (
+												<th scope="rowgroup" rowspan={group.length} class="ll-fname">
+													f{f}
+													<span class="ll-fsub">{names[f]}</span>
+												</th>
+											)}
+											<td class="num">{c.D}</td>
+											<td class="num">{c.budget} x D</td>
+											<td class="num ll-delta">
+												{fmtDelta(c.who[0][1])}
+												<span
+													class="ll-bar"
+													style={`width:${Math.min(100, (Math.abs(c.who[0][1]) / 0.4) * 100) * 0.06}rem`}
+													aria-hidden="true"
+												/>
+											</td>
+											<td>
+												<span class="ft1-who">
+													{c.who.map(([w]) => (
+														<span>
+															<span class="ll-chip" style={`background:${(display[w] ?? [w, 'var(--m-hcma)'])[1]}`} aria-hidden="true" />
+															{(display[w] ?? [w])[0]}
+														</span>
+													))}
+												</span>
+											</td>
+										</tr>
+									))}
+								</tbody>
+							);
+						})}
+					</table>
+				</div>
+			</details>
+		)
+	}
+
+	<div class="ll-notes">
+		<p>
+			<strong>Read with care.</strong> "Credibly behind" is the preregistered rule: a competitor leads by more than 0.02 in
+			target share with posterior probability above 0.9 over the ten paired runs. Cell-level intervals of this kind were
+			found to be about 25% too narrow in earlier work, so the counts on this page are counts and not significance
+			statements. NGOpt ran at every dimension. HCMA is not run in this harness: its values are the COCO archive's, on its
+			own instances, for D 2 to 20, and TPE ran a capped slice of the grid. Where a competitor did not run a cell it cannot
+			lead it.
+		</p>
+		<p>
+			Source: <code>data/ft1/ft1_v2.json</code>, from the analysis script <code>final_ft1.py</code> run with no
+			arguments after every arm had finished.
+		</p>
+	</div>
+</div>

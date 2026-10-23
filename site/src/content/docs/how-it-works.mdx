@@ -1,0 +1,153 @@
+---
+title: How it works
+description: "AMM spends a known evaluation budget in stages: whole-budget gates, a prefix or an ATM stage, local probes and engines, and a finisher. This page explains each stage and lets you replay a recorded run."
+---
+
+import Claim from '../../components/Claim.astro';
+import Figure from '../../components/Figure.astro';
+import RoutingMap from '../../components/RoutingMap.astro';
+import RunPlayer from '../../components/RunPlayer.astro';
+import overview from '../../assets/figures/F1_overview.png';
+
+AMM does not contain a new search method. It decides which classical method gets the evaluation budget,
+and when, by reading the function with cheap probes. It is given the dimension D, the budget B, the box
+and the function values at the points it evaluates, and nothing else: no function name, no optimum value.
+The thresholds depend on D and B only. Every probe evaluation counts against B, and every evaluated point
+lies in the box. One configuration serves all functions.
+
+:::note[Which configuration this page describes]
+The overview figure, the routing map and the probe table follow the paper draft (v3), which describes
+preset `c43`. The configuration frozen for the paper is preset <Claim id="freeze.preset" /> (config hash <Claim id="freeze.config_hash" />, checkable in the public code with `amm_optimizer.presets.get("c46").config_hash()`).
+It extends `c43` with the changes listed [below](#what-c46-adds). The routing map has not been regenerated
+for `c46` yet: pending.
+:::
+
+## The pipeline
+
+<Figure
+  src={overview}
+  alt="Flowchart of AMM. Inputs f, box, D and B enter a chain of gates. If D and B are small, COBYQA gets the whole budget. Otherwise a pair test can send a separable function to STEP restarts or a chained function to coordinate search, and a basin reading can send a function with several basins to MLSL. If B is at most about 100 times D, a prefix uses the whole budget. Otherwise the ATM sampler runs, then STEP with a separability check, then, for non-separable functions of dimension 5 or more, local tests (plateau, curvature) choose between IPOP-aCMA, a BFGS and SLSQP stage, or the finisher. A finisher closes every path."
+  status="diagram"
+  caption="Routing of AMM as in the paper draft (preset c43). Rounded boxes are phases, diamonds are probes or gates, square boxes are engines; the dashed box groups the engines that spend the rest of the budget. A probe that does not trigger a route costs its evaluations and the run continues to the right. This is a diagram of code, not a result."
+  repro={{
+    command: 'rendered by the paper figure pipeline from latex/figs/src/overview_diagram.tex',
+    commit: 'draft v3: preset c43, hash 781edd1e0767c7e2. Frozen preset: c46, hash 2153948ebed51150',
+    hardware: 'not applicable',
+    cost: 'not applicable',
+  }}
+/>
+
+Five stages, in the order a run meets them. D is the dimension, B the budget and b the evaluations left.
+Symbols and thresholds are those of the paper draft's Table 2.
+
+1. **Whole-budget gates.** Three gates can hand the whole budget to one engine.
+   At D up to 3 and B up to 10D, restarted COBYQA runs, because no probe would pay for itself.
+   From D = 5 and B of at least 100D, a pair test reads whether the function is additive over pairs of
+   coordinates: a separable reading goes to STEP restarts, and a reading where only adjacent coordinates
+   interact (confirmed by a band check, from 300D) goes to a coordinate search along decoupled directions.
+   At D = 2 to 3 from 100D, a basin reading sends a landscape with several smooth basins to MLSL.
+   A gate that does not fire costs only its evaluations.
+2. **The prefix (B up to 100D).** The prefix spends the whole budget: a uniform design, STEP from 30D, then a
+   curvature probe that sends a smooth reading to restarted SLSQP and a rugged one to a (1+1)-CMA-ES (or, at
+   100D, to populations ranked by a quadratic surrogate). Below 31D and 200 evaluations the probe is skipped:
+   one SLSQP descent, then the (1+1)-CMA-ES. At D of 2 or less, Nelder&ndash;Mead restarts replace the evolution strategy.
+3. **The ATM stage (B above 100D).** The ATM sampler takes a fifth of the budget (at most 60D from D = 10),
+   then STEP takes half of what is left, with a separability check.
+4. **Local probes (D of 5 or more, non-separable).** A plateau probe and the curvature probe classify the
+   incumbent. A plateau goes to IPOP-aCMA-ES with four times the default population. A rugged reading with
+   much budget left goes to the same schedule, unless a fractal probe diverts it to restarted SLSQP.
+   A smooth reading goes to an SLSQP stage, which its exit status, a hill-valley test and a kink reading can end early.
+5. **The finisher.** A restarted (1+1)-CMA-ES that hands stalls to IPOP-aCMA-ES populations.
+
+## The probes
+
+Each probe reads points the run evaluated anyway or a few extra ones, and its cost is charged to B. When a
+probe does not fire, the run stays on its default path. Function names in the last column are in
+`src/amm_optimizer/` of the public repository (the development code lived in `src/atm/`).
+
+| Probe | What it reads | Cost (evaluations) | Fires: sends the budget to | Default when it does not fire | Code |
+|---|---|---|---|---|---|
+| Pair test | Additivity residual of f over adjacent and random distant coordinate pairs. A residual of at least 1e-6 on a distant pair reads non-separable; on adjacent pairs only, a chain | 3D+1 | Separable: STEP restarts. Chain, after a band check (6D evaluations): coordinate search | Non-separable: the run continues | `chain_phase.pair_test`, `band_consistency` |
+| Basin reading | Rank-quadratic R² on a Sobol design (at most 0.5 reads several basins), and the change of second differences between two scales (at most 0.1 reads smooth) | Design, then 4D | Several basins: MLSL. One smooth basin up to 300D: one SLSQP descent first | Continue from the design's best point | `basin_phase.rank_quadratic_r2`, `local_reading`, `multi_basin_route` |
+| Curvature β | Slope of the log of the mirrored loss against log step at three scales (a quadratic gives 2). At least 1.45 reads smooth | 24 (12 below 30D) | Smooth: restarted SLSQP (prefix) or the smooth route | (1+1)-CMA-ES or populations | `qn_phase.curvature_beta` |
+| Plateau | Four mirrored probes at 3e-4 of the box width; at least half repeat f(x) exactly | 4 | IPOP-aCMA-ES with four times the default population | Curvature probe | `qn_phase.plateau_check` |
+| STEP separability check | A stored point re-evaluated after the incumbent moved along another axis; from 1000D a two-axis check once STEP stalls | Re-evaluations | Separable: straight to the finisher | Local probes | `step_phase.run_step_phase` |
+| Fractal (D of 20 or more) | Mirrored second differences at four scales from 1e-7 to 1e-4 of the box width | 32 | Fractal: restarted SLSQP | IPOP schedule | `qn_phase.micro_slopes` |
+| Kink | Mirrored second difference at 1e-7 of the box width, at least 5e7 | 6 | Scaled finite-difference BFGS | Finisher | `qn_phase.kink_check` |
+| Hill-valley | Whether a point between two converged descent ends is worse than both | Up to 9 | Separate basins: sampled SLSQP restarts | Finisher | `qn_phase.multi_basin` |
+| Exit status and stall monitor | SLSQP's own exits and iterations (a majority of failed exits; progress of the first descent) | 0 | Failed majority: L-BFGS-B | Finisher | `qn_phase.failure_majority` |
+
+The curvature, pair, local-basin and fractal readings are invariant to f &rarr; af + c with a &gt; 0, and the
+plateau, rank and hill-valley tests to any increasing transformation of f. The kink threshold is absolute and is
+tied to the scale of bbob's function values. Sources: paper draft v3, section 3.2 and appendix B.1; the constants
+were checked against the frozen code (for example `BETA_THRESHOLD`, `TIE_SCALE`, `KINK_D2`, `SEP_TOL`).
+
+## The engines
+
+All engines return when they converge, spend their share or stall, and every result is offered to an incumbent
+that never gets worse. Restarted engines restart from uniform points until their share is spent.
+
+| Engine | What it is | Used for |
+|---|---|---|
+| COBYQA | SciPy's trust-region method on quadratic models, restarted; initial trust radius 0.25 of the box width | Whole-budget gate at small D and B |
+| SLSQP | SciPy's, box bounds, forward-difference step 1e-9 | Prefix, basin descents, MLSL, the smooth local route |
+| L-BFGS-B | SciPy's, ten correction pairs | Takes the rest when most SLSQP descents fail |
+| Scaled finite-difference BFGS | Nonsmooth BFGS in the style of Lewis and Overton | One try on smooth readings at small budgets; after a kink |
+| Nelder&ndash;Mead restarts | Simplex method | D of 2 or less |
+| STEP | Round-robin coordinate search in the style of BSrr | Separable route; a stage after the ATM sampler |
+| Coordinate search | Global line searches along decoupled directions | Chain reading |
+| MLSL | SLSQP descents from Sobol points that no better point nearby beats | Several-basin reading at D = 2 to 3 |
+| (1+1)-Cholesky-CMA-ES | With active update and quadratic-model steps | Prefix and finisher |
+| IPOP-aCMA-ES | (&mu;/&mu;<sub>w</sub>,&lambda;)-CMA-ES with active update and box clipping, restarted with growing populations | Plateau and rugged routes; stalls of the finisher |
+| ATM sampler | Population-based random search: four sub-samplers, a resource allocator, success-rate control of step widths | The stage after the prefix range |
+
+References for the engines are on the [paper page](/paper/); the draft still marks several identifiers as to be found.
+
+## The routing map
+
+The map shows, for each dimension and budget multiplier, which stage runs first and the stage list a run follows
+when no probe routes the whole budget. Hover, focus or tap a cell. The map was produced by a dry run of the
+configuration&rsquo;s own control flow with the probe outcomes forced, so it shows what is *possible* in a cell
+and what the *default* path is, not which route a given function takes.
+
+<RoutingMap />
+
+Which route each bbob function actually takes in the final test: pending (the harness did not log routes).
+
+## Watch it work
+
+The player replays one recorded run of AMM (preset <Claim id="freeze.preset" />) and one run of pycma IPOP on the
+same two-dimensional function, from the same start point and seed, with the same budget. The shading shows
+the landscape in powers of ten of the distance from the optimum value. Play, pause, step with the arrow keys,
+reset with R, or drag the slider.
+
+:::caution[One run, not a result]
+Each recording is a single seed on one instance of one function (bbob instance 1, in the range already used during
+development). It illustrates behaviour and says nothing about how often either method wins; for that, see the
+[results](/results/). The IPOP setting here is a demo setting, not the benchmark harness arm.
+:::
+
+<RunPlayer />
+
+The timeline strip under the slider shows only what the frozen code reports. AMM can report the blocks of its ATM
+sampler through the documented profiler hook, so those evaluations are marked. The other stages (COBYQA, SLSQP,
+Nelder&ndash;Mead, STEP, MLSL, CMA-ES, the probes) are not reported by any hook in the frozen code, and the strip does
+not guess them. A run that never enters the ATM stage, such as a Gallagher run routed to MLSL, shows no strip.
+Full stage tracing needs a change to the code and waits for the post-FT1 branch; the exact hook is in
+`data/demo/README.md`.
+
+## What c46 adds
+
+The frozen preset builds on `c43` with the changes below, as described in `src/amm_optimizer/presets.py`. They affect the prefix
+and the local routes rather than the gates drawn in the figure.
+
+- `c44`: a plateau check in the prefix above 30D from D = 5, which hands plateau functions to restarted CMA-ES
+  populations; and, at budgets up to 10D for D = 4 to 20, a reading of the prefix&rsquo;s first SLSQP descent that
+  hands rugged or non-quadratic runs to restarted COBYQA.
+- `c45`: the capped BFGS try on rugged readings continues where its best point reads a kink; a ridge reading in the
+  prefix hands a descent that overshoots a sharp ridge to restarted COBYQA; the one-descent prefixes retry a descent
+  that did not move; the finisher&rsquo;s populations start at once on a band of rugged readings; and any box is mapped onto [-5, 5]<sup>D</sup>.
+- `c46`: in the prefix at 100D, a very low finite rugged curvature reading keeps the (1+1)-CMA-ES instead of switching to lq2 populations.
+
+The confirmation of each change on fresh instance ids is recorded in that docstring. Each probe and engine above is
+named in `src/amm_optimizer/`, so every statement on this page can be checked against the code of the public repository (<Claim id="repo.public_url" />, commit <Claim id="repo.commit_public" />).

@@ -1,0 +1,41 @@
+/* Styles for FT1LossTable.astro (final test FT1: cells where AMM is credibly behind a competitor).
+   It builds on limits.css (the .amm-loss rules) and only changes what must look different for
+   final-test data: the accent is blue instead of the development orange, and the wide tables
+   scroll inside a labelled region on narrow screens. Colours come from the tokens in custom.css. */
+
+.amm-ft1 td.ll-heat {
+	background: color-mix(in srgb, var(--oi-blue) calc(var(--ll-n, 0) * 45%), transparent);
+}
+.amm-ft1 .ll-bar {
+	background: var(--oi-blue);
+}
+.amm-ft1 .ll-notes {
+	border-left-color: var(--oi-blue);
+}
+.amm-ft1 .ft1-scroll {
+	overflow-x: auto;
+	max-width: 100%;
+}
+.amm-ft1 .ft1-scroll:focus-visible {
+	outline: 2px solid var(--sl-color-accent);
+	outline-offset: 2px;
+}
+.amm-ft1 .ft1-scroll table {
+	min-width: 28rem;
+}
+.amm-ft1 .ft1-who {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.15rem 0.9rem;
+}
+.amm-ft1 .ft1-who span {
+	white-space: nowrap;
+}
+.amm-ft1 .ft1-sub {
+	font-size: 0.78rem;
+	color: var(--sl-color-gray-3);
+	font-weight: 400;
+}
+.amm-ft1 td.ll-na {
+	color: var(--sl-color-gray-3);
+}

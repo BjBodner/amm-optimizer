@@ -1,0 +1,197 @@
+---
+title: Results
+description: "AMM against the field on the COCO bbob suite: the preregistered final test, ECDF per dimension, a cell-by-cell comparison, and every number's provenance."
+---
+
+import Claim from '../../components/Claim.astro';
+import Stat from '../../components/Stat.astro';
+import Figure from '../../components/Figure.astro';
+import Legend from '../../components/Legend.astro';
+import ft1Ecdf from '../../assets/figures/ft1_ecdf_by_dim.png';
+import ft1Cellmap from '../../assets/figures/ft1_cellmap.png';
+import ecdfByDim from '../../assets/figures/c46_field_ecdf_by_dim.png';
+import heatmap from '../../assets/figures/c46_field_heatmap.png';
+import groups from '../../assets/figures/c46_field_ecdf_groups.png';
+
+:::note[The final test]
+The first part of this page is the preregistered final test **FT1**: the frozen configuration on bbob
+instances <Claim id="ids.final" />, which no design decision used. The frozen configuration was run once; the
+analysis was run twice, as logged in advance (first without NGOpt at D 5 to 40, which was still running, then
+with every competitor at every dimension). The numbers here are from the second. The second part is development data on instances used while building
+AMM, shown for context and labelled in-sample.
+:::
+
+## How to read this page
+
+Each figure answers one question and states the conditions it holds under: budgets (evaluations per
+dimension), dimensions, instance ids, seeds, competitor versions and the commit. The curves and the
+cell map follow the COCO convention: the measure is the fraction of (function, target) pairs reached,
+with 51 targets from 10² down to 10⁻⁸, functions weighted equally. Dimensions are never pooled, because
+dimension is a fact of your problem that you can use to choose an algorithm.
+
+<Legend />
+
+## Final test (ids 101-110)
+
+### 1. Share of targets reached, per dimension
+
+<Figure
+  src={ft1Ecdf}
+  alt="Five line charts, one per dimension (2, 5, 10, 20 and 40), of the fraction of function-target pairs reached against budget from 10 to 1000 times the dimension, on the final-test instances. AMM's thick line is the highest, or level with the highest, at every budget in every chart. At the largest budget the nearest competitors are differential evolution, HCMA's archive levels and the CMA-ES variants in two dimensions, HCMA's archive levels in 5 to 20 dimensions, and restarted SLSQP in 40 dimensions. NGOpt, drawn at every dimension, is below AMM everywhere; in 5 dimensions it reaches about half of the pairs at 300 times the dimension and falls back at 1000."
+  status="final"
+  caption="Final test FT1: fraction of (function, target) pairs reached versus budget, bbob f1 to f24. Grey band: the best method in each cell. HCMA is shown at the COCO archive's own levels (D 2 to 20, other instances), not rerun. NGOpt is shown at every dimension."
+  repro={{
+    command: 'final_ft1.py with no arguments, and ft1_plots.py as run for v2 (batch b095_final_ft1)',
+    seed: '9000, one run per function, dimension, instance and budget (6,000 runs of AMM)',
+    ids: '101-110, never used by any design decision',
+    budgets: '10, 30, 100, 300, 1000 x D',
+    commit: 'frozen configuration c46, config hash 2153948ebed51150 (tagged history in the research archive)',
+    competitors: 'pycma IPOP/BIPOP, SLSQP, DE, TPE (capped slice) and NGOpt in the same harness; HCMA from the COCO archive',
+  }}
+  loading="eager"
+/>
+
+### 2. The preregistered comparisons: AMM against IPOP and against SLSQP
+
+Before any final-test run, the comparisons and the ranges they should fall in were written down. Each number
+is the mean over 120 (function, dimension) cells of AMM's share of targets minus the competitor's, with a 95%
+bootstrap interval over cells (2,000 resamples) and a Holm correction over the five budgets. Every budget is
+above zero for both comparisons.
+
+| Budget | AMM minus IPOP (F1) | Predicted | AMM minus SLSQP (F4) | Predicted |
+|---|---|---|---|---|
+| 10 x D | <Claim id="ft1.f1_10" /> | +.06 to +.17 | <Claim id="ft1.f4_10" /> | −.01 to +.03 |
+| 30 x D | <Claim id="ft1.f1_30" /> | +.12 to +.25 | <Claim id="ft1.f4_30" /> | .00 to +.05 |
+| 100 x D | <Claim id="ft1.f1_100" /> | +.20 to +.36 | <Claim id="ft1.f4_100" /> | +.05 to +.15 |
+| 300 x D | <Claim id="ft1.f1_300" /> | +.20 to +.36 | <Claim id="ft1.f4_300" /> | +.13 to +.27 |
+| 1000 x D | <Claim id="ft1.f1_1000" /> | +.12 to +.27 | <Claim id="ft1.f4_1000" /> | +.20 to +.35 |
+
+All ten results fell inside the predicted ranges, and so did the two cell counts below: every preregistered
+prediction of the final test held. The lead over SLSQP is small at small budgets, where a
+quasi-Newton method is hard to beat on smooth functions, and grows with the budget.
+
+### 3. Cell by cell: where AMM leads and where it trails
+
+Each cell is one function at one dimension and budget. Blue means AMM leads the best competitor in that cell
+by more than 0.02; orange means it trails by more than 0.02, with the leader named. Cells within 0.02 are
+pale. This is a descriptive plotting rule on the mean over the ten instances, not a significance test, and it is
+**not** the "credibly behind" rule used for the counts below, so the map shows more orange cells than the
+<Claim id="ft1.f2_behind" /> that the preregistered rule counts.
+
+<Figure
+  src={ft1Cellmap}
+  alt="A heatmap of 24 bbob functions (rows) by five dimensions and five budgets (columns) for the final test. Blue cells, where AMM leads the best competitor, are concentrated at larger budgets and on functions f3, f4, f12, f20 and f22 in higher dimensions. Orange cells, where a named competitor leads, are mostly at small budgets in two to ten dimensions on f2 and f8 to f14, where SLSQP leads, plus cells led by HCMA's archive levels, IPOP, BIPOP, TPE, DE and, on f9 and a few other cells at small budgets, NGOpt. Many cells are pale, meaning a difference below 0.02."
+  status="final"
+  caption="AMM minus the best competitor, per cell, final test. Values of at least .05 are printed; the leader is named where AMM trails by more than .02. NGOpt is shown at every dimension."
+  repro={{
+    command: 'ft1_plots.py, as run for v2',
+    ids: '101-110',
+    seed: '9000',
+    budgets: '10, 30, 100, 300, 1000 x D',
+    commit: 'frozen configuration c46, config hash 2153948ebed51150 (tagged history in the research archive)',
+    competitors: 'best of pycma IPOP/BIPOP, SLSQP, DE, TPE, NGOpt in the same harness, and HCMA (archive)',
+  }}
+/>
+
+The preregistered counts use a stricter, probabilistic rule: a cell counts as *credibly behind* when some
+competitor leads by more than .02 with posterior probability above .9 over the ten paired runs, and as
+*credibly ahead* when AMM does so against every competitor that ran the cell.
+
+<div class="amm-stats">
+  <Stat id="ft1.highest" label="of 600 cells: AMM has the highest mean (ties included)" />
+  <Stat id="ft1.f2_behind" label="of 600 cells: credibly behind some competitor" />
+  <Stat id="ft1.f3_ahead_all" label="of 600 cells: credibly ahead of every competitor that ran it" />
+</div>
+
+The preregistered ranges were 30 to 75 cells credibly behind and 70 to 120 credibly ahead of all. Both
+results fell inside their ranges. The cell-level intervals are about 25% too narrow, so these are counts and
+not statements of significance. Every one of the <Claim id="ft1.f2_behind" /> cells where AMM is credibly
+behind is listed, with the competitor that leads, on the [limits page](/limits/). The
+[research log](/research-log/#the-final-test-ft1) records how the analysis was run.
+
+Where AMM has the highest mean, per budget (cells out of 120, ties included):
+
+| Budget | 10 x D | 30 x D | 100 x D | 300 x D | 1000 x D |
+|---|---|---|---|---|---|
+| AMM | <Claim id="ft1.highest_10" /> | <Claim id="ft1.highest_30" /> | <Claim id="ft1.highest_100" /> | <Claim id="ft1.highest_300" /> | <Claim id="ft1.highest_1000" /> |
+
+Against HCMA's archive levels (which are on other instances, D 2 to 20, 96 cells per budget), AMM's share of
+targets minus HCMA's is <Claim id="ft1.hcma_10" />, <Claim id="ft1.hcma_30" />, <Claim id="ft1.hcma_100" />,
+<Claim id="ft1.hcma_300" /> and <Claim id="ft1.hcma_1000" /> at 10, 30, 100, 300 and 1000 times the dimension.
+The margin at 10 x D is small, so read the lead as holding from 30 x D.
+
+## Development context (in-sample, ids 61-70)
+
+These figures come from instances used while AMM was being built. They are not held out and are shown because
+they were the basis for the final-test predictions; the final-test numbers above were within about .01 of
+them for the per-budget comparisons.
+
+### 4. Share of targets reached, per dimension
+
+<Figure
+  src={ecdfByDim}
+  alt="Five line charts, one per dimension (2, 5, 10, 20 and 40), of the fraction of function-target pairs reached against budget from 10 to 1000 times the dimension, on the development instances. AMM's thick line is at or near the top of every chart; competitor lines sit below it, with differential evolution and BIPOP catching up only at the largest budget in two dimensions."
+  status="dev"
+  caption="Development data: fraction of (function, target) pairs reached versus budget, bbob f1 to f24. Grey band: the best method in each cell. HCMA is shown at the COCO archive's own levels, not rerun."
+  repro={{
+    command: 'pending: filled from the run manifest',
+    ids: '61-70 (in-sample)',
+    budgets: '10, 30, 100, 300, 1000 x D',
+    seed: 'one seed per run',
+    commit: 'frozen configuration c46, config hash 2153948ebed51150 (tagged history in the research archive); the in-sample runs were made by development commits (c45 for 528 of 600 cells), see Reproduce',
+    competitors: 'pycma IPOP/BIPOP, SLSQP, DE, TPE, NGOpt run in the same harness; HCMA from the COCO archive',
+  }}
+/>
+
+### 5. Cell by cell (development)
+
+With the same descriptive rule as the final-test cell map (more than 0.02 apart), the development comparison
+has:
+
+<div class="amm-stats">
+  <Stat id="field.ahead" label="cells where AMM is ahead by more than 0.02" />
+  <Stat id="field.level" label="cells within 0.02 of the best" />
+  <Stat id="field.behind" label="cells where it is behind by more than 0.02" />
+</div>
+
+<Figure
+  src={heatmap}
+  alt="A heatmap of 24 bbob functions (rows) by five dimensions and five budgets (columns) on the development instances. Blue cells, where AMM leads the best competitor, are concentrated at larger budgets and on functions f3, f4, f20 and f22; orange cells, where a named competitor leads, appear mostly at small budgets and on f7, f8, f9 and f12. Many cells are pale, meaning a difference of less than 0.02."
+  status="dev"
+  caption="Development data: AMM minus the best competitor, per cell. Blue: AMM leads by more than 0.02. Orange: a competitor leads by more than 0.02, named in the cell."
+  repro={{
+    ids: '61-70 (in-sample)',
+    budgets: '10, 30, 100, 300, 1000 x D',
+    commit: 'frozen configuration c46, config hash 2153948ebed51150 (tagged history in the research archive); the in-sample runs were made by development commits (c45 for 528 of 600 cells), see Reproduce',
+    competitors: 'best of pycma IPOP/BIPOP, SLSQP, DE, TPE, NGOpt (same harness) and HCMA (archive)',
+  }}
+/>
+
+### 6. By function group (development)
+
+<Figure
+  src={groups}
+  alt="A five by five grid of line charts: rows are the five bbob function groups, columns are dimensions 2, 5, 10, 20 and 40, each showing the share of targets reached against budget. AMM's thick line is at or near the top in most panels. It is not on top for the multimodal group f15 to f19 in two dimensions, where differential evolution is higher at the largest budget, and for f6 to f9 at 10 and 20 dimensions at the largest budget, where the CMA-ES variants reach the top."
+  status="dev"
+  caption="The same measure split by function group: f1-f5 separable, f6-f9 low or moderate conditioning, f10-f14 high conditioning unimodal, f15-f19 multimodal with adequate structure, f20-f24 multimodal with weak structure."
+  repro={{ ids: '61-70 (in-sample)', commit: 'development commits, see Reproduce' }}
+/>
+
+## What to know about this data
+
+- **Final test:** one seed per (function, dimension, instance, budget), ten instances per cell. HCMA is archive
+  data on other instances and exists for D 2 to 20 only; TPE ran a capped slice of the grid; NGOpt ran at every
+  dimension. Where a competitor is missing (HCMA at D 40, most of TPE), the best competitor is the best of the
+  others, so those cells are easier to win than a full comparison would be.
+- **Development data:** one seed per instance, ten instances. The AMM series is a composite: 528 of the 600
+  cells come from the full-grid run of the previous configuration c45, and 72 cells (D 10, 20 and 40 at
+  100 x D) from the literal frozen configuration c46, which differs from c45 by one parameter from D = 10.
+- **Package versions recorded** for the development runs: Python 3.12.10, NumPy 2.5.4, SciPy 1.18.1, pycma
+  4.5.0, cocoex 2.8.2. The Optuna and Nevergrad versions and the hardware were not recorded for these runs.
+
+## What this page does not show yet
+
+- **Intervals on the curves.** Bootstrap intervals over instances for every ECDF curve.
+- **Problems beyond bbob:** <Claim id="beyond.bbob" />.
+- **Wall-clock cost per evaluation** and run-to-run seed variance (see the [limits page](/limits/)).
+- **Raw data downloads:** one CSV per figure with a manifest of hashes, generated with the final run.

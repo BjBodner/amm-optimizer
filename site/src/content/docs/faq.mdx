@@ -1,0 +1,138 @@
+---
+title: FAQ
+description: "Short, honest answers about AMM: what it is, how it differs from CMA-ES, Nevergrad and Optuna, what it was tested on, where it loses, whether it is released, and how far to trust the benchmark."
+---
+
+import Claim from '../../components/Claim.astro';
+
+Two kinds of benchmark numbers appear on this page. The **final test** (FT1) is the frozen configuration run
+once on bbob instance ids <Claim id="ids.final" />, which no design decision used. The **in-sample** numbers are development results on ids <Claim id="ids.dev" />, which
+were used while AMM was being built (one seed per instance, not held out). Each number says which it is.
+
+## What is AMM?
+
+AMM (Adaptive Multi Mode) is a derivative-free optimizer for black-box functions. You give it a starting
+point, a box and an evaluation budget. It spends a small part of the budget on cheap probes that read the
+function (for example how smooth it is, whether it separates into one-variable parts), then routes the rest to
+a classical algorithm that suits the reading: a (1+1)-CMA-ES, SLSQP, L-BFGS-B, Nelder-Mead, COBYQA,
+restarted population CMA-ES and others. How it works is on the [how it works](/how-it-works/) page.
+
+## Is it released?
+
+The code is public: <Claim id="repo.public_url" />, version <Claim id="pkg.version_public" />. PyPI: <Claim id="release.pypi" />.
+Until 0.3.0 is on PyPI, install with `pip install git+https://github.com/BjBodner/amm-optimizer`, as described in
+[Get started](/get-started/). The licence is <Claim id="pkg.license" />.
+
+## Why rename from ATM to AMM?
+
+ATM (Adaptive Two Mode) is the name of the original sampler, which mixes a random search with a search along
+the last successful direction. The configuration frozen for the paper, `c46`, is a hybrid: the ATM sampler is
+one stage among the classical engines listed above, and the routing between them is the main idea. The name AMM
+says that. The package is renamed: the import is `amm_optimizer` (distribution `amm-optimizer`), and the class and preset names (`ATMConfig`, `c46`) keep the old name. Without `config=`, `minimize` runs
+<Claim id="pkg.default_config" />. Whether `c46` becomes the default configuration is not decided, so AMM is selected with
+`config=amm_optimizer.presets.get("c46")`. AMM alone is ambiguous (automated market maker, adaptive mixture
+Metropolis), so the site always writes the full name.
+
+## How is it different from CMA-ES, Nevergrad and Optuna?
+
+AMM is not a new search paradigm. It chooses among existing ones. pycma's IPOP and BIPOP CMA-ES are
+competitors in the benchmark, and a CMA-ES variant is also one of AMM's own engines. Nevergrad's NGOpt is
+itself a meta-optimizer that selects an algorithm from the problem's dimension and budget, so the difference
+claimed for AMM is the probes of the function itself, not the idea of choosing. Whether that difference helps is
+what the [results](/results/) measure, on one benchmark suite. Optuna's TPE is a sampler built for
+hyperparameter search. In the benchmark it ran on a capped slice of the grid only (see
+[Reproduce](/reproduce/)). The field also includes SciPy's SLSQP and differential evolution, and HCMA from the COCO
+archive.
+
+## Does AMM beat everything?
+
+No. In the final test, AMM has the highest mean share of targets reached, ties included, in
+<Claim id="hero.highest" /> of <Claim id="ft1.cells" /> function, dimension and budget cells
+(<Claim id="hero.highest_pct" />). It is credibly behind some competitor in <Claim id="ft1.f2_behind" /> cells, and all of
+them are listed on the [limits](/limits/) page. In <Claim id="ft1.f3_ahead_all" /> cells it is credibly ahead of every
+competitor that ran the cell. "Credibly" is the preregistered rule: a competitor leads by more than 0.02 in target share
+with posterior probability above 0.9 over the ten paired runs. These are counts, not significance statements, because
+cell-level intervals of this kind were found to be about 25% too narrow.
+
+Over IPOP the lead is <Claim id="ft1.lead_ipop" />, with bootstrap intervals above zero at every budget. The in-sample
+comparison uses a different, simpler rule, so its counts are not comparable with those above: AMM ahead of the best
+competitor by more than +0.02 in <Claim id="field.ahead" /> cells, level in <Claim id="field.level" /> and behind by more
+than 0.02 in <Claim id="field.behind" />, out of <Claim id="hero.cells" /> cells, on one seed per instance. That 0.02
+is a plotting threshold, not a significance test.
+
+## What budgets and dimensions does it handle?
+
+It was tested on 24 bbob functions in dimensions 2, 5, 10, 20 and 40, with budgets of 10, 30, 100, 300 and
+1000 evaluations per dimension, on noiseless, continuous, box-bounded problems. Outside that range nothing is
+claimed. Results beyond bbob are <Claim id="beyond.bbob" />.
+
+## Does it need gradients?
+
+No. It uses function values only. Some stages (SLSQP, L-BFGS-B and a BFGS variant) estimate gradients by finite
+differences, and those evaluations count against your budget. If you can get gradients cheaply, a gradient-based
+method is the better tool.
+
+## Does it work on noisy functions?
+
+Untested, and not supported: the objective must be deterministic. With noise, `result.fun` is the best value
+observed, which is biased low. See [wrapping your objective](/guides/#wrapping-your-objective).
+
+## Why did it lose on my function or in cell X?
+
+The cells where AMM is credibly behind a competitor in the final test are listed on the [limits](/limits/) page with
+the leading competitor named. The most frequent leaders are restarted SLSQP, mostly at 10 to 30 evaluations per
+dimension on smooth functions, and HCMA's archive levels, among others on f7 and f19. The cells where AMM is behind the best
+competitor by more than 0.02 in the in-sample comparison are drawn on the [results](/results/) heatmap and listed on the
+same page. In that in-sample comparison, SLSQP is the best competitor in <Claim id="field.behind_slsqp" /> of the
+<Claim id="field.behind" /> behind cells, and <Claim id="field.behind_le30" /> are at 10 or 30 evaluations per
+dimension. The functions with the most in-sample behind cells are f8 and f9, then f7. Three caveats apply to the
+in-sample list. The margin is a threshold, not a test. A competitor that is missing in a cell (HCMA at dimension 40,
+NGOpt at dimension 10, most of TPE) cannot lead it. The cause of a particular loss is not given on this page: the [research
+log](/research-log/) records what was tried.
+
+For your own function, the first things to check are in the
+[guides](/guides/#when-something-goes-wrong): determinism, the box, and the budget in multiples of the dimension.
+
+## How were the results preregistered?
+
+During development, <Claim id="prereg.cycles" /> cycles are logged. Each candidate change was screened and
+then confirmed on instance ids that were not used for the choice, and the ids spent are recorded in a ledger.
+The ids <Claim id="ids.dev" /> were used for development, so figures on them are in-sample. The configuration
+was frozen on 2026-10-22 (config hash <Claim id="freeze.config_hash" />; the tag <Claim id="freeze.tag" /> is in the research archive, not in the public repository). The final test FT1
+on ids <Claim id="ids.final" /> had a written, approved preregistration with predicted ranges and falsifiers before any
+run. Its results are in, and every preregistered prediction held: the ten comparisons with IPOP and SLSQP, and the counts of
+cells credibly behind (<Claim id="ft1.f2_behind" /> of 600, predicted 30 to 75) and credibly ahead of all
+(<Claim id="ft1.f3_ahead_all" />, predicted 70 to 120). The deviations from the plan were logged before any result was
+read. The [research log](/research-log/) is where the preregistrations, the deviations and the failed predictions are
+kept. The preregistration documents themselves are in the research archive (DOI: <Claim id="archive.doi" />, pending), not in the public code repository.
+
+## Was the final test run more than once?
+
+The runs were made once. The analysis was run twice on them, and the site reports the second (v2). A first analysis (v1)
+was published before some of NGOpt's runs had finished, a deviation that was logged before any result was read. v2 is the
+same preregistered script run after all arms had finished, with NGOpt at every dimension. The comparisons with IPOP and
+SLSQP do not involve NGOpt and are the same in both; the counts that involve NGOpt differ. The first analysis stays in
+the [research log](/research-log/#the-final-test-ft1) with its numbers.
+
+## Can I trust the benchmark?
+
+Read it with these limits in mind:
+
+- It is one suite, bbob. The final test has one run per cell and instance; the comparisons with IPOP and SLSQP carry
+  bootstrap intervals, and the cell counts are counts, not significance statements. The in-sample numbers have one seed
+  per instance and no intervals.
+- The final test is the same 24 functions as the development, on new instances.
+- The in-sample `c46` series is a composite of two runs (see [Reproduce](/reproduce/)).
+- Competitors were run by the author, not by their developers. HCMA is archive data on other instances. The
+  Optuna and Nevergrad versions and the hardware were not recorded.
+- Coverage of the competitors is unequal across cells.
+
+What helps: every figure states its conditions and has a reproduce block, losing cells are shown on the same
+grid as winning ones, and the code and the configuration hash are public. The data download (the research archive) is pending.
+
+## How do I cite AMM?
+
+There is no paper or DOI yet. The arXiv identifier is <Claim id="paper.arxiv" /> and the Zenodo DOI is
+<Claim id="release.doi" />. Until they exist, do not cite a version of this site. The [paper](/paper/) page will
+carry a BibTeX entry when there is something to cite. If you must refer to the software now, name the repository <Claim id="repo.public_url" />, its commit
+<Claim id="repo.commit_public" /> and the configuration hash <Claim id="freeze.config_hash" />.

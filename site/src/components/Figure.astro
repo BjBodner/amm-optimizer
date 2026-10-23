@@ -1,0 +1,52 @@
+---
+// A benchmark figure that always states what it is: development (in-sample) or final, and how
+// to reproduce it. Never show a figure without alt text and a status.
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+interface Repro {
+	command?: string;
+	seed?: string;
+	ids?: string;
+	budgets?: string;
+	commit?: string;
+	competitors?: string;
+	hardware?: string;
+	cost?: string;
+}
+interface Props {
+	src: ImageMetadata;
+	alt: string;
+	status: 'dev' | 'final' | 'diagram';
+	caption: string;
+	repro?: Repro;
+	dataHref?: string;
+	loading?: 'eager' | 'lazy';
+}
+const { src, alt, status, caption, repro = {}, dataHref, loading = 'lazy' } = Astro.props;
+const rows: [string, string | undefined][] = [
+	['command', repro.command],
+	['seed', repro.seed],
+	['instance ids', repro.ids],
+	['budgets', repro.budgets],
+	['commit', repro.commit],
+	['competitors', repro.competitors],
+	['hardware', repro.hardware],
+	['cost', repro.cost],
+];
+const label = status === 'dev' ? 'development, in-sample' : status === 'diagram' ? 'diagram of the frozen design' : 'final test';
+---
+
+<figure class="amm-figure">
+	<Image src={src} alt={alt} loading={loading} widths={[640, 1000, 1400]} sizes="(min-width: 60rem) 46rem, 100vw" />
+	<figcaption>
+		<span class="amm-pill" data-status={status}>{label}</span>{caption}
+	</figcaption>
+	<details class="amm-repro">
+		<summary>Reproduce this figure</summary>
+		<dl>
+			{rows.map(([k, v]) => (<><dt>{k}</dt><dd>{v ?? 'pending: filled from the run manifest'}</dd></>))}
+			{dataHref && (<><dt>data</dt><dd><a href={dataHref}>download CSV / JSON</a></dd></>)}
+		</dl>
+	</details>
+</figure>

@@ -1,0 +1,131 @@
+---
+title: Changelog
+description: "Dated changes to the code behind AMM: the 0.3.0 packaging release of the public repository, and the development history before it, condensed from the development changelog."
+---
+
+import Claim from '../../components/Claim.astro';
+
+The public repository (<Claim id="repo.public_url" />, commit <Claim id="repo.commit_public" />) is version <Claim id="pkg.version_public" />. PyPI:
+<Claim id="release.pypi" />. Its own `CHANGELOG.md` has two entries, 0.3.0 and 0.2.0, which are condensed first. The development history below them
+is condensed from the development changelog, which is part of the tagged history in the research archive (DOI: <Claim id="archive.doi" />, pending), not of the public repository.
+
+## 0.3.0 (2026-10-23)
+
+A packaging release; no algorithmic change. The configuration `c46` (config hash <Claim id="freeze.config_hash" />) is bit-identical to the frozen one.
+
+- **Breaking: the import name is now `amm_optimizer`.** 0.2.0 installed the top-level modules `atm` and `amm`, which collide with unrelated
+  PyPI projects of those names; both modules are gone. `ATMConfig` and the preset names (`c46`) are unchanged.
+- **The default configuration is unchanged.** `amm_optimizer.minimize` without `config=` runs <Claim id="pkg.default_config" />. AMM needs `config=amm_optimizer.presets.get("c46")`.
+- The package requires <Claim id="pkg.requires" />. 0.2.0 declared lower floors that SciPy 1.16 or newer cannot satisfy.
+- Fixed: `import` no longer fails on NumPy 1.x; the `c46` preset no longer crashes for one-dimensional problems at budgets of 150 or more.
+- Added: `py.typed`, an installed-package smoke test, GitHub Actions workflows (CI, release, security checks), `SECURITY.md` and `CONTRIBUTING.md`.
+
+## 0.2.0 (release of the freeze)
+
+Packaging of the frozen code: import as `amm` (the implementation kept its code name `atm`), `CITATION.cff` and an AMM README. No algorithmic
+change. This release is on PyPI. Its default `minimize` is the original ATM sampler; it is to be yanked and replaced by 0.3.0.
+
+## Development history before 0.2.0
+
+The entries below describe the code as it was at the time, when the module was `atm`.
+
+### 2026-10-22: code freeze
+
+- The configuration `c46` is frozen for the paper (`docs/FREEZE_2026-10-22.md`,
+  config hash <Claim id="freeze.config_hash" />). The algorithm does not change for the final test.
+- Cycle 71: an opt-in option `stage_extend_max_per_dim` (the `stage_extend_restart` option only up to a
+  budget per dimension). The capped version was not confirmed on fresh ids, so it is **not** in any preset.
+- Batch 91 was rejected under the letter of its pre-set rule. `c46` is unchanged.
+
+### 2026-10-22: cycle 70, `c46`
+
+- New preset `c46` (`c45` plus `prefix_low_beta=0.15` from dimension 10): in the evolution-strategy prefix at
+  100 x D, a finite rugged curvature reading below the threshold keeps the (1+1)-CMA-ES instead of the lq2
+  populations (aimed at bbob f23). Confirmed on fresh ids and promoted. It is the best composite.
+- Opt-in options added and not in a preset: `centre_point` / `centre_point_min_dim`, `smooth_bfgs_second`.
+- Batch 89 (`stage_extend_restart` on `c45`) was rejected.
+
+### 2026-10-22: cycles 67-69, `c45`
+
+- New preset `c45`. It adds a rugged-route BFGS try that continues to the end of the budget on a kink
+  reading, a ridge reading that hands the rest of the prefix to restarted COBYQA, retries of a descent that
+  did not move, a band where the finisher's populations start at once, and `box_normalize`. Confirmed on
+  fresh ids.
+- `Variant.box_normalize`: `minimize` maps any box onto [-5, 5] in each coordinate and runs there. It is
+  bit-identical on bbob, where the box is already [-5, 5].
+- Several other options were added as opt-in and left out of the presets, or rejected, among them
+  `sampled_polish_per_dim` and `sep_route_low`.
+
+### 2026-10-21: cycles 63-66, `c44`
+
+- New preset `c44`: plateau populations in the prefix from dimension 5, and `small_switch`, which reads the
+  first SLSQP descent at two checkpoints at budgets up to 10 x D and may hand the rest to restarted COBYQA.
+- `Variant.prefix_nan_reading`: where an undefined curvature reading of the prefix goes. Opt-in.
+
+### 2026-10-21: cycles 52-61, presets `c39` to `c43`
+
+- `c43`: `atm.cobyqa_phase.run_cobyqa_restarts` (restarted SciPy COBYQA in the box) and the small-engine
+  option for the smallest budgets, in dimensions up to 3.
+- `c42`: after `basin_route`'s smooth, single-basin reading at dimensions 2 and 3, SLSQP descents from the
+  design, then the usual path.
+- `c41`: `qn_phase.run_scaled_bfgs(box_qp=...)`, SLSQP's bound handling in a BFGS descent, and the route
+  `qn44`.
+- `c40`: a one-descent prefix (one SLSQP descent, then the (1+1)-ES) at small budgets.
+- `c39`: `atm.basin_phase`: a Sobol design and a curvature probe send smooth multi-basin readings
+  (Gallagher-type functions) at dimensions 2 and 3 to MLSL; a stall check on the separable search.
+- `Variant.fork_seed` (research): independent continuations from one hand-over, for a router dataset.
+
+### 2026-10-20: cycles 35-51, presets `c35` to `c38`
+
+- `c38`: `atm.chain_phase` and the options `chain_route` and `sep_route`. A pair test of additivity sends a
+  linear chain (bbob f20) to a decoupled coordinate search, and a separable function to restarted STEP.
+- `c37`: a restarted nonsmooth BFGS on forward differences (`qn_phase.run_scaled_bfgs`) for the f13
+  kink route and a capped try at dimensions 5 to 9.
+- `c36`: a fractal-reading route to restarted SLSQP, and prefix switches (separable smooth prefix reaches
+  SLSQP).
+- `c35`: Gallagher-style restarts of SLSQP from the best unclaimed sample point.
+- `step_phase.run_step_phase` keeps its samples in arrays: bit-exact and much faster at large budgets.
+
+### 2026-10-19: integration of the research line, presets `c23` to `c34`
+
+- The research line (composites `c23` to `c31`), the code-review branch and `refactor` were merged. Every
+  characterised run of the research tip reproduces bit for bit, except 14 round-1 arms that use a removed
+  option (`docs/MERGE_2026-10-19.md`).
+- `atm.presets` holds the named configurations, with `get`, `names` and `with_changes`. Each preset equals
+  `benchmarks/arms/<name>_config.txt`, and `quick_scan --config preset:NAME` reads them.
+- Renames: `Variant.nm_max_dim` of `refactor` became `simplex_max_dim`; the research line's
+  `ATMConfig.improved()` became `ATMConfig.improved_wave5()`, and `improved()` is the Tier 5 hybrid.
+- `c32` to `c34` added the L-BFGS-B fallback when an SLSQP call fails more often than it converges, an
+  IPOP route from dimension 20, a stall monitor on the first SLSQP descent, and a second descent from a
+  uniform point.
+- **Harness fix:** the cache of bbob optimal values (`f_opt`) held wrong values for 291 f12 instances
+  because of rounding in a COCO data line. The harness now reads the exact value, repaired the cache,
+  and flags runs that stopped on a false final-target hit. Every f12 score before this date is affected.
+- `scipy>=1.16` became a declared dependency.
+- Research tooling added: a posterior goal ledger, fresh-id claim scripts and a consolidated PDF builder.
+
+### Before the research line (undated entries)
+
+The repository changelog does not date these entries.
+
+- `ATMConfig.variant` (`atm.config.Variant`): opt-in algorithm variants, every default equal to the original
+  and tested bit for bit; `ATMConfig.to_dict`, `from_dict`, `config_hash`; `minimize(bounds=...)`.
+- `ATMConfig.improved()`: the best configuration of `docs/IMPROVEMENTS.md` (needs `bounds=`);
+  `ATMConfig()` stays the original. Later waves added a (1+1)-ES prefix, a learned covariance, a late
+  Nelder-Mead refinement, and a wave-7 restriction of the local stages after a holdout found a regression
+  on multimodal functions. `improved_wave6()` keeps the previous preset for reproducibility.
+- A scoring fix (exact bbob optima instead of cached values that floored converged runs), raw COCO
+  evaluation and the 2019 start protocol; `benchmarks/quick_scan.py` version 2 (stable seeds,
+  provenance, process pool, resume, cluster bootstrap).
+- The COCO/bbob harness (`benchmarks/run_bbob.py` and companions, `docs/BENCHMARKS.md`), block profiling
+  (`atm.profiling`), a CI workflow, a `py.typed` marker, and faster parent selection (bit-identical).
+- Opt-in variants that were added and then removed again for no aggregate gain are recorded in
+  `docs/DEVIATIONS.md`.
+
+### 0.2.0.dev0 (development version)
+
+- A clean re-implementation of ATM as the `atm` package, bit-identical to `BjBodner/atm@69828c6` with
+  `ATMConfig(strict_budget=False)`.
+- Strict budget by default (at most `budget` calls, all counted), handling of NaN and infinite objective
+  values, conductor robustness, and an opt-in correct second best. All differences from the original are
+  listed in `docs/DEVIATIONS.md`.

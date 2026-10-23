@@ -1,0 +1,135 @@
+---
+title: Get started
+description: "Install AMM, run a ten-line example, and read the result: what bounds, budget, seed and x0 mean, and how to pick a budget for your dimension."
+---
+
+import Claim from '../../components/Claim.astro';
+
+AMM (Adaptive Multi Mode) minimises a function you can only evaluate, with no gradients. You give it
+a starting point, a search box and the number of evaluations you can afford. It returns the best
+point it found.
+
+## Install
+
+AMM is released as the distribution `amm-optimizer` and imported as `amm_optimizer`.
+PyPI status: <Claim id="release.pypi" />. Until version 0.3.0 is released there, install from the public repository
+(<Claim id="repo.public_url" />):
+
+```bash
+pip install git+https://github.com/BjBodner/amm-optimizer
+```
+
+Do not install the 0.2.0 release from PyPI for this page: it imports as `amm` or `atm`, and its default `minimize` is the
+original ATM sampler. From a checkout, `pip install -e .` installs the same code; `pip install -e ".[bench]"` adds the COCO tooling
+used by the benchmarks.
+
+The package is version <Claim id="pkg.version_public" /> and needs <Claim id="pkg.requires" />, as declared in `pyproject.toml`
+of the repository. The licence is <Claim id="pkg.license" />.
+
+:::danger[Pass config= to get AMM]
+`amm_optimizer.minimize` without `config=` runs <Claim id="pkg.default_config" />. AMM needs
+`config=amm_optimizer.presets.get("c46")`. Changing the default is not done and is not decided, so every example on this site passes the
+configuration explicitly.
+:::
+
+## The ten-line example
+
+This is the example from the [home page](/), with its output.
+
+```python
+import numpy as np
+import amm_optimizer
+
+def rosenbrock(x):
+    return float(np.sum(100 * (x[1:] - x[:-1] ** 2) ** 2 + (1 - x[:-1]) ** 2))
+
+result = amm_optimizer.minimize(
+    rosenbrock, x0=np.zeros(5), bounds=(-5, 5), budget=2000, seed=0,
+    config=amm_optimizer.presets.get("c46"),
+)
+print(result.nfev, result.fun)
+print(result.x.round(3))
+```
+
+```text
+2000 2.4585372370019567e-13
+[1. 1. 1. 1. 1.]
+```
+
+The known optimum is x = (1, 1, 1, 1, 1) with f = 0. The output was produced by the frozen
+configuration `c46` (config hash <Claim id="freeze.config_hash" />). The last digits of `fun` depend on the
+number of BLAS threads the machine uses (one thread gives a different value near 1e-13); `x` does
+not change at this precision. Without the `config=` line the same call runs the original ATM sampler and reaches
+only f = 1.7 on this example.
+
+## What the arguments mean
+
+The signature in the repository is `minimize(fun, x0, budget, *, seed=None, rng=None, config=None, profile=False, bounds=None)`.
+
+| Argument | Meaning |
+|---|---|
+| `fun` | A function that takes a 1-D NumPy array and returns a number (it is passed through `float`). It must be deterministic. |
+| `x0` | The starting point. Its length is the dimension D. The objective must be finite there, or `ValueError` is raised. With `budget=1` the only evaluation is `x0`. Different starting points give different runs; the benchmarks draw them uniformly from the box. |
+| `budget` | The maximum number of calls to `fun`, at least 1. With the default accounting no more than `budget` calls are made, every call counts, and the best point found is kept even if the budget ends mid-step. `result.nfev` is the true number of calls. |
+| `bounds` | `(lower, upper)`, each a scalar or one value per coordinate. Finite, with every lower bound below its upper bound. `c46` and the other presets raise `ValueError` without it. |
+| `seed` | Makes the run reproducible: the same seed, objective, `x0`, `budget` and `bounds` give the same result on the same software. `rng` takes an existing `numpy.random.RandomState` instead. |
+| `config` | An `ATMConfig`. `None` means the original ATM sampler, not AMM. See the [API reference](/api/). |
+| `profile` | `True` records the time spent in each named block of the algorithm in `result.timings`. It does not change the result. |
+
+**Bounds are used by the optimizer, not enforced on your function from outside.** In the code, the
+presets fold their samples back into the box before calling `fun`. In a small test with `c46` (three
+different boxes, a budget of 300 evaluations) every point the objective received was inside the box,
+but that is a test, not a proof. If your function is undefined outside the box, check this on your
+own problem. The [guides](/guides/#bounds) go into more detail.
+
+## What `result` contains
+
+`minimize` returns an `OptimizeResult` with five fields.
+
+| Field | Content |
+|---|---|
+| `x` | The best point found, as a NumPy array of length D. |
+| `fun` | The objective value at `x` (a Python float). It is the best value *observed*. |
+| `nfev` | The number of objective calls made. |
+| `nrestarts` | The number of restarts the run made. |
+| `timings` | `None`, unless `profile` was set. |
+
+There is no success flag, convergence message or evaluation history. The README says the run uses
+its whole budget, and `nfev` equalled `budget` in every test run for this page.
+
+## How big should the budget be?
+
+Budgets are best thought of as a multiple of the dimension D. The benchmarks on the
+[results page](/results/) use 10, 30, 100, 300 and 1000 times D evaluations, on 24 functions in
+dimensions 2, 5, 10, 20 and 40.
+
+| D | 10 x D | 100 x D | 1000 x D |
+|---|---|---|---|
+| 2 | 20 | 200 | 2000 |
+| 5 | 50 | 500 | 5000 |
+| 10 | 100 | 1000 | 10000 |
+| 40 | 400 | 4000 | 40000 |
+
+The example above has D = 5 and a budget of 2000, which is 400 x D. AMM reads the budget and the
+dimension when it chooses what to run, so a larger budget does not just mean more of the same.
+
+Outside the tested range nothing is claimed. Budgets below 10 x D, dimensions above 40 and
+budgets far above 1000 x D were not benchmarked, and the field comparison stops at 1000 x D. Some
+development confirmations used up to 3000 x D. See the [limits](/limits/) page for the cells where AMM
+loses inside the tested range.
+
+## The objective must be deterministic
+
+The same point must give the same value every time. The method was tested on noiseless, continuous,
+box-bounded problems only. Noisy objectives are untested, and results beyond the bbob suite are
+<Claim id="beyond.bbob" />. See [wrapping your objective](/guides/#wrapping-your-objective).
+
+## Notebook
+
+A Colab notebook does not exist yet. It is a pending item and will be linked here when it does.
+
+## Next
+
+- [Guides](/guides/): budget, bounds, seeds, parallel evaluation, wrapping an objective, errors.
+- [API reference](/api/): every public name of version 0.3.0.
+- [Reproduce](/reproduce/): the pinned versions and commands behind the benchmark numbers.

@@ -1,0 +1,46 @@
+---
+title: About
+description: "What the AMM project is, its licence, how the writing was done with AI support, and how to contact the project."
+---
+
+import Claim from '../../components/Claim.astro';
+import Author from '../../components/Author.astro';
+
+## The project
+
+AMM (Adaptive Multi Mode) is a derivative-free optimizer for continuous black-box problems. It reads the function with
+cheap probes and routes the evaluation budget to a classical algorithm. It grew out of an earlier optimizer, ATM
+(Adaptive Two Mode), whose sampler is one stage inside AMM. The code is Python, depends on NumPy and SciPy, and is
+developed with a preregistered protocol that the [research log](/research-log/) describes.
+
+This site states every result next to its status: final, in-sample development data, or pending. The
+[limits page](/limits/) lists where AMM loses.
+
+## Licence
+
+Licensed under <Claim id="pkg.license" />. The package version in the repository is <Claim id="pkg.version_public" />, and the PyPI
+release is <Claim id="release.pypi" />.
+
+## Contact
+
+- General: <Claim id="contact.general" />
+- Security reports: <Claim id="contact.security" />. The repository has a `SECURITY.md`.
+- Source repository: <Claim id="repo.public_url" /> (public). The research archive (preregistrations, FT1 data, id ledger, tagged history) is planned as a Zenodo deposit, DOI <Claim id="archive.doi" />.
+
+## How this site and the paper were written
+
+AI tools supported the drafting of the paper, the site text, tables and figures, and helped with code and literature
+search: <Claim id="ai.tool" />. The author makes the decisions and does the final edit pass. Numbers on the site are not typed
+into the text: each comes from one data file and carries its status (final, in-sample or pending). AI support does not replace the author's checking: responsibility for the content stays with the author.
+
+<Author>
+
+**About the author.** Benjy Bodner is the author of the AMM project and of the original ATM implementation, which the code in this
+repository re-implements and reproduces exactly. He is also the author of
+`BjBodner/bbob-landscapes` (an interactive viewer of the 24 bbob benchmark functions, with a
+[live page](https://bjbodner.github.io/bbob-landscapes/)). He writes articles on machine learning and data science for
+Medium and Towards Data Science: see the [writing page](/writing/).
+
+Affiliation: <Claim id="about.affiliation" />.
+
+</Author>

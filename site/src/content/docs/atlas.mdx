@@ -1,0 +1,38 @@
+---
+title: BBOB Landscape Atlas
+description: "A public viewer of all 24 bbob test functions, and why different functions need different engines."
+---
+
+import Author from '../../components/Author.astro';
+
+The BBOB Landscape Atlas is a separate public viewer of the 24 functions of the bbob suite. It shows each
+function as a rotating heat map or an elevation view, drawn from exact function values of instance 1 on a
+201 by 201 grid, with a classification label for each function. The recorded runs on the
+[How it works](/how-it-works/#watch-it-work) page use the same instance.
+
+<Author>
+
+- [Open the Atlas](https://bjbodner.github.io/bbob-landscapes/). Add a function number to the address to open one function, for example `#f15`.
+- [Source repository](https://github.com/BjBodner/bbob-landscapes) (Apache-2.0).
+
+</Author>
+
+:::note[Links hidden by default]
+The links name the author&rsquo;s account, so they appear only when the build shows author details
+(`AMM_SHOW_AUTHOR=1`). They are hidden by default.
+:::
+
+## Why different functions need different engines
+
+Which classical algorithm is best for a black-box problem depends on the budget and on the landscape. Around
+10 evaluations per dimension, model-based trust-region methods lead. On smooth functions, quasi-Newton methods with
+finite-difference gradients converge fast. With thousands of evaluations per dimension, restarted CMA-ES with
+growing populations finds global structure that local methods miss. The Atlas makes the landscape side of that
+statement visible: a smooth valley, a field of regularly placed local optima and a set of basins of different
+depth call for different tools.
+
+The user usually knows the budget before the run, but not the landscape, so AMM reads the landscape with probes.
+The paper draft gives one example: f3 and f15 are the same Rastrigin function without and with a rotation. A
+router that reads only the dimension and the budget must send both to the same engine, while AMM&rsquo;s pair test,
+at a cost of 3D+1 evaluations, sends f3 to STEP restarts and leaves f15 on the general path. The
+[How it works](/how-it-works/) page lists every probe and the engine it selects.

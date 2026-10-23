@@ -1,0 +1,13 @@
+---
+// Named author block. Rendered only when AMM_SHOW_AUTHOR=1; the build guard fails if it appears
+// while the flag is off (the author block is hidden by default).
+import { SHOW_AUTHOR } from '../lib/flags';
+---
+
+{
+	SHOW_AUTHOR && (
+		<section data-author-block>
+			<slot />
+		</section>
+	)
+}

@@ -1,0 +1,13 @@
+---
+import Claim from './Claim.astro';
+interface Props {
+	id: string;
+	label: string;
+}
+const { id, label } = Astro.props;
+---
+
+<div class="amm-stat">
+	<span class="num"><Claim id={id} /></span>
+	<span class="lbl">{label}</span>
+</div>

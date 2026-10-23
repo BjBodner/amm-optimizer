@@ -1,0 +1,307 @@
+---
+// Recorded-run player: one real AMM (preset c46) run and one pycma IPOP run from the same start
+// point and seed, drawn on the 2-D landscape. Data: data/demo/*.json, copied to public/demo/ by
+// tools/record_run.py --publish. The player starts paused; nothing plays until the user presses
+// Play. Without JavaScript the viewer sees a static SVG poster of the finished runs.
+import index from '../../data/demo/index.json';
+import { withBase } from '../lib/base';
+
+interface Run {
+	id: string;
+	file: string;
+	poster: string;
+	title: string;
+	note: string;
+	D: number;
+	budget: number;
+}
+const runs = index as Run[];
+const first = runs[0];
+---
+
+<section class="rp" data-rp data-runs={JSON.stringify(runs.map((r) => ({ id: r.id, file: r.file, title: r.title, note: r.note, budget: r.budget })))} aria-label="Recorded run player">
+	<div class="rp-bar rp-js-only" hidden>
+		<label class="rp-field">Function
+			<select data-fn>
+				{runs.map((r) => (<option value={r.id}>{r.title}: {r.note}</option>))}
+			</select>
+		</label>
+	</div>
+
+	<noscript>
+		<figure class="rp-poster">
+			<img
+				src={withBase(`/demo/${first.poster}`)}
+				width="700"
+				height="360"
+				alt={`Two square maps of ${first.title} on [-5, 5]^2, shaded by distance from the optimum value in powers of ten. Left: the 600 points AMM evaluated. Right: the 600 points pycma IPOP evaluated from the same start point.`}
+			/>
+			<figcaption>Static picture of the finished {first.title} runs. Turn on JavaScript to replay them.</figcaption>
+		</figure>
+	</noscript>
+
+	<div class="rp-app rp-js-only" hidden>
+		<div class="rp-panels" tabindex="0" data-focus aria-label="Run player. Space plays and pauses, left and right arrow keys step one evaluation, shift with the arrows steps ten, R resets.">
+			<figure class="rp-panel">
+				<figcaption><span class="rp-key rp-key-amm" aria-hidden="true"></span><strong>AMM (c46)</strong> <span data-best-amm></span></figcaption>
+				<canvas data-cv="amm" role="img" aria-label="Points AMM has evaluated so far, on the landscape of the chosen function"></canvas>
+			</figure>
+			<figure class="rp-panel">
+				<figcaption><span class="rp-key rp-key-ipop" aria-hidden="true"></span><strong>pycma IPOP</strong> <span data-best-ipop></span></figcaption>
+				<canvas data-cv="ipop" role="img" aria-label="Points pycma IPOP has evaluated so far, on the same landscape"></canvas>
+			</figure>
+		</div>
+
+		<div class="rp-controls" role="group" aria-label="Playback controls">
+			<button type="button" data-act="play" class="rp-btn rp-play">Play</button>
+			<button type="button" data-act="back" class="rp-btn" aria-label="Step back one evaluation">&#9664; Step</button>
+			<button type="button" data-act="fwd" class="rp-btn" aria-label="Step forward one evaluation">Step &#9654;</button>
+			<button type="button" data-act="reset" class="rp-btn" aria-label="Reset to evaluation 0 (key R)">Reset</button>
+			<label class="rp-field">Speed
+				<select data-speed>
+					<option value="10">10 evals/s</option>
+					<option value="30" selected>30 evals/s</option>
+					<option value="100">100 evals/s</option>
+					<option value="300">300 evals/s</option>
+				</select>
+			</label>
+		</div>
+
+		<div class="rp-scrub">
+			<input type="range" min="0" max="600" step="1" value="600" data-scrub aria-label="Evaluation number" />
+			<div class="rp-strip" data-strip hidden>
+				<span class="rp-strip-label">AMM stage reported by the profiler hook</span>
+				<div class="rp-strip-bar" data-strip-bar></div>
+			</div>
+		</div>
+
+		<p class="rp-status" data-status aria-hidden="true"></p>
+		<p class="rp-sr" data-live aria-live="polite"></p>
+
+		<figure class="rp-conv">
+			<figcaption>Best regret so far against evaluations (log scale). Regret is f minus the known optimum value; neither optimizer sees it.</figcaption>
+			<canvas data-cv="conv" role="img" aria-label="Line chart of the best regret found so far by AMM and by pycma IPOP against the number of evaluations"></canvas>
+		</figure>
+
+		<details class="rp-repro">
+			<summary>Reproduce this run</summary>
+			<dl data-repro></dl>
+		</details>
+	</div>
+
+	<p class="rp-error" data-error role="alert" hidden></p>
+</section>
+
+<style is:global>
+	.rp {
+		font-family: var(--sl-font);
+		font-size: 0.88rem;
+		margin: 1.4rem 0;
+		--rp-amm: var(--m-amm);
+		--rp-ipop: var(--m-ipop);
+	}
+	.rp[data-ready] .rp-js-only {
+		display: block;
+	}
+	.rp-field {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		font-size: 0.82rem;
+	}
+	.rp select {
+		font: inherit;
+		min-height: 2rem;
+		max-width: 100%;
+		padding: 0.15rem 0.4rem;
+		color: var(--sl-color-white);
+		background: var(--sl-color-gray-7);
+		border: 1px solid var(--sl-color-gray-4);
+		border-radius: 6px;
+	}
+	.rp-bar {
+		margin-bottom: 0.7rem;
+	}
+	.rp-panels {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.8rem;
+		border-radius: 8px;
+	}
+	.rp-panels:focus-visible,
+	.rp button:focus-visible,
+	.rp select:focus-visible,
+	.rp input:focus-visible,
+	.rp summary:focus-visible {
+		outline: 3px solid var(--sl-color-accent-high);
+		outline-offset: 2px;
+	}
+	.rp-panel {
+		margin: 0;
+	}
+	.rp-panel figcaption,
+	.rp-conv figcaption {
+		font-size: 0.8rem;
+		margin-bottom: 0.25rem;
+		color: var(--sl-color-gray-2);
+	}
+	.rp canvas {
+		display: block;
+		width: 100%;
+		height: auto;
+		aspect-ratio: 1 / 1;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 6px;
+	}
+	.rp-conv canvas {
+		aspect-ratio: 16 / 7;
+	}
+	.rp-key {
+		display: inline-block;
+		width: 0.7rem;
+		height: 0.7rem;
+		margin-right: 0.35rem;
+		vertical-align: baseline;
+	}
+	.rp-key-amm {
+		background: var(--rp-amm);
+		border-radius: 50%;
+	}
+	.rp-key-ipop {
+		background: var(--rp-ipop);
+	}
+	.rp-controls {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem 0.6rem;
+		margin: 0.8rem 0 0.4rem;
+	}
+	.rp-btn {
+		font: inherit;
+		font-weight: 600;
+		min-height: 2.4rem;
+		min-width: 2.4rem;
+		padding: 0.3rem 0.8rem;
+		border: 1px solid var(--sl-color-gray-4);
+		border-radius: 6px;
+		background: transparent;
+		color: var(--sl-color-white);
+		cursor: pointer;
+	}
+	.rp-play {
+		min-width: 5.2rem;
+		background: var(--sl-color-accent);
+		border-color: var(--sl-color-accent);
+		color: #fff;
+	}
+	:root:not([data-theme='light']) .rp-play {
+		color: #06121b;
+	}
+	.rp-scrub input[type='range'] {
+		width: 100%;
+		min-height: 1.5rem;
+		accent-color: var(--sl-color-accent);
+	}
+	.rp-strip {
+		margin-top: 0.2rem;
+	}
+	.rp-strip[hidden] {
+		display: none;
+	}
+	.rp-strip-label {
+		font-size: 0.72rem;
+		color: var(--sl-color-gray-3);
+	}
+	.rp-strip-bar {
+		position: relative;
+		height: 1.5rem;
+		border: 1px solid var(--sl-color-gray-4);
+		border-radius: 4px;
+		background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--sl-color-gray-4) 45%, transparent) 4px 5px);
+		overflow: hidden;
+	}
+	.rp-seg {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.7rem;
+		font-weight: 700;
+		color: var(--sl-color-black);
+		background: var(--oi-orange);
+		border-inline: 2px solid var(--sl-color-white);
+		white-space: nowrap;
+		overflow: hidden;
+	}
+	.rp-cursor {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: 2px;
+		background: var(--sl-color-white);
+		box-shadow: 0 0 0 1px var(--sl-color-black);
+	}
+	.rp-status {
+		font-variant-numeric: tabular-nums;
+		margin: 0.5rem 0;
+		min-height: 3.2em;
+	}
+	.rp-sr {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+	}
+	.rp-conv {
+		margin: 0.8rem 0;
+	}
+	.rp-repro {
+		font-size: 0.82rem;
+	}
+	.rp-repro summary {
+		cursor: pointer;
+		min-height: 1.5rem;
+		color: var(--sl-color-accent-high);
+	}
+	.rp-repro dl {
+		display: grid;
+		grid-template-columns: max-content 1fr;
+		gap: 0.2rem 1rem;
+		margin: 0.5rem 0 0;
+	}
+	.rp-repro dt {
+		color: var(--sl-color-gray-3);
+	}
+	.rp-repro dd {
+		margin: 0;
+		font-family: var(--sl-font-mono);
+		font-size: 0.76rem;
+		overflow-wrap: anywhere;
+	}
+	.rp-error {
+		color: var(--st-pending);
+		font-weight: 600;
+	}
+	.rp-poster img {
+		width: 100%;
+		height: auto;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 6px;
+		background: #fff;
+	}
+	@media (max-width: 36rem) {
+		.rp-panels {
+			grid-template-columns: 1fr;
+		}
+		.rp select {
+			font-size: 0.8rem;
+		}
+	}
+</style>
+
+<script is:inline src={withBase("/demo/player.js")}></script>

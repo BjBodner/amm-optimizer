@@ -1,0 +1,327 @@
+---
+title: Research log
+description: "How AMM was developed: the preregistered loop, the predictions that held and the ones that failed, the freeze, the spent instance ids and where the preregistrations are."
+---
+
+import Claim from '../../components/Claim.astro';
+
+:::note[Where the documents are]
+The preregistrations, batch results and lessons are **not in the public code repository** (<Claim id="repo.public_url" />),
+which holds one squashed commit of the code. They will be published as a research archive on Zenodo (DOI: <Claim id="archive.doi" />,
+pending). The archive holds the preregistration documents, the FT1 data and outputs (v1 and v2), the spent-instance ledger, and a
+git bundle of the scrubbed full history, which contains the tag <Claim id="freeze.tag" />. Paths on this page are paths inside that archive. Until it is published, this page is a summary, and the
+primary record is not available to readers.
+:::
+
+## The loop
+
+The development log counts <Claim id="prereg.cycles" /> cycles at the time the paper draft was written. In its final
+form a cycle is five steps:
+
+1. **Find a losing cell.** Compare the current composite with the field on development instances, cell by cell: one
+   function, one dimension, one budget.
+2. **Trace the mechanism.** Run traces show which engine stalls or wastes the budget in that cell, and why. If the loss
+   is a known property of a component (for example the (1+1)-CMA-ES on f6, f7, f11 and f13), the cell is routed to
+   another component and the component is not tuned.
+3. **Preregister a fix.** Before any run, a document states the probe and engine, the slice where they should help, a
+   numeric range for the gain, the cells where a loss is accepted (named trades), and the acceptance rule.
+4. **Screen** the candidate on development instances with that fixed rule.
+5. **Confirm once** on bbob instances never used before, against the method without the change. Keep it only if the
+   preregistered prediction held. Those instances are then spent.
+
+The last step of the whole project is a frozen final test, run once. It has been run, and its two analyses (v1 and v2) are
+described in [the final test FT1](#the-final-test-ft1) below. The loop leaves an audit trail for every rule: a
+motivating function, a written prediction and a confirmation on unseen instances. It can say no, and it makes the
+design effort countable.
+
+### How big the log is
+
+When the paper draft was written the log had <Claim id="prereg.batches" /> numbered batches,
+<Claim id="prereg.confirmations" /> holdout or fresh-id confirmation runs and <Claim id="prereg.composites" /> promoted
+composites. The batch index has grown since and reaches cycle <Claim id="prereg.last_cycle" /> at the freeze, so the two
+cycle counts come from different dates. Arms screened and CPU hours: <Claim id="effort.arms_cpu" />.
+
+## The development in stages
+
+The acceptance rule changed over time, and each change is dated in the log. Batch numbers and rules are in
+`docs/research/batches/PROTOCOL.md` and `INDEX.md`.
+
+- **Batches 1 to 10, rule v0.** Two audit rounds on 2026-10-17 built a hybrid from the original ATM sampler and
+  compared it with pycma on one harness. A change was kept if its target slice improved, the primary interval was above
+  zero and no function group lost more than .02. A first holdout on fresh ids confirmed the final candidate of that
+  round.
+- **Batches 11 to 19, rule v1.** A/A runs (the same configuration twice with shifted seeds) showed that the guardrail
+  "no group loses more than .02" failed <Claim id="calib.guardrail_null" /> of the time with no true effect. It
+  was replaced by declared cells and a Holm-corrected harm test.
+- **Predictions with ranges.** Round 2 of 2026-10-17 preregistered numeric ranges and not only signs; its predictions
+  held <Claim id="round2.held" /> times, and the misses were informative. Ranges have been preregistered since.
+- **The SLSQP result.** The first comparison with restarted SciPy SLSQP was predicted to be a lead of
+  <Claim id="conf.slsqp_pred" /> for c23. It was a deficit: SLSQP led by <Claim id="conf.slsqp_actual" /> on the smooth
+  functions. Every quasi-Newton route of AMM was added after that, and SLSQP stays in the field.
+- **Batches 20 to 53, rules v2 to v4.** The goal became every cell and not the average: first against pycma-IPOP cell
+  by cell, then (from Batch 48) against the per-cell best of pycma and SLSQP.
+- **Batch 54 on, rule v5.** An arm is accepted on its development slice if no Holm harm appears, no dimension-by-budget
+  interval lies below zero, a two-level shrinkage gate flags no cell outside the named trades, and the sign of the
+  primary prediction holds. Fresh-id confirmations remain the deciding step. Components such as the kink route, the pair
+  test and the COBYQA gate were added one at a time in this period and confirmed on fresh ids. The twelve confirmations
+  from c32 to c43 are summarised below.
+- **Batches 75 to 93 (to the freeze).** From Batch 75 each batch has its own folder with `prereg.md` and `results.md`.
+  The composites c44, c45 and c46 were confirmed on new ids. A last candidate, c47, was not.
+
+## Predictions that held and predictions that failed
+
+In the last twelve confirmations (c32 to c43), <Claim id="prereg.held" /> written predictions held and
+<Claim id="prereg.failed" /> did not (counts as in the paper's Appendix C). These are add-one results: each component was tested on its target slice against its predecessor. They show robustness to new
+instances of the same 24 functions. They do not show generalisation to other functions, and they do not measure a
+component's marginal value in the final configuration.
+
+### The failed predictions, and one earlier miss
+
+Gains are differences in the share of targets reached, with 95% cluster-bootstrap intervals, on never-used ids.
+
+| Composite | Piece | Predicted gain | Measured gain | What happened |
+|---|---|---|---|---|
+| c35 | kink route, f13 (smaller SLSQP step) | <Claim id="conf.kink1_pred" /> | <Claim id="conf.kink1" /> | Interval includes zero. Not promoted. |
+| c36 | the same kink route, retested | <Claim id="conf.kink2_pred" /> | <Claim id="conf.kink2" /> | Interval includes zero. Not promoted. |
+| c37 | kink redesign, f13 (scaled BFGS) | <Claim id="conf.kink3_pred" /> | <Claim id="conf.kink3" /> | Held. Promoted. The redesign followed two failures. |
+| c37 | plateau check in the prefix, f7 | <Claim id="conf.plateau_pred" /> | <Claim id="conf.plateau" /> | Interval includes zero. Counted as not held. The prereg marked it non-blocking and low-powered; it was reported, not promoted on its own. |
+| c47 | sx capped at 300 times the dimension, f8 and f9, D 5 to 40 | <Claim id="conf.c47_pred" /> | <Claim id="conf.c47_x" /> | The claim was a gain above zero; the interval includes zero. Not confirmed, and outside the twelve-confirmation count above. c46 stays the frozen configuration. |
+| c23 | first SLSQP comparison | lead of <Claim id="conf.slsqp_pred" /> over SLSQP | SLSQP led by <Claim id="conf.slsqp_actual" /> | Wrong sign (an early round). Changed the design: quasi-Newton routes were added. |
+
+The first three rows are the kink route for f13, whose path is the paper's worked example of one piece from idea to
+decision. The final test's F2 and F3 are not in this table: in the first analysis (v1) both fell just outside their
+ranges, in AMM's favour, and in the second (v2) both are inside. The [FT1 section](#the-final-test-ft1) keeps both.
+
+### A few of the confirmed predictions
+
+These are examples, not the full list; the paper's Table A2 has all 22 component claims.
+
+| Composite | Piece | Slice | Gain on never-used ids |
+|---|---|---|---|
+| c36 | fractal reading, restarted SLSQP | f23, D 20 to 40, 1000 to 3000 times the dimension | <Claim id="conf.f23_fractal" /> |
+| c37 | kink to scaled BFGS | f13, D 10 to 40, 1000 times the dimension | <Claim id="conf.kink3" /> |
+| c38 | pair test, separable reading to STEP restarts | f3, D 5 to 40, 100 times the dimension | <Claim id="conf.f3_step" /> |
+| c38 | pair test, chain reading to coordinate search | f20, D 5 to 40, 300 to 3000 times the dimension | <Claim id="conf.f20_chain" /> |
+| c43 | COBYQA at D = 2, 10 times the dimension | all functions | <Claim id="conf.cobyqa_d2" /> |
+
+An intermediate configuration, c32, led pycma's IPOP-CMA-ES on never-used ids by <Claim id="conf.c32_ipop" /> in target
+share (one seed per instance, in the project's own harness). That is a development-stage result for an intermediate
+composite and not a statement about the frozen configuration.
+
+### Batches after c43, as logged
+
+Arm names are the project's own labels. Verdicts follow the batch index.
+
+| Batch | Cycle | Arms or composite | Verdict |
+|---|---|---|---|
+| 75 | 63 | pp5b | accepted, with named trades |
+| 76, 76b | 64 | nanp | 76 rejected (named-trade depth exceeded); 76b, on new seeds, accepted with named trades |
+| 77 | 65 | ss7 | accepted |
+| 78 | 66 | c44, confirmation on ids 610 to 649 | both claims confirmed |
+| 79 | 67 | trycontk44, ridge44 | both accepted (ridge44 with named trades) |
+| 80 | informational | c44 on MA-BBOB development rows | not used for design |
+| 81 | 68 | cdp44, atm20s44 | rejected as preregistered |
+| 81b | 69 | atm20s45 | rejected under the letter of its calibrated mass check; parked until after the freeze |
+| 82 | 69 | ftp45 | held (freeze note) |
+| 83, 84 | 69 | r5z45, rugb45 | accepted |
+| 85, 85b | 69 | sep2e45 | rejected under the letter, then rejected again on new seeds |
+| 86 | 69 | c45, confirmation on ids 650 to 689 | all five claims confirmed |
+| 88 | 70 | lowb88 | accepted |
+| 89 | 70 | sx89 | rejected |
+| 90 | 70 | c46, confirmation on ids 690 to 729 | claim confirmed |
+| 91 | 71 | atm20s46 | rejected under the letter; parked |
+| 92 | 71 | sx92 | accepted on the screen |
+| 93 | 71 | c47, confirmation on ids 730 to 769 | claim not confirmed; c46 stays frozen |
+| 95 | final | FT1: frozen c46 against the field, ids 101 to 110 | v2: F1, F2, F3 and F4 all held (v1, with NGOpt at D 2 only, had F2 and F3 just outside their ranges) |
+
+One more idea, a centre-point evaluation, was not screened. The freeze note lists it.
+
+## The freeze
+
+The configuration used for the final test is frozen. A reader can identify it from the public code by its config hash:
+`amm_optimizer.presets.get("c46").config_hash()` returns <Claim id="freeze.config_hash" />. The freeze is also a git tag in the
+development history, which is in the research archive (not in the public repository).
+
+| | |
+|---|---|
+| Preset | <Claim id="freeze.preset" /> |
+| Config hash | <Claim id="freeze.config_hash" /> |
+| Tag, in the archive's history | <Claim id="freeze.tag" /> |
+| Commit, in the archive's history | <Claim id="freeze.commit" /> (<Claim id="freeze.commit_pre_rewrite" /> before the history was rewritten) |
+| Package version at the freeze | <Claim id="pkg.version" /> (the public repository is version <Claim id="pkg.version_public" />, with no algorithmic change) |
+
+The hash was <Claim id="data.c46_hash_run" /> when the in-sample runs were made. It changed at the freeze because the
+configuration schema gained an opt-in field. The config text of the runs equals the config text of the frozen configuration, and the
+characterisation snapshots pin the behaviour bit for bit.
+
+The freeze note says what may still change: the benchmark harness (to run the COCO-format final test), documentation,
+the paper and analysis scripts. The algorithm may not. The last confirmation that could still have changed the
+composite (c47) failed on the day of the freeze.
+
+Not in the frozen composite: the rejected or parked batches above, a held candidate, and one idea that was not screened.
+The leave-one-route-out ablation was not run before the freeze. It is planned as a labelled post-freeze analysis on fresh
+ids, with no pruning of the frozen configuration: <Claim id="ablation.result" />. Its preregistration was awaiting
+approval when this page was written.
+
+## The final test FT1
+
+The final test ran the frozen configuration (<Claim id="freeze.preset" />, config hash
+<Claim id="freeze.config_hash" />) once on bbob instance ids <Claim id="ids.final" />, which no design decision used.
+It has two analyses of the same runs. **Version v1** (2026-10-22) included NGOpt at D 2 only, because NGOpt's runs at D 5 to
+40 were still going. **Version v2** (2026-10-23) includes NGOpt at every dimension, after all 33 arms had finished, and is
+the final test result used across this site (NGOpt at <Claim id="ft1.ngopt_dims" />).
+
+### What was preregistered
+
+The entry was written and approved by the author on 2026-10-22, before any run, with the analysis fixed in advance
+(`paper/PREREG_final_test.md` on the branch `research-paper`; its FT1 entry is copied into the batch folder
+`docs/research/batches/b095_final_ft1/prereg.md`).
+
+- **Question.** Does the frozen configuration keep its development lead over the classical field on instances that no
+  design decision used?
+- **Data.** bbob functions 1 to 24, dimensions 2, 5, 10, 20 and 40, budgets of 10, 30, 100, 300 and 1000 evaluations per
+  dimension, instance ids <Claim id="ids.final" />, one run per function, dimension, instance and budget, seed 9000:
+  <Claim id="ft1.runs" /> runs of the frozen configuration in <Claim id="ft1.cells" /> cells. Metric: the share of 51
+  log-spaced targets (10^2 down to 10^-8) reached within the budget.
+- **Competitors**, same harness, same ids, same seed: pycma IPOP and BIPOP, restarted SciPy SLSQP, SciPy differential
+  evolution, Optuna's TPE (the capped slice), Nevergrad's NGOpt; HCMA as COCO archive levels on its own instances, D 2 to
+  20, labelled as such.
+- **F1.** AMM minus IPOP per budget: the mean over the 120 (function, dimension) cells with equal weight per function,
+  a 95% bootstrap interval over cells, Holm correction over the five budgets.
+- **F2.** Cells credibly behind: some competitor leads by more than 0.02 with posterior probability above 0.9 over the
+  ten paired runs (the field ledger's rule); counted per dimension and per budget, and every such cell listed by name.
+- **F3.** Cells credibly ahead of every competitor that ran the cell: the same rule, flipped.
+- **F4.** AMM minus restarted SLSQP per budget, as F1.
+- **Falsifiers.** F1 fails if any budget's Holm-adjusted interval reaches 0. F2 above 100 cells, or F3 below 50, would
+  mean the development ledger was optimistic beyond the stated ranges, and the paper would then lead with the losses.
+- **Caveat written in advance.** Cell-level intervals are about 25% too narrow (lesson 42), so F2 and F3 are reported as
+  counts and never as significance.
+
+### What happened, in order
+
+Times are 2026-10-22 up to the v1 analysis. Each deviation was logged before any FT1 result was read.
+
+1. The field's arms started first, from about 16:15. Their results were not read until the runs of the frozen
+   configuration were complete.
+2. **Deviation 1, about 17:00.** The plan was to start the frozen configuration's runs after the freeze time (19:48).
+   The author asked for everything to run at once, and they started at about 17:00. The freeze, the configuration, the
+   data and the analysis did not change. No field result had been read.
+3. **Analysis-script additions, about 18:30.** The script gained options to point it at other data and to write JSON,
+   and three descriptive tables (cells where AMM has the highest mean, AMM minus IPOP per dimension and budget, AMM minus
+   HCMA's level). They are not part of F1 to F4. A dry run on the development data reproduced that data's ledger.
+4. **NGOpt.** At about 18:00 the decision was to let NGOpt run in full and wait. **Deviation 2, about 18:20,** replaced
+   it: publish a first version without NGOpt at D 5, 10, 20 and 40, and add them in a second version. F1 and F4 do not
+   involve NGOpt. For F2 and F3 the preregistration notes the known effect, from development data only: with fewer
+   competitors per cell F2 can only fall and F3 can only rise.
+5. **v1.** The analysis ran at 19:27, when every arm except NGOpt at D 5 to 40 had finished
+   (`final_ft1.py --ngopt-dims=2`). Its output and the JSON with the numbers are the record of v1.
+6. **v2, 2026-10-23.** After all 33 arms had finished, the same preregistered script, `final_ft1.py`, was run with no
+   arguments, so that NGOpt counts at every dimension. The script was not changed between the two analyses; the flag in
+   step 5 is the only difference. The output (`ft1_output_v2.txt`) and the JSON (`ft1_v2.json`) are the record of v2, and
+   the site reads them. F1, F4 and the HCMA comparison are identical in v1 and v2, because they do not involve NGOpt.
+
+### Prediction against result
+
+Predicted ranges are copied from the preregistration. Results are the v2 results, from the same claims as the rest of the
+site; F1 and F4 are identical in v1. Differences are in mean target share.
+
+| Quantity | Predicted | Result (v2) | Outcome |
+|---|---|---|---|
+| F1: AMM minus IPOP, 10 x D | +.06 to +.17 | <Claim id="ft1.f1_10" /> | held |
+| F1, 30 x D | +.12 to +.25 | <Claim id="ft1.f1_30" /> | held |
+| F1, 100 x D | +.20 to +.36 | <Claim id="ft1.f1_100" /> | held |
+| F1, 300 x D | +.20 to +.36 | <Claim id="ft1.f1_300" /> | held |
+| F1, 1000 x D | +.12 to +.27 | <Claim id="ft1.f1_1000" /> | held |
+| F4: AMM minus SLSQP, 10 x D | −.01 to +.03 | <Claim id="ft1.f4_10" /> | held |
+| F4, 30 x D | .00 to +.05 | <Claim id="ft1.f4_30" /> | held |
+| F4, 100 x D | +.05 to +.15 | <Claim id="ft1.f4_100" /> | held |
+| F4, 300 x D | +.13 to +.27 | <Claim id="ft1.f4_300" /> | held |
+| F4, 1000 x D | +.20 to +.35 | <Claim id="ft1.f4_1000" /> | held |
+| F2: cells credibly behind some competitor | 30 to 75 of 600 | <Claim id="ft1.f2_behind" /> | held, inside the range |
+| F3: cells credibly ahead of all that ran the cell | 70 to 120 of 600 | <Claim id="ft1.f3_ahead_all" /> | held, inside the range |
+
+### From v1 to v2
+
+Only the counts that involve NGOpt can differ between the two analyses.
+
+| | v1 (2026-10-22, NGOpt at D 2 only) | v2 (2026-10-23, NGOpt at every dimension) |
+|---|---|---|
+| F2, cells credibly behind some competitor | <Claim id="ft1.v1_f2" /> of 600, just below the range of 30 to 75 | <Claim id="ft1.f2_behind" /> of <Claim id="ft1.cells" />, inside the range |
+| F3, cells credibly ahead of all that ran the cell | <Claim id="ft1.v1_f3" />, just above the range of 70 to 120 | <Claim id="ft1.f3_ahead_all" />, inside the range |
+| Cells where AMM has the highest mean (ties included) | <Claim id="ft1.v1_highest" /> of 600 | <Claim id="ft1.highest" /> of <Claim id="ft1.cells" /> (<Claim id="hero.highest_pct" />) |
+| NGOpt, credibly behind it | 0 of the 120 cells it ran | <Claim id="ft1.behind_ngopt" /> of <Claim id="ft1.ran_ngopt" /> |
+| F1, F4, HCMA comparison | same as v2 | same as v1 |
+
+Reading:
+
+- **F1 and F4 held at every budget.** Every budget is above 0 under Holm correction, and so is every one of the 25
+  dimension-by-budget cells (a descriptive check). The falsifier of F1 was not reached. These are the same in v1 and v2.
+- **v1 missed the ranges of F2 and F3 narrowly, in AMM's favour; v2 is inside both.** The preregistration noted the
+  direction in advance: with fewer competitors per cell, F2 can only fall and F3 can only rise. v2 confirms it. Including
+  NGOpt at D 5 to 40 added <Claim id="ft1.behind_ngopt" /> credibly behind cells, all led by NGOpt, which took F2 from <Claim id="ft1.v1_f2" /> to
+  <Claim id="ft1.f2_behind" />, and it lowered F3 from <Claim id="ft1.v1_f3" /> to <Claim id="ft1.f3_ahead_all" />. After v2, every
+  preregistered prediction of the final test held: F1, F4, F2 and F3. Neither falsifier was reached.
+- **v2 was produced by running the unchanged preregistered script after all arms had finished.** v1 and v2 differ only
+  in the NGOpt flag. The reason for v1 and its deviation were logged before any result was read, and v1 stays in the
+  record.
+- **The new cells** are f9 at D 5 and D 10 (10 x D), f17 at D 5 (100 x D and 300 x D), f20 at D 40 (10 x D) and f23 at D 40
+  (10 x D). They are listed with the other cells on the [limits](/limits/#1-in-the-final-test-ids-101-110) page.
+- **A narrow margin.** AMM's lead over HCMA's archive level is small at 10 x D (<Claim id="ft1.hcma_10" />) and larger
+  from 30 x D (<Claim id="ft1.hcma_30" /> at 30 x D, <Claim id="ft1.hcma_100" /> at 100,
+  <Claim id="ft1.hcma_300" /> at 300 and <Claim id="ft1.hcma_1000" /> at 1000 x D). HCMA is archive data on other
+  instances, D 2 to 20.
+- **Not shown by this test.** It is the same 24 functions on new instances. Generalisation beyond bbob, the ablation of
+  routes and the per-evaluation overhead are separate and still open.
+
+## Spent instance ids
+
+bbob instances are identified by raw ids. A confirmation is only a test of an idea if its ids were never used for
+a decision. The ledger of spent and reserved ids is checked by the analysis code before a claim is scored.
+
+At the freeze: spent <Claim id="ids.spent" />; reserved and never used <Claim id="ids.reserved" />; next free
+<Claim id="ids.next_free" />. FT1 then used <Claim id="ids.final" />: those ids moved from reserved to spent in the
+commit that carries the FT1 preregistration, and the rest of the reserved block stays reserved.
+
+| Ids | Use |
+|---|---|
+| 1 to 30 | calibration, development and the early holdouts and head-to-head comparisons (the final-candidate holdout, the fresh confirmation of one candidate, the round-2 comparison) |
+| 31 to 60 | confirmations of c18 and c23 |
+| <Claim id="ids.dev" /> | development field: every in-sample comparison with the field, so these ids steered about twenty composites |
+| 71 to 100 | development ids, the c24 confirmation and the Tier 4 and 5 holdouts |
+| <Claim id="ids.reserved" /> | reserved for the final test at the freeze and unused before it; <Claim id="ids.final" /> are now spent by FT1 |
+| 116 to 769 | one block per confirmation or check, from c25 to c47, each used once; the last block (730 to 769) tested c47 |
+
+MA-BBOB has its own ledger. Its rows 900 to 999 are reserved for the generalisation test. One earlier run (rows 3 to
+302, c44) was informational and not used for any decision.
+
+## Lessons the log kept
+
+The log has a dated list of lessons. Four that changed the protocol:
+
+- Run the strongest simple baseline on the same harness first. Restarted SLSQP beat an early composite.
+- Calibrate every guardrail with an A/A run before relying on it.
+- Spend runs on new instance ids, not on new seeds. Only ids widen the claim.
+- Use a holdout once. A holdout that has decided anything becomes development data.
+
+## Preregistration documents
+
+Paths inside the research archive (DOI: <Claim id="archive.doi" />, pending), in the order a reader would want them.
+Only `docs/FREEZE_2026-10-22.md` is also in the public code repository.
+
+- `docs/research/CYCLE.md`: how a cycle runs, end to end.
+- `docs/research/batches/PROTOCOL.md`: the acceptance rules v0 to v5 and their standing additions.
+- `docs/research/LESSONS.md`: the lessons, with dates.
+- `docs/research/audit_2026-10-17/PREREG.md` and `RESULTS.md`: Batches 1 to 74 and the confirmations up to c43, frozen at Batch 74.
+- `docs/research/batches/bNNN_<slug>/prereg.md` and `results.md`: one folder per batch from Batch 75 (for example `b078_fresh610`, `b086_fresh650`, `b090_fresh690`, `b093_fresh730`).
+- `docs/research/batches/INDEX.md`: one row per batch (generated).
+- `docs/research/batches/spent_ids.json` and `spent_ids_mabbob.json`: the id ledgers.
+- `docs/HOLDOUT.md`, `HOLDOUT_TIER4.md`, `HOLDOUT_TIER5.md`: the earlier holdouts, each preregistered before its run.
+- `docs/FREEZE_2026-10-22.md`: what is frozen and what may still change.
+- `paper/PREREG_final_test.md` on the branch `research-paper`: the preregistration of the final test FT1.
+- `docs/research/batches/b095_final_ft1/prereg.md` and `results.md`: the FT1 entry with its approval, the deviations and
+  execution notes, and the results (v1 and v2). The arms file is `benchmarks/arms/final_ft1.json`, the results are in
+  `benchmarks/results/scan/audit/final101/` and the analysis script is `final_ft1.py`.
+
+The protocol requires each `prereg.md` to be committed before its run (lesson 7), and a confirmation adds its ids to the
+ledger in the same commit. The archive's git bundle holds that history, so a reader can check both once the archive is
+published. Until then, this page is the project's own account.

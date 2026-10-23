@@ -1,0 +1,170 @@
+---
+title: API reference
+description: "The public interface of the amm_optimizer package, version 0.3.0: minimize, OptimizeResult, ATMConfig, the presets including c46, and the profiling types."
+---
+
+import Claim from '../../components/Claim.astro';
+
+Written from the source of version <Claim id="pkg.version_public" /> in the public repository (<Claim id="repo.public_url" />,
+commit <Claim id="repo.commit_public" />): `src/amm_optimizer/api.py`, `config.py`, `presets.py`, `result.py`, `profiling.py` and
+`__init__.py`. The import is `amm_optimizer`; the old module names `atm` and `amm` of the 0.2.0 release do not exist in 0.3.0.
+
+:::caution[The default config is not AMM]
+`amm_optimizer.minimize(...)` without `config=` runs <Claim id="pkg.default_config" />. AMM is selected with
+`config=amm_optimizer.presets.get("c46")`. No change of the default is decided.
+:::
+
+`amm_optimizer.__all__` is: `ATMConfig`, `OptimizeResult`, `Profiler`, `Timings`, `TimingProfiler`, `minimize`,
+`presets`, `__version__`. The class name `ATMConfig` and the preset codes (`c46`) keep the history of the method.
+
+## `minimize`
+
+```python
+amm_optimizer.minimize(
+    fun, x0, budget, *,
+    seed=None, rng=None, config=None, profile=False, bounds=None,
+) -> OptimizeResult
+```
+
+Minimise `fun` starting from `x0` with about `budget` evaluations.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `fun` | `Callable[[np.ndarray], float]` | The objective. Called with one point at a time. Must be deterministic. |
+| `x0` | array-like | The starting point. Converted with `np.asarray(x0, dtype=float)`. Its length is the dimension. |
+| `budget` | `int` | The maximum number of calls to `fun`. Must be at least 1. |
+| `seed` | `int or None` | Seed for a reproducible run. |
+| `rng` | `np.random.RandomState or None` | An existing generator to continue its stream. Takes precedence over `seed`. |
+| `config` | `ATMConfig or None` | `None` is `ATMConfig()`, the original algorithm. Pass a preset for AMM. |
+| `profile` | `bool` or `Profiler` | `True` times the named blocks and returns them as `result.timings`. A `TimingProfiler` accumulates over several runs. Profiling does not change the result. |
+| `bounds` | `(lower, upper)` or `None` | The search box, each element a scalar or one value per coordinate. Required by every preset. |
+
+Behaviour taken from the code and docstrings:
+
+- With the default `strict_budget=True`, at most `budget` objective calls are made, every call is
+  counted, and the best point of a batch cut short by the budget is kept.
+- `bounds` "is not enforced and changes nothing by itself; only variants that use the box read it".
+  The presets do, and they raise `ValueError` without it. They fold samples back into the box
+  (see [Guides](/guides/#bounds)). The preset option `box_normalize` (on in `c45` and `c46`) maps any
+  box onto [-5, 5] in each coordinate and runs there.
+- The objective must be finite at the starting point.
+
+Raises `ValueError` when: `budget` is below 1; a preset needs `bounds` and none was given; the bounds are
+not finite or a lower bound is not below its upper bound; the objective is not finite at the starting point.
+
+## `OptimizeResult`
+
+A dataclass, returned by `minimize`.
+
+| Field | Type | Description |
+|---|---|---|
+| `x` | `np.ndarray` | The best point found. |
+| `fun` | `float` | The objective value there: the best value observed. |
+| `nfev` | `int` | The true number of objective calls. |
+| `nrestarts` | `int` | The number of restarts made. |
+| `timings` | `Timings or None` | Per-block time, only when `profile` was set. |
+
+There is no success flag, message or history.
+
+## `ATMConfig`
+
+A frozen dataclass: the tunable structure of the optimizer.
+
+| Field | Default | Description |
+|---|---|---|
+| `iterations_per_hyperparameter_set` | 5 | Iterations per hyperparameter set. The presets set it to 1,000,000. |
+| `second_best` | `"legacy"` | How the crossover partner is chosen: `"legacy"` or `"exclude_winner"` (the real runner-up; opt-in because it changes almost every run). |
+| `strict_budget` | `True` | `True`: at most `budget` calls, all counted. `False` reproduces the original's looser accounting (`budget + 2` calls), which a non-default variant does not allow. |
+| `initial_population` | 64 | Samples per iteration at the start of every search (4 x 16). |
+| `evaluations_per_iteration` | 60 | The iteration count is derived from the budget assuming this many evaluations per iteration. |
+| `conductor` | `ConductorConfig()` | The mass-and-spring resource conductor: `total_resources` 60, `n_algorithms` 4, `mass`, `self_spring`, `interaction_spring`, `min_samples`. |
+| `restart` | `RestartPolicy()` | When a search restarts. |
+| `variant` | `Variant()` | The switchable departures from the original algorithm. |
+
+`Variant` is a frozen dataclass with a long list of fields, every default equal to the original's
+behaviour (`Variant()` reproduces it bit for bit). Each field is documented in `docs/DEVIATIONS.md`, and the
+presets below set the ones that make up AMM. Unknown keys raise `ValueError` in `from_dict`.
+
+Constructors and methods:
+
+| Name | Description |
+|---|---|
+| `ATMConfig()` | The original ATM, bit for bit (with `strict_budget=False`). |
+| `ATMConfig.composite()` | ATM's sampler plus five improvements (success-rate width control, a uniform first pool, bounds folded with a 25% corner clip, a pool sized from the budget, no re-evaluation of the incumbent). Needs `bounds`. |
+| `ATMConfig.improved()` | The composite plus local-search stages (simplex search up to 4 dimensions, (1+1)-ES above, a learned covariance up to 10 dimensions, a simplex tail up to 10 dimensions). The preset the 0.3.0 README calls the recommended one (it is a legacy preset; the README's quick start uses `c46`). Needs `bounds`. |
+| `ATMConfig.improved_wave5()` | The composite with the (1+1)-ES prefix and the learned covariance, no simplex stages. It was `improved()` until 2026-10-19; the research line's composites `c23` to `c31` start from it. |
+| `ATMConfig.improved_v2()` | An alias of `improved()`. |
+| `ATMConfig.improved_wave6()` | An earlier version, kept for reproducibility. Per the docstring it loses to the composite on multimodal functions f15-f19 at 100 x D. |
+| `config.to_dict()` | Every field as plain Python containers. |
+| `ATMConfig.from_dict(data)` | The inverse. |
+| `config.config_hash()` | A 16-character fingerprint of `to_dict()` for provenance. It changes when the schema gains a field, even if behaviour does not (see [Reproduce](/reproduce/)). |
+
+Validation: a non-default `variant` needs `strict_budget=True`, and `second_best` must be `"legacy"` or
+`"exclude_winner"`.
+
+## `amm_optimizer.presets`
+
+Named configurations. Every preset needs `minimize(..., bounds=(lower, upper))` and a deterministic objective.
+
+```python
+amm_optimizer.presets.names()                         # ('c23', 'c24', ..., 'c46')
+amm_optimizer.presets.get("c46")                      # an ATMConfig
+amm_optimizer.presets.with_changes("c46", **changes)  # the preset with some Variant fields replaced
+```
+
+| Function | Description |
+|---|---|
+| `names()` | The preset names, oldest first: `c23` to `c46`. |
+| `get(name)` | The `ATMConfig` of the preset. Raises `ValueError` for an unknown name. |
+| `with_changes(name, **variant_changes)` | The preset with some `Variant` fields replaced (`dataclasses.replace`). |
+
+Each preset equals `benchmarks/arms/<name>_config.txt`, and `tests/test_presets.py` checks the configurations and
+their hashes. `c23` is built directly. Each later preset is its predecessor plus the changes below.
+
+**`c46` is the AMM configuration: <Claim id="freeze.preset" /> at config hash <Claim id="freeze.config_hash" />**,
+frozen for the paper. It is `c45` plus `prefix_low_beta=0.15` from dimension 10.
+
+| Preset | Built from | What it adds (from the docstrings) |
+|---|---|---|
+| `c23` | | `improved()`-style global phase with success-rate widths, a learned covariance and reflection into the box; a (1+1)-CMA-ES prefix up to 100 x D (Nelder-Mead at D 2 or below); then ATM for 20% of the budget, a separable STEP search, and a restarted (1+1)-Cholesky-CMA-ES with quadratic model steps, handing stalls to active population CMA-ES. |
+| `c24` | `c23` | An lq2-surrogate population prefix at 100 x D on non-separable functions; a curvature probe in the hand-over. |
+| `c25` | `c24` | Curvature-gated prefix: SLSQP where the probe reads smooth, lq2 populations where rugged. |
+| `c26` | `c25` | An SLSQP stage before the CMA finisher on smooth non-separable functions. |
+| `c27` | `c26` | The gated prefix also at 10 x D; one SLSQP descent before Nelder-Mead at D 2; a curvature-routed local phase (`qn7`). |
+| `c28` | `c27` | Plateau route `qn8`: IPOP populations with 4x the default lambda on plateaus. |
+| `c29` | `c28` | SLSQP's finite-difference step 1e-9 in the prefix and the local stage. |
+| `c30` | `c29` | The local phase back to `qn8` (`qn9` was rejected). |
+| `c31` | `c30` | Route `qn12`: the 1e-9 step in the stage, SciPy's step in the Gallagher restarts. |
+| `c32` | `c31` | L-BFGS-B fallback when an SLSQP call fails more often than it converges. |
+| `c33` | `c32` | Route `qn17`: from D 20, unprotected IPOP populations on a rugged reading with enough budget left. |
+| `c34` | `c33` | Route `qn19`: a stall monitor on the first SLSQP descent, and a second descent from a uniform point. |
+| `c35` | `c34` | Route `qn20`: Gallagher-like readings restart SLSQP from the best unclaimed sample point. |
+| `c36` | `c35` | Route `qn29` (fractal rugged reading goes to restarted SLSQP) and prefix switches. |
+| `c37` | `c36` | Route `qn38`: a scaled finite-difference nonsmooth BFGS for the f13 kink route, and a capped BFGS try at D 5 to 9. |
+| `c38` | `c37` | `chain_route` and `sep_route`: a pair test sends a linear chain to a decoupled coordinate search and a separable function to restarted STEP. |
+| `c39` | `c38` | `basin_route` (smooth multi-basin readings at D 2 to 3 go to MLSL) and a stall check from 1000 x D. |
+| `c40` | `c39` | A one-descent prefix below 31 x D, and the whole budget to the prefix at 10 x D. |
+| `c41` | `c40` | Route `qn44`: one SLSQP-bound-handling BFGS descent on a smooth reading up to 300 x D. |
+| `c42` | `c41` | One basin descent on the smooth, single-basin reading, keeping ATM's hand-over share. |
+| `c43` | `c42` | Restarted COBYQA as the engine for the smallest budgets at D 3 or below. |
+| `c44` | `c43` | Plateau populations in the prefix from D 5, and `small_switch` to COBYQA at budgets up to 10 x D. |
+| `c45` | `c44` | A BFGS try that continues on a kink reading, a ridge reading that hands the prefix to COBYQA, NaN reading as plateau, `box_normalize`, descent retries, and direct populations on a rugged band. |
+| `c46` | `c45` | `prefix_low_beta=0.15` from D 10: a finite rugged curvature reading below it keeps the (1+1)-CMA-ES in the prefix at 100 x D. |
+
+The phase order that `minimize` follows is described in the module docstring of `amm_optimizer/api.py`: prefix, ATM
+(restarted), hand-over (separable search), local phase (SLSQP routes, IPOP, Nelder-Mead), then a finisher. The
+[how it works](/how-it-works/) page explains the routing in prose.
+
+## Profiling
+
+`minimize(..., profile=True)` times the named blocks of the algorithm. The default profiler measures nothing
+and does not change results.
+
+| Name | Description |
+|---|---|
+| `Profiler` | The protocol an object must follow to be passed as `profile`. |
+| `TimingProfiler` | Records, per block name, the number of calls and the inclusive and exclusive time. |
+| `Timings` | The report: `blocks` (a dictionary of `BlockStats` with `calls`, `total_s`, `self_s`, `min_s`, `max_s`), and the properties `wall_s`, `objective_s` (time inside your function) and `overhead_s` (the optimizer's own time), plus `share(name)`, `to_dict()` and `table()`. |
+
+Block names include `total`, `init`, `section`, `draw`, `evaluate`, `objective`, `advance`, `select` and
+`reallocate`.
