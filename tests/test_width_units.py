@@ -24,7 +24,7 @@ def rastrigin(x):
 
 def test_box_units_are_exact_on_the_bbob_box():
     runs = [
-        atm.minimize(
+        atm.api.minimize(
             rastrigin,
             np.full(4, 2.0),
             4000,
@@ -46,7 +46,7 @@ def test_box_units_follow_the_box():
 
 def test_box_units_need_a_box():
     with pytest.raises(ValueError, match="bounds"):
-        atm.minimize(
+        atm.api.minimize(
             rastrigin,
             np.zeros(2),
             100,

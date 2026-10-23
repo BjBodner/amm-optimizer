@@ -42,7 +42,7 @@ def test_preset_survives_a_round_trip():
 
 def test_preset_needs_the_search_box_and_says_so():
     with pytest.raises(ValueError, match="bounds"):
-        atm.minimize(
+        atm.api.minimize(
             rastrigin, np.zeros(3), 300, seed=0, config=atm.ATMConfig.composite()
         )
 
@@ -55,7 +55,7 @@ def test_preset_runs_inside_the_box_and_spends_exactly_the_budget():
         return rastrigin(x)
 
     x0 = np.full(4, 3.0)
-    result = atm.minimize(
+    result = atm.api.minimize(
         recording,
         x0,
         800,
@@ -78,8 +78,8 @@ def test_preset_beats_the_defaults_on_a_smooth_box_problem():
 
     x0 = np.full(5, 4.0)
     kwargs = {"bounds": (-5.0, 5.0)}
-    default = atm.minimize(sphere, x0, 1000, seed=3, **kwargs).fun
-    improved = atm.minimize(
+    default = atm.api.minimize(sphere, x0, 1000, seed=3, **kwargs).fun
+    improved = atm.api.minimize(
         sphere, x0, 1000, seed=3, config=atm.ATMConfig.composite(), **kwargs
     ).fun
     assert improved < default

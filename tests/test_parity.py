@@ -22,7 +22,7 @@ def new_optimize(fun, x0, budget):
     rng = np.random.RandomState()
     rng.set_state(np.random.get_state())
     config = atm.ATMConfig(strict_budget=False)
-    return atm.minimize(fun, x0, budget, rng=rng, config=config).x
+    return atm.api.minimize(fun, x0, budget, rng=rng, config=config).x
 
 
 # Scenarios whose golden record is a crash in the original that the new code

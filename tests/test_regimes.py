@@ -94,7 +94,7 @@ def test_minimize_with_regimes(regimes):
         seen.append(rastrigin(x))
         return seen[-1]
 
-    result = atm.minimize(
+    result = atm.api.minimize(
         counted,
         np.full(5, 3.0),
         5000,
@@ -147,7 +147,7 @@ def test_minimize_with_a_population_local_phase(local):
         return seen[-1]
 
     config = hyb(cma_local=local, cma_local_min_dim=2)
-    result = atm.minimize(
+    result = atm.api.minimize(
         counted, np.full(5, 3.0), 5000, seed=6, config=config, bounds=BOX
     )
     assert result.nfev == len(seen) <= 5000
@@ -162,7 +162,7 @@ def test_minimize_with_the_one_plus_one_first_then_ipop():
         return seen[-1]
 
     config = hyb(cma_local="then_ipop", cma_local_min_dim=2, cma_restart_rule="short")
-    result = atm.minimize(
+    result = atm.api.minimize(
         counted, np.full(5, 3.0), 5000, seed=7, config=config, bounds=BOX
     )
     assert result.nfev == len(seen) <= 5000

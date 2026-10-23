@@ -142,7 +142,7 @@ def test_the_es_needs_the_controller_and_the_box():
         Variant(es_phase="prefix")
     assert Variant(es_phase="prefix", amplitude_control="success_rate").needs_box
     with pytest.raises(ValueError, match="bounds"):
-        atm.minimize(
+        atm.api.minimize(
             sphere,
             np.zeros(3),
             200,
@@ -156,7 +156,7 @@ def test_the_es_needs_the_controller_and_the_box():
 def test_a_run_spends_the_budget_and_beats_atm_alone_on_the_sphere():
     x0 = np.full(5, -3.0)
     budget = 1500
-    with_es = atm.minimize(
+    with_es = atm.api.minimize(
         sphere, x0, budget, seed=3, config=atm.ATMConfig(variant=ES), bounds=(-5, 5)
     )
     plain = Variant(
@@ -165,7 +165,7 @@ def test_a_run_spends_the_budget_and_beats_atm_alone_on_the_sphere():
         pool_rule="budget",
         pool_min=12,
     )
-    without = atm.minimize(
+    without = atm.api.minimize(
         sphere, x0, budget, seed=3, config=atm.ATMConfig(variant=plain), bounds=(-5, 5)
     )
     assert with_es.nfev == budget
@@ -173,7 +173,7 @@ def test_a_run_spends_the_budget_and_beats_atm_alone_on_the_sphere():
 
 
 def test_a_tiny_budget_runs_without_error():
-    result = atm.minimize(
+    result = atm.api.minimize(
         sphere, np.zeros(2), 3, seed=0, config=atm.ATMConfig(variant=ES), bounds=(-5, 5)
     )
     assert result.nfev == 3
@@ -190,7 +190,7 @@ def test_the_es_is_skipped_above_the_budget_limit():
             points.append(np.array(x))
             return sphere(x)
 
-        atm.minimize(
+        atm.api.minimize(
             spy,
             x0,
             budget,
@@ -223,7 +223,7 @@ def test_small_dimensions_use_their_own_budget_limit():
             seen.append(np.array(x))
             return sphere(x)
 
-        atm.minimize(
+        atm.api.minimize(
             spy,
             np.full(dim, -3.0),
             budget,
@@ -261,7 +261,7 @@ def test_the_design_follows_the_factor_and_has_at_least_four_points(monkeypatch)
 
     def design(factor, budget):
         variant = Variant(**{**ES.to_dict(), "es_init_factor": factor})
-        atm.minimize(
+        atm.api.minimize(
             sphere,
             np.zeros(3),
             budget,
@@ -286,7 +286,7 @@ def test_the_uniform_first_pool_is_skipped_after_the_es_but_not_without_it():
             seen.append(np.array(x))
             return sphere(x)
 
-        atm.minimize(
+        atm.api.minimize(
             spy,
             x0,
             budget,
@@ -351,7 +351,7 @@ def test_the_cycle38_prefix_takes_the_whole_small_budget(
     config = presets.with_changes(
         "c34", prefix_full_per_dim=30.0, prefix_full_min_per_dim=least
     )
-    atm.minimize(sphere, np.zeros(5), budget, seed=0, config=config, bounds=(-5, 5))
+    atm.api.minimize(sphere, np.zeros(5), budget, seed=0, config=config, bounds=(-5, 5))
     assert seen == [budget if whole else int(0.9 * budget)]
 
 
@@ -370,5 +370,5 @@ def test_preplat_runs_only_above_30_x_dim(monkeypatch, budget, passed):
 
     monkeypatch.setattr(atm.api, "run_es_phase", spy)
     config = presets.with_changes("c36", prefix_plateau_pop=True)
-    atm.minimize(sphere, np.zeros(5), budget, seed=0, config=config, bounds=(-5, 5))
+    atm.api.minimize(sphere, np.zeros(5), budget, seed=0, config=config, bounds=(-5, 5))
     assert seen == [passed]

@@ -81,10 +81,10 @@ def test_the_separable_ellipsoid_is_solved_far_better_with_learned_scales():
         return float(np.sum(weights * (np.asarray(x) - 1.0) ** 2))
 
     base = Variant(amplitude_control="success_rate_targeted", pool_rule="budget")
-    plain = atm.minimize(
+    plain = atm.api.minimize(
         ellipsoid, np.zeros(d), 4000, seed=0, config=atm.ATMConfig(variant=base)
     )
-    learned = atm.minimize(
+    learned = atm.api.minimize(
         ellipsoid, np.zeros(d), 4000, seed=0, config=atm.ATMConfig(variant=DIAG)
     )
     assert learned.nfev == 4000

@@ -142,7 +142,7 @@ def test_resolve_profiler():
 
 
 def test_no_timings_by_default():
-    assert atm.minimize(sphere, np.zeros(3), 300, seed=0).timings is None
+    assert atm.api.minimize(sphere, np.zeros(3), 300, seed=0).timings is None
 
 
 @pytest.mark.parametrize("strict", [True, False])
@@ -155,9 +155,9 @@ def test_profiling_does_not_change_the_run(strict, dim):
         trace.append(sphere(x))
         return trace[-1]
 
-    plain = atm.minimize(recording, np.zeros(dim), 700, seed=3, config=config)
+    plain = atm.api.minimize(recording, np.zeros(dim), 700, seed=3, config=config)
     plain_trace, trace[:] = list(trace), []
-    timed = atm.minimize(
+    timed = atm.api.minimize(
         recording, np.zeros(dim), 700, seed=3, config=config, profile=True
     )
     np.testing.assert_array_equal(plain.x, timed.x)
@@ -171,7 +171,7 @@ def test_profiling_does_not_change_the_run(strict, dim):
 
 
 def test_blocks_cover_the_run_and_add_up():
-    result = atm.minimize(sphere, np.zeros(5), 1500, seed=1, profile=True)
+    result = atm.api.minimize(sphere, np.zeros(5), 1500, seed=1, profile=True)
     t = result.timings
     expected = {
         "total", "init", "section", "draw", "sample", "sample.crossover",
@@ -189,8 +189,8 @@ def test_blocks_cover_the_run_and_add_up():
 
 def test_a_shared_profiler_accumulates_over_runs():
     prof = TimingProfiler()
-    a = atm.minimize(sphere, np.zeros(3), 400, seed=0, profile=prof)
-    b = atm.minimize(sphere, np.zeros(3), 400, seed=1, profile=prof)
+    a = atm.api.minimize(sphere, np.zeros(3), 400, seed=0, profile=prof)
+    b = atm.api.minimize(sphere, np.zeros(3), 400, seed=1, profile=prof)
     assert b.timings.blocks["total"].calls == 2
     assert a.timings is not None
     assert b.timings.blocks["objective"].calls == a.nfev + b.nfev

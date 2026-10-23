@@ -81,7 +81,7 @@ def fingerprint(name: str, function: str, dim: int, multiplier: int) -> str:
     x0 = rng.uniform(-4, 4, dim)
     config = config_of(name)
     kwargs = {"bounds": (-5.0, 5.0)} if config.variant.needs_box else {}
-    atm.minimize(recording, x0, multiplier * dim, rng=rng, config=config, **kwargs)
+    atm.api.minimize(recording, x0, multiplier * dim, rng=rng, config=config, **kwargs)
     digest = hashlib.sha256(np.asarray(costs).tobytes()).hexdigest()[:20]
     return f"{len(costs)}:{digest}"
 

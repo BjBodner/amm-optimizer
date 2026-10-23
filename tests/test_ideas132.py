@@ -6,7 +6,8 @@ unchanged."""
 import numpy as np
 import pytest
 
-from amm_optimizer import minimize, presets, qn_phase
+from amm_optimizer import presets, qn_phase
+from amm_optimizer.api import minimize
 from amm_optimizer.bounds import Box
 from amm_optimizer.config import Variant
 from amm_optimizer.objective import CountedObjective

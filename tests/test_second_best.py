@@ -59,8 +59,8 @@ def test_the_option_changes_the_search_and_still_works():
         return float(np.sum((x - 2) ** 2)) - 100.0  # negative costs
 
     x0 = np.zeros(5)
-    legacy = atm.minimize(shifted, x0, 1500, seed=2)
-    fixed = atm.minimize(
+    legacy = atm.api.minimize(shifted, x0, 1500, seed=2)
+    fixed = atm.api.minimize(
         shifted, x0, 1500, seed=2, config=atm.ATMConfig(second_best="exclude_winner")
     )
     assert not np.array_equal(legacy.x, fixed.x)

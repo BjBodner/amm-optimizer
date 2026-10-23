@@ -86,6 +86,6 @@ def test_only_the_parent_kind_that_is_read_is_selected(monkeypatch):
 
     monkeypatch.setattr(section, "runner_up", counting_runner_up)
     monkeypatch.setattr(section, "best_eighth", counting_eighth)
-    atm.minimize(lambda x: float(np.sum(x**2)), np.ones(3), 700, seed=0)
+    atm.api.minimize(lambda x: float(np.sum(x**2)), np.ones(3), 700, seed=0)
     assert calls["runner_up"] == 1  # one search, one first iteration
     assert calls["best_eighth"] > 5

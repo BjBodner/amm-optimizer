@@ -41,12 +41,12 @@ dim, budget, repeats = (int(a) for a in sys.argv[2:5])
 fun = lambda x: float(np.sum(x ** 2))
 kwargs = {"profile": True} if mode == "timing" else {}
 x0 = np.full(dim, 3.0)
-atm.minimize(fun, x0, budget, seed=0, **kwargs)  # warm-up
+atm.api.minimize(fun, x0, budget, seed=0, **kwargs)  # warm-up
 times = []
 for _ in range(repeats):
     gc.disable()
     t = time.perf_counter_ns()
-    result = atm.minimize(fun, x0, budget, seed=1, **kwargs)
+    result = atm.api.minimize(fun, x0, budget, seed=1, **kwargs)
     times.append(time.perf_counter_ns() - t)
     gc.enable()
 print(json.dumps({"times": times, "fun": repr(result.fun), "nfev": result.nfev}))

@@ -298,7 +298,7 @@ def run(config: atm.ATMConfig, case: Case) -> dict[str, Any]:
     starts = np.random.RandomState(10_000 + case.seed)
     x0 = BOX[0] + (BOX[1] - BOX[0]) * starts.rand(case.dim)
     try:
-        result = atm.minimize(
+        result = atm.api.minimize(
             fun,
             x0,
             case.budget,

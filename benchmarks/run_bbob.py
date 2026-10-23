@@ -94,7 +94,7 @@ class NewSolver:
         return self._rng.rand(dim)
 
     def solve(self, fun, x0, budget: int) -> None:
-        self._atm.minimize(
+        self._atm.api.minimize(
             fun,
             x0,
             budget,

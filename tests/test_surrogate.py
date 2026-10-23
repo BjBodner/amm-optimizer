@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import scipy.linalg
 
-from amm_optimizer import minimize
+from amm_optimizer.api import minimize
 from amm_optimizer.bounds import Box
 from amm_optimizer.config import ATMConfig, Variant
 from amm_optimizer.objective import CountedObjective

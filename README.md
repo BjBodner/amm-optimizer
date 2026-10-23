@@ -5,7 +5,7 @@ budget** and a **known box**. It does not run one algorithm: it spends a small, 
 budget on *online probes* (curvature, plateau, separability, kink, basin and fractal readings of the
 objective near the incumbent) and uses their outcomes to route the rest of the budget among
 quasi-Newton (SLSQP, L-BFGS-B), trust-region (COBYQA), coordinate (STEP), multistart (MLSL) and
-population (CMA-ES family, the ATM sampler) engines. A probe that does not fire leaves the run on
+population (CMA-ES family, the ATM sampler) engines. `amm_optimizer.minimize` runs AMM by default. A probe that does not fire leaves the run on
 a general path, so a misreading costs evaluations, not the run. Every rule reads only the
 dimension, the budget, the box and evaluated function values.
 
@@ -22,9 +22,10 @@ pip install -e ".[dev]"              # from a checkout; add ",bench" for the COC
 ```
 
 Source, issues and the changelog: <https://github.com/BjBodner/amm-optimizer>. Upgrading from 0.2.0: the import
-name changed to `amm_optimizer` (`import amm_optimizer as amm`); see [CHANGELOG.md](CHANGELOG.md).
+name changed to `amm_optimizer` (`import amm_optimizer as amm`). Upgrading from 0.3.0: `amm.minimize` now runs
+AMM by default and needs `bounds=`; the original ATM sampler is `config=amm.ATMConfig()`. See [CHANGELOG.md](CHANGELOG.md).
 
-## Quick start (the configuration frozen for the paper)
+## Quick start
 
 ```python
 import numpy as np
@@ -39,25 +40,31 @@ result = amm.minimize(
     budget=100 * 10,                        # maximum number of function evaluations
     seed=0,                                 # runs are deterministic given the seed
     bounds=(-5, 5),                         # required: the box (scalars or one value per coordinate)
-    config=amm.presets.get("c46"),          # the frozen configuration; see docs/FREEZE_2026-10-22.md
 )
 print(result.x, result.fun, result.nfev)
 ```
 
-`bounds` is required by this preset (it raises `ValueError` without it). The box is used, not
-enforced as a constraint: samples are folded into it before the function is called. The objective
-must be deterministic. Tested on noiseless, continuous, box-constrained problems with budgets of
-10 to 1000 x the dimension.
+Called without `config=`, `amm.minimize` runs AMM, the configuration frozen for the paper
+(`amm.presets.get("c46")`; passing it as `config=` gives a bit-identical run). It needs `bounds=`:
+without it, and without a `config`, the call raises `ValueError`. The box is used, not enforced as
+a constraint: samples are folded into it before the function is called. The objective must be
+deterministic. Tested on noiseless, continuous, box-constrained problems with budgets of 10 to
+1000 x the dimension.
+
+**The original ATM sampler** is one engine of AMM and is still available on its own: pass
+`config=amm.ATMConfig()` (no `bounds=` needed). `amm_optimizer.api.minimize` is the same engine
+without the AMM default, so a call to it with no `config` also runs the original sampler. Versions
+up to 0.3.0 ran that sampler when `config` was omitted; see the changelog.
 
 **Reproducing the paper.** The configuration hash of `amm.presets.get("c46").config_hash()` is `2153948ebed51150`; [docs/FREEZE_2026-10-22.md](docs/FREEZE_2026-10-22.md) records what was frozen. The pre-registrations, batch notes and result files of the development are kept in a separate research archive.
 
 **Citation.** See `CITATION.cff` (the paper's reference will be added when it is public).
 
-## Legacy ATM presets
+## The original ATM sampler and the older presets
 
 The sections below document the original ATM sampler and the older presets
 (`ATMConfig()`, `composite()`, `improved()`); they are kept because every recorded result and test
-depends on them. This repository is a clean, tested re-implementation of the original ATM that
+depends on them. None of them is the default of `amm.minimize`: pass them as `config=`. This repository is a clean, tested re-implementation of the original ATM that
 reproduces its results exactly (see [docs/DEVIATIONS.md](docs/DEVIATIONS.md)).
 
 ```python
@@ -67,7 +74,10 @@ import amm_optimizer as amm
 def sphere(x):
     return np.sum((x - 2) ** 2)
 
-result = amm.minimize(sphere, x0=np.zeros(10), budget=2000, seed=0)
+result = amm.minimize(
+    sphere, x0=np.zeros(10), budget=2000, seed=0,
+    config=amm.ATMConfig(),                 # the original ATM sampler; no bounds needed
+)
 print(result.x, result.fun, result.nfev)
 ```
 
@@ -77,12 +87,15 @@ best point found is kept even if the budget ends mid-iteration). Pass `seed=` (o
 NaN or infinite raises `ValueError`; NaN or infinite values elsewhere count as failed
 evaluations and never win.
 
-The defaults reproduce the original ATM exactly (see `docs/DEVIATIONS.md`);
+`ATMConfig()` reproduces the original ATM exactly, and so does `amm_optimizer.api.minimize` called
+without a `config` (see `docs/DEVIATIONS.md`); the default of `amm.minimize` is AMM, not the original.
 `ATMConfig(strict_budget=False)` also restores the original's looser budget accounting.
 
-## Better results: the improved preset
+## The earlier hybrid: the improved preset
 
-If you know the search box, `ATMConfig.improved()` gets far more out of the same budget:
+`ATMConfig.improved()` is the hybrid that preceded AMM. It is kept for reproducibility; AMM
+(`c46`, the default) is the configuration to use. If you know the search box, `improved()` gets far
+more out of the same budget than the original sampler:
 
 ```python
 result = amm.minimize(
@@ -108,14 +121,15 @@ first part of small budgets; a learned covariance up to 10 dimensions; and, up t
 dimensions, a simplex search over the last half of the budget. Each option is documented in
 `docs/DEVIATIONS.md`.
 
-Presets, from simplest to largest:
+Presets, from simplest to largest (`c46` last, as the frozen AMM):
 
 | Preset | What it is | Evidence |
 |---|---|---|
 | `ATMConfig()` | the original ATM, bit for bit | `tests/golden`, 400-case parity sweep |
 | `ATMConfig.composite()` | ATM's sampler plus the five improvements; stays pure ATM | +.101, +.097, +.099 on three untouched holdouts |
-| `ATMConfig.improved()` | the composite plus the local stages above (recommended) | +.196 over the original, +.096 over the composite on a fourth holdout |
+| `ATMConfig.improved()` | the composite plus the local stages above (the earlier hybrid, kept for reproducibility) | +.196 over the original, +.096 over the composite on a fourth holdout |
 | `ATMConfig.improved_wave6()` | an earlier version, kept for reproducibility; loses on multimodal functions at medium budgets | Tier 4 |
+| `presets.get("c46")` | AMM, the default of `amm.minimize` | [docs/FREEZE_2026-10-22.md](docs/FREEZE_2026-10-22.md) |
 
 `tests/golden/presets.json` pins the exact cost traces of all of them.
 
@@ -123,9 +137,9 @@ Presets, from simplest to largest:
 were not used to design it (18,000 runs per arm, raw COCO evaluation):
 
 * ECDF value (fraction of targets reached) improves by **+.196** [95 % CI +.180, +.212] over
-  the defaults, averaged over budgets of 30, 100 and 300 x dimension, and by **+.096**
+  `ATMConfig()`, averaged over budgets of 30, 100 and 300 x dimension, and by **+.096**
   [+.085, +.108] over `composite()`.
-* The gain shrinks as the dimension grows: over the defaults +.412 at D = 2, +.197 at D = 5,
+* The gain shrinks as the dimension grows: over `ATMConfig()` +.412 at D = 2, +.197 at D = 5,
   +.127 at D = 10, +.082 at D = 20, +.055 at D = 40; over `composite()` +.215 at D = 2 down to
   +.017 at D = 40, where the two are almost the same algorithm.
 * It does **not** beat everything: a plain (1+1)-ES with the 1/5 rule is still ahead at 40
@@ -147,7 +161,7 @@ python benchmarks/block_profile.py   # where the time goes, per algorithm block
 
 | Path | What it is |
 |------|------------|
-| `src/amm_optimizer/` | the package |
+| `src/amm_optimizer/` | the package (`default.py` is the public `minimize`; `api.py` is the engine, whose default is the original sampler and which the tests call) |
 | `reference/` | byte-identical copy of the original module, used only by tests |
 | `tests/golden/` | recorded trajectories from the original |
 | `docs/DEVIATIONS.md` | every difference from the original |

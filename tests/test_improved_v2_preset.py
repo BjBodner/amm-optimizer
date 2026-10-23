@@ -22,17 +22,17 @@ def test_the_preset_is_a_non_default_strict_variant_and_the_default_is_untouched
 def test_the_preset_needs_the_box_and_beats_the_original_on_a_sphere():
     improved = atm.ATMConfig.improved()
     with pytest.raises(ValueError, match="bounds"):
-        atm.minimize(sphere, np.zeros(3), 300, seed=0, config=improved)
+        atm.api.minimize(sphere, np.zeros(3), 300, seed=0, config=improved)
     x0 = np.full(5, -3.0)
-    new = atm.minimize(sphere, x0, 800, seed=1, config=improved, bounds=(-5, 5))
-    old = atm.minimize(sphere, x0, 800, seed=1)
+    new = atm.api.minimize(sphere, x0, 800, seed=1, config=improved, bounds=(-5, 5))
+    old = atm.api.minimize(sphere, x0, 800, seed=1)
     assert new.nfev == old.nfev == 800
     assert new.fun < old.fun * 1e-3
 
 
 def test_the_preset_runs_in_ten_and_twenty_dimensions():
     for dim in (10, 20):
-        result = atm.minimize(
+        result = atm.api.minimize(
             sphere,
             np.full(dim, -3.0),
             60 * dim,
@@ -72,7 +72,7 @@ def test_the_preset_skips_the_local_prefix_in_small_dimensions_at_100_x_d():
             seen.append(np.array(x))
             return sphere_cost(x)
 
-        atm.minimize(spy, x0, budget, seed=3, config=config, bounds=box)
+        atm.api.minimize(spy, x0, budget, seed=3, config=config, bounds=box)
         return seen
 
     wave6 = first_points(atm.ATMConfig.improved_wave6(), 300)

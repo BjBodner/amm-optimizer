@@ -42,7 +42,7 @@ def test_a_shipped_config_runs_in_small_dimensions(name: str, dim: int, budget: 
         return value
 
     x0 = np.full(dim, 1.5)
-    result = atm.minimize(fun, x0, budget, seed=0, config=config, bounds=bounds)
+    result = atm.api.minimize(fun, x0, budget, seed=0, config=config, bounds=bounds)
 
     assert len(seen) == budget == result.nfev
     assert np.isfinite(result.fun)

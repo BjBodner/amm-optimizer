@@ -121,7 +121,7 @@ def test_options_spend_the_budget_and_keep_the_best(changes):
         seen.append(fun(x))
         return seen[-1]
 
-    result = atm.minimize(
+    result = atm.api.minimize(
         counted, np.full(6, 3.0), 3000, seed=4, config=final(**changes), bounds=BOX
     )
     assert result.nfev == len(seen) == 3000
@@ -138,7 +138,7 @@ def test_population_gate_is_inert_when_the_budget_cannot_pay(dim):
         return float(10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x)))
 
     runs = [
-        atm.minimize(
+        atm.api.minimize(
             rastrigin, np.full(dim, 3.0), 300 * dim, seed=2, config=c, bounds=BOX
         )
         for c in (
@@ -236,7 +236,7 @@ def test_batch13_options_spend_the_budget(changes):
         seen.append(fun(x))
         return seen[-1]
 
-    result = atm.minimize(
+    result = atm.api.minimize(
         counted, np.full(6, 3.0), 3000, seed=5, config=final(**changes), bounds=BOX
     )
     assert result.nfev == len(seen) == 3000

@@ -61,7 +61,7 @@ def test_the_first_iteration_uses_the_resolved_pool():
         points.append(np.array(x))
         return float(np.sum(x**2))
 
-    atm.minimize(
+    atm.api.minimize(
         spy, np.full(3, 2.0), 200, seed=0, config=ATMConfig(variant=BUDGET_RULE)
     )
     # start, then a first iteration of 24 columns (4 of them the incumbent)
@@ -79,7 +79,7 @@ def test_the_rule_combines_with_skipping_the_incumbent_down_to_the_minimum():
     )
     resolved = resolve_config(config, 10, 2)
     assert resolved.initial_population == 8
-    result = atm.minimize(
+    result = atm.api.minimize(
         lambda x: float(np.sum(x**2)), np.ones(2), 300, seed=1, config=config
     )
     assert result.nfev == 300

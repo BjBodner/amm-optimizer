@@ -11,7 +11,8 @@ import numpy as np
 import pytest
 
 import characterisation_cases as cc
-from amm_optimizer import minimize, presets
+from amm_optimizer import presets
+from amm_optimizer.api import minimize
 from amm_optimizer.config import Variant
 
 
