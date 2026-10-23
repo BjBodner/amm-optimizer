@@ -1,5 +1,7 @@
 # Deviations from the original (`BjBodner/atm@69828c6`)
 
+This page compares the engine (`amm_optimizer.api.minimize`, whose default `ATMConfig()` is the original ATM sampler) with the original. The public `amm_optimizer.minimize` defaults to the AMM preset `c46` instead; pass `config=ATMConfig()` to it to get the original sampler.
+
 With `ATMConfig(strict_budget=False)` the refactor reproduces the original bit for bit on every scenario in `tests/golden` and on a 400-case random sweep against the live reference (`pytest -m slow`). The differences below are the only ones, and none changes a result on an input where the original ran to completion.
 
 | # | Change | Effect on results | Audit ref |

@@ -183,11 +183,11 @@ def test_the_late_refinement_spends_the_last_share_on_the_local_search():
         return rosenbrock(x)
 
     config = variant(refine_fraction=0.5, local_method="nelder_mead")
-    result = atm.minimize(
+    result = atm.api.minimize(
         spy, np.array([-3.0, 3.0]), 1000, seed=0, config=config, bounds=(-5, 5)
     )
     assert result.nfev == len(points) <= 1000
-    plain = atm.minimize(
+    plain = atm.api.minimize(
         rosenbrock,
         np.array([-3.0, 3.0]),
         1000,
@@ -202,7 +202,7 @@ def test_the_refinement_uses_the_es_above_the_simplex_dimension():
     config = variant(
         refine_fraction=0.4, local_method="nelder_mead", nm_refine_max_dim=2
     )
-    result = atm.minimize(
+    result = atm.api.minimize(
         sphere, np.full(3, -3.0), 1500, seed=0, config=config, bounds=(-5, 5)
     )
     assert result.nfev == 1500
@@ -212,10 +212,10 @@ def test_the_refinement_uses_the_es_above_the_simplex_dimension():
 def test_the_refinement_is_skipped_below_its_minimum_budget():
     config = variant(refine_fraction=0.5, refine_min_budget_per_dim=1000.0)
     plain = variant()
-    a = atm.minimize(
+    a = atm.api.minimize(
         sphere, np.full(3, -3.0), 300, seed=1, config=config, bounds=(-5, 5)
     )
-    b = atm.minimize(
+    b = atm.api.minimize(
         sphere, np.full(3, -3.0), 300, seed=1, config=plain, bounds=(-5, 5)
     )
     np.testing.assert_array_equal(a.x, b.x)
@@ -225,10 +225,10 @@ def test_the_refinement_is_skipped_above_its_dimension_limit():
     config = variant(refine_fraction=0.5, refine_max_dim=2)
     plain = variant()
     for dim, same in ((3, True), (2, False)):
-        a = atm.minimize(
+        a = atm.api.minimize(
             sphere, np.full(dim, -3.0), 300, seed=1, config=config, bounds=(-5, 5)
         )
-        b = atm.minimize(
+        b = atm.api.minimize(
             sphere, np.full(dim, -3.0), 300, seed=1, config=plain, bounds=(-5, 5)
         )
         assert np.array_equal(a.x, b.x) is same
@@ -241,7 +241,7 @@ def test_the_simplex_prefix_beats_the_es_prefix_in_two_dimensions():
         runs = []
         for seed in range(4):
             rng = np.random.RandomState(seed)
-            result = atm.minimize(
+            result = atm.api.minimize(
                 rosenbrock,
                 rng.uniform(-4, 4, 2),
                 200,

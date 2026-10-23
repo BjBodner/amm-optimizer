@@ -26,7 +26,7 @@ def f(x):
 costs = []
 rng = np.random.RandomState(11)
 x0 = 10 * (rng.rand(6) - 0.5)
-res = atm.minimize(f, x0, 1500, rng=rng)
+res = atm.api.minimize(f, x0, 1500, rng=rng)
 print(json.dumps({
     "sha": hashlib.sha256(np.asarray(costs).tobytes()).hexdigest(),
     "x": res.x.tolist(),
@@ -67,7 +67,7 @@ def test_repeated_runs_in_one_process_are_identical():
             return costs[-1]
 
         rng = np.random.RandomState(3)
-        res = atm.minimize(f, 10 * (rng.rand(4) - 0.5), 800, rng=rng)
+        res = atm.api.minimize(f, 10 * (rng.rand(4) - 0.5), 800, rng=rng)
         return hashlib.sha256(np.asarray(costs).tobytes()).hexdigest(), res.x
 
     (sha_a, x_a), (sha_b, x_b) = run(), run()
@@ -80,7 +80,9 @@ def test_interleaved_runs_do_not_share_state():
 
     def solo(seed):
         rng = np.random.RandomState(seed)
-        return atm.minimize(lambda x: float(np.sum(x**2)), np.ones(3), 500, rng=rng).x
+        return atm.api.minimize(
+            lambda x: float(np.sum(x**2)), np.ones(3), 500, rng=rng
+        ).x
 
     expected = [solo(1), solo(2)]
     # Run them again after disturbing the global stream.

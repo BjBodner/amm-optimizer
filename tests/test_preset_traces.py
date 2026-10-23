@@ -30,7 +30,4 @@ def test_the_named_presets_are_the_recorded_ones():
     from preset_cases import config_of
 
     assert atm.ATMConfig.composite() == config_of("composite")
-    assert atm.ATMConfig.improved() == config_of("v2")
-    assert atm.ATMConfig.improved_v2() == atm.ATMConfig.improved()
-    assert atm.ATMConfig.improved_wave6() == config_of("wave6")
     assert atm.ATMConfig() == config_of("default")

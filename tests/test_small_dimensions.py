@@ -12,6 +12,8 @@ import numpy as np
 import pytest
 
 import amm_optimizer as atm
+from amm_optimizer.config import Variant
+from preset_cases import LOCAL_STAGES
 
 BOX = (-5.0, 5.0)
 DIMS = (1, 2, 3)
@@ -20,7 +22,10 @@ BUDGETS = (1, 10, 40, 150, 300)
 CONFIGS = {
     "default": lambda: (atm.ATMConfig(), None),
     "composite": lambda: (atm.ATMConfig.composite(), BOX),
-    "improved": lambda: (atm.ATMConfig.improved(), BOX),
+    "local_stages": lambda: (
+        atm.ATMConfig(variant=Variant(**LOCAL_STAGES)),
+        BOX,
+    ),
     "c46": lambda: (atm.presets.get("c46"), BOX),
 }
 
@@ -42,7 +47,7 @@ def test_a_shipped_config_runs_in_small_dimensions(name: str, dim: int, budget: 
         return value
 
     x0 = np.full(dim, 1.5)
-    result = atm.minimize(fun, x0, budget, seed=0, config=config, bounds=bounds)
+    result = atm.api.minimize(fun, x0, budget, seed=0, config=config, bounds=bounds)
 
     assert len(seen) == budget == result.nfev
     assert np.isfinite(result.fun)

@@ -132,8 +132,6 @@ def text_of(config: atm.ATMConfig) -> str:
 # The ``refactor`` line's presets (merged 2026-10-19; recorded at its tip 330e7bb).
 NAMED |= {
     "refactor_composite": text_of(atm.ATMConfig.composite()),
-    "refactor_improved": text_of(atm.ATMConfig.improved()),
-    "refactor_improved_wave6": text_of(atm.ATMConfig.improved_wave6()),
 }
 
 
@@ -206,8 +204,6 @@ PINNED: tuple[str, ...] = ("default", CURRENT)
 RECENT: tuple[str, ...] = (
     *presets.names()[-3:],
     "refactor_composite",
-    "refactor_improved",
-    "refactor_improved_wave6",
 )
 # Each named config against the one it was built on (consecutive composites, the
 # routes on their composite; the rest of the routes are ``c26`` with one change).
@@ -220,8 +216,6 @@ BASES: dict[str, str] = {
     "qn13": "c31",
     "qn13n": "c31",
     "refactor_composite": "default",
-    "refactor_improved": "refactor_composite",
-    "refactor_improved_wave6": "refactor_improved",
 }
 # ``stepsgrow`` differs from ``steps`` only at a population restart with at least
 # 2000 x D evaluations left, which no grid case reaches; ``test_routing`` pins it.
@@ -298,7 +292,7 @@ def run(config: atm.ATMConfig, case: Case) -> dict[str, Any]:
     starts = np.random.RandomState(10_000 + case.seed)
     x0 = BOX[0] + (BOX[1] - BOX[0]) * starts.rand(case.dim)
     try:
-        result = atm.minimize(
+        result = atm.api.minimize(
             fun,
             x0,
             case.budget,

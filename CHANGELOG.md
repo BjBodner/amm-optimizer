@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0 (2026-10-23)
+
+The default of `minimize` is now AMM. No algorithmic change: the engine, `ATMConfig()` and every preset behave exactly as in 0.3.0 (the golden, parity and characterisation tests are untouched).
+
+- **Breaking: `amm_optimizer.minimize` called without `config=` now runs AMM** (`presets.get("c46")`, config hash `2153948ebed51150`), not the original ATM sampler. In 0.3.0 and earlier the omitted `config` meant `ATMConfig()`: on a 5-dimensional Rosenbrock example (budget 2000, seed 0) the old default reaches f = 1.7 and AMM reaches f of about 1e-13.
+- **Breaking: AMM needs the search box.** A call with neither `config=` nor `bounds=(lower, upper)` raises `ValueError` and the message names both ways out. Calls that pass a `config` are unchanged, including those that pass `bounds`.
+- **To get the old behaviour** pass `config=amm_optimizer.ATMConfig()` (no `bounds` needed), or call `amm_optimizer.api.minimize`, the engine, whose default is still the original sampler and which the test suite uses.
+- Added: `amm_optimizer/default.py` with the public `minimize` (same signature and return type as the engine); `amm_optimizer.api` is importable from the package namespace. `tests/test_default_amm.py` pins the new default against the explicit `c46` call and the engine.
+- Docs: the README starts from the default AMM call.
+- Removed: `ATMConfig.improved()`, `improved_wave5()`, `improved_v2()` and `improved_wave6()` (the earlier hybrid; AMM is `presets.get("c46")`). `ATMConfig()`, `ATMConfig.composite()` and every preset of `presets.names()` are unchanged (same config hashes). To reproduce the earlier hybrid, build it from `Variant` fields.
+- The tests, benchmarks and tools that relied on the old default now call `amm_optimizer.api.minimize`; a pure rename.
+
 ## 0.3.0 (2026-10-23)
 
 Packaging release; no algorithmic change (c46 is bit-identical: 408 recorded runs of c46 and the default match `tests/characterisation.json`).

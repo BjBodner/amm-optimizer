@@ -45,7 +45,7 @@ def test_needs_a_success_rate_controller_and_a_box():
     with pytest.raises(ValueError, match="success-rate"):
         Variant(restart_mode="uniform")
     with pytest.raises(ValueError, match="bounds"):
-        atm.minimize(
+        atm.api.minimize(
             lambda x: 0.0,
             np.zeros(2),
             50,
@@ -60,7 +60,7 @@ def plateau(x):
 
 @pytest.mark.parametrize("mode", ["incumbent", "uniform", "ipop"])
 def test_a_plateau_restarts_and_spends_the_budget(mode):
-    result = atm.minimize(
+    result = atm.api.minimize(
         plateau, np.zeros(3), 3000, seed=1, config=config(restart_mode=mode), bounds=BOX
     )
     assert result.nrestarts >= 2
@@ -68,7 +68,7 @@ def test_a_plateau_restarts_and_spends_the_budget(mode):
 
 
 def test_legacy_mode_does_not_restart_on_a_plateau():
-    result = atm.minimize(
+    result = atm.api.minimize(
         plateau, np.zeros(3), 3000, seed=1, config=config(), bounds=BOX
     )
     assert result.nrestarts == 0
@@ -83,7 +83,7 @@ def test_best_point_is_kept_across_restarts(mode):
         seen.append(value)
         return value
 
-    result = atm.minimize(
+    result = atm.api.minimize(
         rastrigin,
         np.full(4, 3.0),
         4000,

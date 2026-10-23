@@ -107,7 +107,7 @@ def sphere(x):
 
 def test_a_variant_that_needs_the_box_refuses_to_run_without_it():
     with pytest.raises(ValueError, match="bounds"):
-        atm.minimize(
+        atm.api.minimize(
             sphere,
             np.zeros(2),
             100,
@@ -123,9 +123,9 @@ def test_bounds_are_not_enforced_for_the_default_variant():
         seen.append(np.array(x))
         return sphere(x)
 
-    with_box = atm.minimize(spy, np.full(3, 4.0), 600, seed=1, bounds=(-5, 5))
+    with_box = atm.api.minimize(spy, np.full(3, 4.0), 600, seed=1, bounds=(-5, 5))
     out = np.abs(np.array(seen)).max()
-    without = atm.minimize(sphere, np.full(3, 4.0), 600, seed=1)
+    without = atm.api.minimize(sphere, np.full(3, 4.0), 600, seed=1)
     assert out > 5  # the default leaves the box
     np.testing.assert_array_equal(with_box.x, without.x)
 
@@ -135,6 +135,8 @@ def test_folding_keeps_the_incumbent_in_the_box_even_with_a_far_optimum():
         return float(np.sum((x - 40) ** 2))  # optimum far outside the box
 
     config = atm.ATMConfig(variant=Variant(bounds="fold", corner_clip=0.25))
-    result = atm.minimize(far, np.zeros(4), 1500, seed=0, config=config, bounds=(-5, 5))
+    result = atm.api.minimize(
+        far, np.zeros(4), 1500, seed=0, config=config, bounds=(-5, 5)
+    )
     assert np.abs(result.x).max() <= 5
     assert result.fun < far(np.zeros(4))

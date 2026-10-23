@@ -50,6 +50,6 @@ def test_runs_within_the_budget(changes):
         return float(np.sum(scales * (q @ x) ** 2))
 
     config = ATMConfig(variant=Variant(**COV, **changes))
-    result = atm.minimize(fun, np.full(5, 2.0), 3000, seed=4, config=config)
+    result = atm.api.minimize(fun, np.full(5, 2.0), 3000, seed=4, config=config)
     assert result.nfev == 3000
     assert np.isfinite(result.fun)

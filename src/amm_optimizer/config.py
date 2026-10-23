@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, field, fields, replace
+from dataclasses import asdict, dataclass, field, fields
 from typing import Any
 
 from .conductor import ConductorConfig
@@ -1125,84 +1125,6 @@ class ATMConfig:
                 pool_rule="budget",
                 pool_min=12,
                 reevaluate_incumbent=False,
-            )
-        )
-
-    @classmethod
-    def improved(cls) -> ATMConfig:
-        """The recommended preset: :meth:`composite` plus local-search stages.
-
-        A hybrid of ATM's sampler with a restarted simplex search in up to 4
-        dimensions and a (1+1)-ES above, both for the first 90 % of small
-        budgets (up to 100 x dim, but only up to 30 x dim in up to 5
-        dimensions, where ATM itself is better on multimodal functions at
-        100 x dim), a learned covariance up to 10 dimensions, and, up to 10
-        dimensions, the last half of the budget spent on a simplex search from
-        ATM's best point. Its gains are those of the hybrid, not of ATM's
-        sampler alone.
-
-        Held out (``docs/HOLDOUT_TIER5.md``, COCO 2021 instances 96-100):
-        +.196 [+.180, +.212] over the defaults and +.096 [+.085, +.108] over
-        :meth:`composite`, every dimension positive, but at D = 40 only +.017
-        over the composite and still behind a plain (1+1)-ES. Pass
-        ``bounds=(lower, upper)``; the objective must be deterministic.
-        """
-        return cls(
-            variant=replace(
-                cls.composite().variant,
-                es_phase="prefix",
-                es_fraction=0.9,
-                es_max_budget_per_dim=100.0,
-                es_small_dim=5,
-                covariance="rank_mu",
-                cov_rate=3.0,
-                cov_select=0.5,
-                local_method="nelder_mead",
-                refine_fraction=0.5,
-                refine_max_dim=10,
-            )
-        )
-
-    @classmethod
-    def improved_wave5(cls) -> ATMConfig:
-        """The preset of Wave 5: :meth:`composite` with the (1+1)-ES prefix and the
-        learned covariance, no simplex stages.
-
-        This was ``ATMConfig.improved()`` until the 2026-10-19 merge of the research
-        and ``refactor`` lines. The research line's documents and tests up to then
-        mean this preset by ``improved()``, and its composites ``c23``-``c31``
-        (``presets``) start from these options.
-        """
-        return cls(
-            variant=replace(
-                cls.composite().variant,
-                es_phase="prefix",
-                es_fraction=0.9,
-                es_max_budget_per_dim=100.0,
-                covariance="rank_mu",
-                cov_rate=3.0,
-                cov_select=0.5,
-            )
-        )
-
-    @classmethod
-    def improved_v2(cls) -> ATMConfig:
-        """Alias of :meth:`improved`, the name used while it was a candidate."""
-        return cls.improved()
-
-    @classmethod
-    def improved_wave6(cls) -> ATMConfig:
-        """The preset of Wave 6 (commit ``da1ef9a``), kept for reproducibility.
-
-        Same as :meth:`improved` but with the local-search prefix for budgets
-        up to 100 x dim in every dimension and a tail in every dimension (a
-        (1+1)-ES above 10); it loses to the plain composite on the multimodal
-        functions f15-f19 at 100 x dim (Tier 4 holdout, -.043; reproduced in
-        Tier 5, -.035) and on separable functions at 300 x dim in 40 dimensions.
-        """
-        return cls(
-            variant=replace(
-                cls.improved().variant, es_small_dim=0, refine_max_dim=1_000_000
             )
         )
 

@@ -11,6 +11,7 @@ from amm_optimizer.bounds import Box
 from amm_optimizer.cma_phase import kendall_tau, lq_step, run_cma, warm_factor
 from amm_optimizer.config import ATMConfig
 from amm_optimizer.objective import CountedObjective
+from preset_cases import wave5_variant
 
 BOX = (-5.0, 5.0)
 
@@ -123,7 +124,7 @@ def test_active_update_keeps_learning_a_rotated_ellipsoid():
 
 def hyb(**changes):
     variant = dataclasses.replace(
-        ATMConfig.improved_wave5().variant, es_kind="cma", cma_handoff=0.2, **changes
+        wave5_variant(), es_kind="cma", cma_handoff=0.2, **changes
     )
     return ATMConfig(iterations_per_hyperparameter_set=1000000, variant=variant)
 
@@ -146,7 +147,7 @@ def test_options_spend_the_budget_and_keep_the_best(changes):
         seen.append(fun(x))
         return seen[-1]
 
-    result = atm.minimize(
+    result = atm.api.minimize(
         counted, np.full(5, 3.0), 2500, seed=8, config=hyb(**changes), bounds=BOX
     )
     assert result.nfev == len(seen) == 2500
@@ -156,7 +157,9 @@ def test_options_spend_the_budget_and_keep_the_best(changes):
 def test_lean_start_and_cap_only_act_from_dimension_ten():
     fun, _ = ellipsoid(4, seed=9)
     runs = [
-        atm.minimize(fun, np.full(4, 3.0), 300, seed=10, config=hyb(**c), bounds=BOX)
+        atm.api.minimize(
+            fun, np.full(4, 3.0), 300, seed=10, config=hyb(**c), bounds=BOX
+        )
         for c in ({}, dict(es_lean_start=True, cma_handoff_cap_per_dim=60.0))
     ]
     assert runs[0].fun == runs[1].fun

@@ -21,7 +21,7 @@ def run(config, budget, dim=4, seed=0, **kw):
         points.append(np.array(x))
         return sphere(x)
 
-    atm.minimize(spy, np.full(dim, -3.0), budget, seed=seed, config=config, **kw)
+    atm.api.minimize(spy, np.full(dim, -3.0), budget, seed=seed, config=config, **kw)
     return np.array(points)
 
 
@@ -58,7 +58,7 @@ def test_only_the_first_iteration_is_uniform():
 
 def test_without_bounds_the_variant_refuses_to_run():
     with pytest.raises(ValueError, match="bounds"):
-        atm.minimize(sphere, np.zeros(2), 50, seed=0, config=UNIFORM)
+        atm.api.minimize(sphere, np.zeros(2), 50, seed=0, config=UNIFORM)
 
 
 def test_a_restart_gets_a_uniform_pool_again(monkeypatch):
@@ -74,7 +74,7 @@ def test_a_restart_gets_a_uniform_pool_again(monkeypatch):
     monkeypatch.setattr(Search, "run", counting)
     config = atm.ATMConfig(variant=Variant(initial_design="uniform"))
     # flat objective: the restart policy fires, each search opens with a pool
-    atm.minimize(
+    atm.api.minimize(
         lambda x: 1.0, np.zeros(3), 6000, seed=0, config=config, bounds=(-5, 5)
     )
     assert len(starts) >= 2

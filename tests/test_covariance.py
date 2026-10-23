@@ -126,7 +126,7 @@ def test_a_run_learns_an_elongated_shape_on_a_rotated_ellipsoid(monkeypatch):
         return float(np.sum(weights * z * z))
 
     config = atm.ATMConfig(variant=COV)
-    result = atm.minimize(
+    result = atm.api.minimize(
         ellipsoid, np.zeros(dim), 3000, seed=0, config=config, bounds=(-5, 5)
     )
     assert result.nfev == 3000
@@ -144,7 +144,7 @@ def test_the_covariance_is_not_learned_above_the_dimension_limit(monkeypatch):
     )
     limited = Variant(**{**COV.to_dict(), "cov_max_dim": 3})
     objective = lambda x: float(np.sum(np.asarray(x) ** 2))  # noqa: E731
-    atm.minimize(
+    atm.api.minimize(
         objective,
         np.ones(4),
         300,
@@ -153,7 +153,7 @@ def test_the_covariance_is_not_learned_above_the_dimension_limit(monkeypatch):
         bounds=(-5, 5),
     )
     assert not calls
-    atm.minimize(
+    atm.api.minimize(
         objective,
         np.ones(3),
         300,

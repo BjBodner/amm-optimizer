@@ -76,7 +76,7 @@ def _solver_new():
         rng = np.random.RandomState(seed)
         x0 = 10 * (rng.rand(dim) - 0.5)
         config = atm.ATMConfig(strict_budget=False)  # same accounting as the original
-        return atm.minimize(fun, x0, budget, rng=rng, config=config).x
+        return atm.api.minimize(fun, x0, budget, rng=rng, config=config).x
 
     return run
 

@@ -81,7 +81,7 @@ def new_ledger(scenario, ledger):
         rng.set_state(np.random.get_state())
         holder.append(rng)
         config = atm.ATMConfig(strict_budget=False)
-        return atm.minimize(fun, x0, budget, rng=rng, config=config).x
+        return atm.api.minimize(fun, x0, budget, rng=rng, config=config).x
 
     ledger.clear()
     run_scenario(optimize, scenario)

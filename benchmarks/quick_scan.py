@@ -717,7 +717,7 @@ class ATMSolver(_Base):
 
         self.name = name
         self.config = config
-        self._minimize = atm.minimize
+        self._minimize = atm.api.minimize
 
     def solve(self, fun, x0, budget):
         box = (BOX[0] * self.box_scale, BOX[1] * self.box_scale)

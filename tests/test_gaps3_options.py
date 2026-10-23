@@ -4,7 +4,8 @@ and ``rugged_direct_beta`` / ``rugged_direct_min_beta``. Each default is c44's."
 import numpy as np
 import pytest
 
-from amm_optimizer import chain_phase, minimize, presets
+from amm_optimizer import chain_phase, presets
+from amm_optimizer.api import minimize
 from amm_optimizer.bounds import Box
 from amm_optimizer.config import Variant
 from amm_optimizer.objective import CountedObjective

@@ -185,10 +185,11 @@ def test_the_controller_converges_on_a_sphere_where_the_original_does_not():
     for variant in (SR, SR2):
         config = atm.ATMConfig(variant=variant)
         results = [
-            atm.minimize(sphere, x0, 3000, seed=s, config=config).fun for s in range(3)
+            atm.api.minimize(sphere, x0, 3000, seed=s, config=config).fun
+            for s in range(3)
         ]
         assert max(results) < 1e-8
-    legacy = atm.minimize(sphere, x0, 3000, seed=0).fun
+    legacy = atm.api.minimize(sphere, x0, 3000, seed=0).fun
     assert legacy > 1e-8
 
 

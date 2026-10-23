@@ -9,6 +9,7 @@ import amm_optimizer as atm
 from amm_optimizer.bounds import Box
 from amm_optimizer.cma_phase import critical_distance, mlsl_start
 from amm_optimizer.config import ATMConfig
+from preset_cases import wave5_variant
 
 BOX = (-5.0, 5.0)
 
@@ -46,13 +47,13 @@ def test_minimize_with_mlsl_placement():
         return value
 
     variant = dataclasses.replace(
-        ATMConfig.improved_wave5().variant,
+        wave5_variant(),
         es_kind="cma",
         cma_handoff=0.2,
         cma_placement="mlsl",
     )
     config = ATMConfig(iterations_per_hyperparameter_set=1000000, variant=variant)
-    result = atm.minimize(
+    result = atm.api.minimize(
         gallagher_like, np.full(3, 4.0), 3000, seed=5, config=config, bounds=BOX
     )
     assert result.nfev == len(seen) == 3000

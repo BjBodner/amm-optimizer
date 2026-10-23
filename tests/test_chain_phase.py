@@ -4,7 +4,8 @@ decoupled coordinate search, and the ``chain_route`` / ``sep_route`` options."""
 import numpy as np
 import pytest
 
-from amm_optimizer import api, chain_phase, minimize, presets
+from amm_optimizer import api, chain_phase, presets
+from amm_optimizer.api import minimize
 from amm_optimizer.bounds import Box
 from amm_optimizer.objective import CountedObjective
 from amm_optimizer.step_phase import run_step_phase

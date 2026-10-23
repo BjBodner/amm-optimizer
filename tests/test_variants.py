@@ -102,7 +102,7 @@ def test_a_variant_that_saves_evaluations_would_otherwise_restart(monkeypatch):
 
     x0 = np.full(10, -3.0)
     config = atm.ATMConfig(variant=Variant(reevaluate_incumbent=False))
-    atm.minimize(objective, x0, 10_000, seed=0, config=config)
+    atm.api.minimize(objective, x0, 10_000, seed=0, config=config)
     assert len(runs) == 1
 
     def originals_limit(config, budget):
@@ -112,7 +112,7 @@ def test_a_variant_that_saves_evaluations_would_otherwise_restart(monkeypatch):
 
     monkeypatch.setattr(api, "iteration_limit", originals_limit)
     runs.clear()
-    atm.minimize(objective, x0, 10_000, seed=0, config=config)
+    atm.api.minimize(objective, x0, 10_000, seed=0, config=config)
     assert len(runs) >= 2  # the rounds ran out first: a silent restart
 
 

@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "amm-optimizer"
-version = "0.3.0"
+version = "0.4.0"
 description = "Adaptive Multi Mode (AMM): budget-aware routing of derivative-free optimizers by online landscape probes (import amm_optimizer)"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-authors = [{ name = "Benjy Bodner" }]
+authors = [{ name = "Benjamin Jacob Bodner" }]
 keywords = ["black-box optimization", "derivative-free", "COCO", "BBOB", "CMA-ES", "algorithm selection"]
 classifiers = [
   "Development Status :: 4 - Beta",

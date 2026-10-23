@@ -4,7 +4,8 @@ many x dim (Batch 89 rejected the uncapped option for its 1000 x D losses)."""
 import numpy as np
 import pytest
 
-from amm_optimizer import minimize, presets, qn_phase
+from amm_optimizer import presets, qn_phase
+from amm_optimizer.api import minimize
 from amm_optimizer.config import Variant
 
 ORIGINAL = qn_phase.run_slsqp_restarts

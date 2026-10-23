@@ -1,13 +1,13 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below (the paper's reference will be added when it is public)."
 title: "Adaptive Multi Mode (AMM): budget-aware routing of optimizers by online landscape probes"
-version: 0.3.0
+version: 0.4.0
 license: Apache-2.0
 type: software
 repository-code: "https://github.com/BjBodner/amm-optimizer"
 authors:
   - family-names: Bodner
-    given-names: Benjy
+    given-names: Benjamin Jacob
 keywords:
   - black-box optimization
   - derivative-free optimization

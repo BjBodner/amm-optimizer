@@ -5,7 +5,8 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from amm_optimizer import api, cobyqa_phase, minimize, presets
+from amm_optimizer import api, cobyqa_phase, presets
+from amm_optimizer.api import minimize
 from amm_optimizer.bounds import Box
 from amm_optimizer.objective import CountedObjective
 

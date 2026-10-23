@@ -104,12 +104,12 @@ def test_handoff_spends_the_budget_and_keeps_the_best():
         seen.append(fun(x))
         return seen[-1]
 
-    result = atm.minimize(
+    result = atm.api.minimize(
         counted, np.full(6, 2.0), 6000, seed=3, config=handoff(0.3), bounds=BOX
     )
     assert result.nfev == len(seen) == 6000
     assert result.fun == min(seen)
-    alone = atm.minimize(
+    alone = atm.api.minimize(
         fun, np.full(6, 2.0), 6000, seed=3, config=handoff(0.0), bounds=BOX
     )
     assert result.fun < 1e-3 * alone.fun
@@ -119,7 +119,7 @@ def test_handoff_needs_a_success_rate_controller_and_a_box():
     with pytest.raises(ValueError, match="success-rate"):
         Variant(cma_handoff=0.3)
     with pytest.raises(ValueError, match="bounds"):
-        atm.minimize(lambda x: 0.0, np.zeros(2), 100, seed=0, config=handoff(0.3))
+        atm.api.minimize(lambda x: 0.0, np.zeros(2), 100, seed=0, config=handoff(0.3))
 
 
 def test_without_restarts_it_returns_at_the_first_stagnation():
@@ -145,7 +145,7 @@ def test_alternating_with_atm_spends_the_budget_and_keeps_the_best():
         seen.append(float(10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))))
         return seen[-1]
 
-    result = atm.minimize(
+    result = atm.api.minimize(
         rastrigin,
         np.full(3, 4.0),
         6000,

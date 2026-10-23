@@ -314,7 +314,7 @@ def run_case(config: atm.ATMConfig, scenario: Scenario, points: list | None = No
         costs.append(float(fun(x)))
         return costs[-1]
 
-    result = atm.minimize(
+    result = atm.api.minimize(
         counted, x0, scenario.budget, rng=rng, config=config, bounds=BOX
     )
     return costs, rng.ledger, result

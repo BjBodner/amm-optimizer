@@ -45,7 +45,7 @@ def profile_scenario(function: str, dim: int, budget: int, seeds: int):
     for seed in range(seeds):
         rng = np.random.RandomState(seed)
         x0 = 10 * (rng.rand(dim) - 0.5)
-        atm.minimize(fun, x0, budget, rng=rng, profile=prof)
+        atm.api.minimize(fun, x0, budget, rng=rng, profile=prof)
     return prof.report()
 
 
