@@ -11,6 +11,7 @@ from amm_optimizer.bounds import Box
 from amm_optimizer.cma_phase import kendall_tau, lq_step, run_cma, warm_factor
 from amm_optimizer.config import ATMConfig
 from amm_optimizer.objective import CountedObjective
+from preset_cases import wave5_variant
 
 BOX = (-5.0, 5.0)
 
@@ -123,7 +124,7 @@ def test_active_update_keeps_learning_a_rotated_ellipsoid():
 
 def hyb(**changes):
     variant = dataclasses.replace(
-        ATMConfig.improved_wave5().variant, es_kind="cma", cma_handoff=0.2, **changes
+        wave5_variant(), es_kind="cma", cma_handoff=0.2, **changes
     )
     return ATMConfig(iterations_per_hyperparameter_set=1000000, variant=variant)
 

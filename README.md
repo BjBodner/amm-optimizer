@@ -63,7 +63,7 @@ up to 0.3.0 ran that sampler when `config` was omitted; see the changelog.
 ## The original ATM sampler and the older presets
 
 The sections below document the original ATM sampler and the older presets
-(`ATMConfig()`, `composite()`, `improved()`); they are kept because every recorded result and test
+(`ATMConfig()` and `composite()`); they are kept because every recorded result and test
 depends on them. None of them is the default of `amm.minimize`: pass them as `config=`. This repository is a clean, tested re-implementation of the original ATM that
 reproduces its results exactly (see [docs/DEVIATIONS.md](docs/DEVIATIONS.md)).
 
@@ -91,11 +91,13 @@ evaluations and never win.
 without a `config` (see `docs/DEVIATIONS.md`); the default of `amm.minimize` is AMM, not the original.
 `ATMConfig(strict_budget=False)` also restores the original's looser budget accounting.
 
-## The earlier hybrid: the improved preset
+## The composite preset
 
-`ATMConfig.improved()` is the hybrid that preceded AMM. It is kept for reproducibility; AMM
-(`c46`, the default) is the configuration to use. If you know the search box, `improved()` gets far
-more out of the same budget than the original sampler:
+`ATMConfig.composite()` is ATM's own sampler plus five improvements (success-rate control of
+the search width, a uniform first pool over the box, bounds folded with a 25 % corner clip, a
+pool sized from the budget, no re-evaluation of the incumbent). It is kept for reproducibility;
+AMM (`c46`, the default) is the configuration to use. If you know the search box, the composite
+gets more out of the same budget than the original sampler:
 
 ```python
 result = amm.minimize(
@@ -104,21 +106,14 @@ result = amm.minimize(
     budget=2000,
     seed=0,
     bounds=(-5, 5),                      # scalars or one value per coordinate
-    config=amm.ATMConfig.improved(),
+    config=amm.ATMConfig.composite(),
 )
 print(result.fun)
 ```
 
 The box is used, not enforced as a constraint: samples are folded back into it before the
 function is called, so the function only ever sees points inside. Without `bounds=` the
-preset raises `ValueError`. The objective must be deterministic.
-
-**This preset is a hybrid, not just ATM.** It takes ATM's sampler with five improvements
-(success-rate control of the search width, a uniform first pool over the box, bounds folded
-with a 25 % corner clip, a pool sized from the budget, no re-evaluation of the incumbent) and
-adds local-search stages: a simplex search in up to 4 dimensions and a (1+1)-ES above, for the
-first part of small budgets; a learned covariance up to 10 dimensions; and, up to 10
-dimensions, a simplex search over the last half of the budget. Each option is documented in
+preset raises `ValueError`. The objective must be deterministic. Each option is documented in
 `docs/DEVIATIONS.md`.
 
 Presets, from simplest to largest (`c46` last, as the frozen AMM):
@@ -127,27 +122,9 @@ Presets, from simplest to largest (`c46` last, as the frozen AMM):
 |---|---|---|
 | `ATMConfig()` | the original ATM, bit for bit | `tests/golden`, 400-case parity sweep |
 | `ATMConfig.composite()` | ATM's sampler plus the five improvements; stays pure ATM | +.101, +.097, +.099 on three untouched holdouts |
-| `ATMConfig.improved()` | the composite plus the local stages above (the earlier hybrid, kept for reproducibility) | +.196 over the original, +.096 over the composite on a fourth holdout |
-| `ATMConfig.improved_wave6()` | an earlier version, kept for reproducibility; loses on multimodal functions at medium budgets | Tier 4 |
 | `presets.get("c46")` | AMM, the default of `amm.minimize` | [docs/FREEZE_2026-10-22.md](docs/FREEZE_2026-10-22.md) |
 
-`tests/golden/presets.json` pins the exact cost traces of all of them.
-
-**What to expect from `improved()`**, measured on COCO bbob (2021 suite) instances 96-100 that
-were not used to design it (18,000 runs per arm, raw COCO evaluation):
-
-* ECDF value (fraction of targets reached) improves by **+.196** [95 % CI +.180, +.212] over
-  `ATMConfig()`, averaged over budgets of 30, 100 and 300 x dimension, and by **+.096**
-  [+.085, +.108] over `composite()`.
-* The gain shrinks as the dimension grows: over `ATMConfig()` +.412 at D = 2, +.197 at D = 5,
-  +.127 at D = 10, +.082 at D = 20, +.055 at D = 40; over `composite()` +.215 at D = 2 down to
-  +.017 at D = 40, where the two are almost the same algorithm.
-* It does **not** beat everything: a plain (1+1)-ES with the 1/5 rule is still ahead at 40
-  dimensions (-.031) and level at 20, and CMA-ES is far ahead of every ATM variant at large
-  budgets (on the Tier 4 instances: .597 against .504 for the closest hybrid at 1000 x D).
-* Only noiseless, continuous, box-constrained problems with budgets of 10 to 1000 x D were
-  tested. The three-algorithm design means its gain should not be described as an improvement
-  of ATM's sampler alone; use `composite()` if you want that.
+`tests/golden/presets.json` pins the exact cost traces of the first two.
 
 ## Development
 

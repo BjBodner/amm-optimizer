@@ -12,6 +12,8 @@ import numpy as np
 import pytest
 
 import amm_optimizer as atm
+from amm_optimizer.config import Variant
+from preset_cases import LOCAL_STAGES
 
 BOX = (-5.0, 5.0)
 DIMS = (1, 2, 3)
@@ -20,7 +22,10 @@ BUDGETS = (1, 10, 40, 150, 300)
 CONFIGS = {
     "default": lambda: (atm.ATMConfig(), None),
     "composite": lambda: (atm.ATMConfig.composite(), BOX),
-    "improved": lambda: (atm.ATMConfig.improved(), BOX),
+    "local_stages": lambda: (
+        atm.ATMConfig(variant=Variant(**LOCAL_STAGES)),
+        BOX,
+    ),
     "c46": lambda: (atm.presets.get("c46"), BOX),
 }
 

@@ -11,6 +11,7 @@ from amm_optimizer.config import ATMConfig, Variant
 from amm_optimizer.objective import CountedObjective
 from amm_optimizer.pop_cma import default_population, run_population_cma
 from amm_optimizer.regimes import run_regimes
+from preset_cases import wave5_variant
 
 BOX = (-5.0, 5.0)
 
@@ -81,7 +82,7 @@ def test_regimes_spend_the_budget_and_keep_the_best(reward):
 
 def hyb(**changes):
     variant = dataclasses.replace(
-        ATMConfig.improved_wave5().variant, es_kind="cma", cma_handoff=0.2, **changes
+        wave5_variant(), es_kind="cma", cma_handoff=0.2, **changes
     )
     return ATMConfig(iterations_per_hyperparameter_set=1000000, variant=variant)
 

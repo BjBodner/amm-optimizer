@@ -9,7 +9,7 @@ harness reads it (``tests/test_presets.py`` checks the configurations and their
 What runs (``api``'s module docstring has the phase order):
 
 * ``c23``: ATM's global phase with success-rate widths, a learned covariance and
-  reflection into the box (``ATMConfig.improved``), as a (1+1)-CMA-ES prefix up to
+  reflection into the box, as a (1+1)-CMA-ES prefix up to
   100 x dim (Nelder-Mead at D <= 2); above that ATM for 20% of the budget (at most
   60 dim), the separable STEP search, and the restarted (1+1)-Cholesky-CMA-ES with
   quadratic model steps, handing stalls (and runs past 150 dim, from D 10) to active

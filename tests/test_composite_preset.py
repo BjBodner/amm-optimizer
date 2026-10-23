@@ -79,7 +79,7 @@ def test_preset_beats_the_defaults_on_a_smooth_box_problem():
     x0 = np.full(5, 4.0)
     kwargs = {"bounds": (-5.0, 5.0)}
     default = atm.api.minimize(sphere, x0, 1000, seed=3, **kwargs).fun
-    improved = atm.api.minimize(
+    tuned = atm.api.minimize(
         sphere, x0, 1000, seed=3, config=atm.ATMConfig.composite(), **kwargs
     ).fun
-    assert improved < default
+    assert tuned < default

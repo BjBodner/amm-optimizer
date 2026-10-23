@@ -27,7 +27,9 @@ COMPOSITE = {
     "pool_min": 12,
     "reevaluate_incumbent": False,
 }
-WAVE6 = {
+# The composite with the (1+1)-ES prefix and the learned covariance: the starting
+# point several tests build their variants from (see ``wave5_variant``).
+WAVE5 = {
     **COMPOSITE,
     "es_phase": "prefix",
     "es_fraction": 0.9,
@@ -35,11 +37,21 @@ WAVE6 = {
     "covariance": "rank_mu",
     "cov_rate": 3.0,
     "cov_select": 0.5,
+}
+# ... plus the simplex stages in small dimensions (smoke tests).
+LOCAL_STAGES = {
+    **WAVE5,
     "local_method": "nelder_mead",
     "refine_fraction": 0.5,
+    "es_small_dim": 5,
+    "refine_max_dim": 10,
 }
-V2 = {**WAVE6, "es_small_dim": 5, "refine_max_dim": 10}
-PRESETS = {"default": {}, "composite": COMPOSITE, "wave6": WAVE6, "v2": V2}
+PRESETS = {"default": {}, "composite": COMPOSITE}
+
+
+def wave5_variant() -> Variant:
+    """The composite with the (1+1)-ES prefix and the learned covariance."""
+    return Variant(**WAVE5)
 
 
 def sphere(x):
