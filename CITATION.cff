@@ -7,7 +7,7 @@ type: software
 repository-code: "https://github.com/BjBodner/amm-optimizer"
 authors:
   - family-names: Bodner
-    given-names: Benjy
+    given-names: Benjamin Jacob
 keywords:
   - black-box optimization
   - derivative-free optimization

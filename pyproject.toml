@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-authors = [{ name = "Benjy Bodner" }]
+authors = [{ name = "Benjamin Jacob Bodner" }]
 keywords = ["black-box optimization", "derivative-free", "COCO", "BBOB", "CMA-ES", "algorithm selection"]
 classifiers = [
   "Development Status :: 4 - Beta",
