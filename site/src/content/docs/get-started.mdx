@@ -12,16 +12,15 @@ point it found.
 ## Install
 
 AMM is released as the distribution `amm-optimizer` and imported as `amm_optimizer`.
-PyPI status: <Claim id="release.pypi" />. Until version 0.3.0 is released there, install from the public repository
-(<Claim id="repo.public_url" />):
+PyPI status: <Claim id="release.pypi" />.
 
 ```bash
-pip install git+https://github.com/BjBodner/amm-optimizer
+pip install amm-optimizer
 ```
 
-Do not install the 0.2.0 release from PyPI for this page: it imports as `amm` or `atm`, and its default `minimize` is the
-original ATM sampler. From a checkout, `pip install -e .` installs the same code; `pip install -e ".[bench]"` adds the COCO tooling
-used by the benchmarks.
+The release 0.2.0 was withdrawn (yanked) because it imported as `amm` or `atm` and its default `minimize` was the
+original ATM sampler. From a checkout of the public repository (<Claim id="repo.public_url" />), `pip install -e .` installs
+the development version; `pip install -e ".[bench]"` adds the COCO tooling used by the benchmarks.
 
 The package is version <Claim id="pkg.version_public" /> and needs <Claim id="pkg.requires" />, as declared in `pyproject.toml`
 of the repository. The licence is <Claim id="pkg.license" />.

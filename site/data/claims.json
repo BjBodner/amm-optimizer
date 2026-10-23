@@ -47,10 +47,10 @@
     },
     "release.pypi": {
       "label": "PyPI release of amm-optimizer",
-      "value": "0.3.0 not yet on PyPI (0.2.0 is, and imports as amm or atm)",
-      "status": "pending",
-      "requiresFinal": true,
-      "source": "pypi.org/pypi/amm-optimizer/json lists only 0.2.0 on 2026-10-23; the repository is at 0.3.0. 0.2.0's default minimize is the original ATM sampler (f = 1.7 on the home-page example); decision: yank 0.2.0 and release 0.3.0 (the maintainer runs the release)"
+      "value": "0.3.0 on PyPI (0.2.0 yanked)",
+      "status": "final",
+      "requiresFinal": false,
+      "source": "pypi.org/pypi/amm-optimizer/json on 2026-10-23: 0.3.0 uploaded 14:08 UTC, 0.2.0 marked yanked; release workflow run for tag v0.3.0 succeeded; checked that pip install amm-optimizer installs 0.3.0 and the site snippet reproduces its printed output"
     },
     "release.doi": {
       "label": "Zenodo DOI of the first release",
