@@ -39,6 +39,7 @@ from typing import Any
 import numpy as np
 
 from . import basin_phase, chain_phase, cobyqa_phase, qn_phase
+from .anytime import Warm
 from .bounds import Box
 from .cma_phase import run_cma, warm_factor
 from .conductor import ConductorConfig, ResourceConductor
@@ -95,7 +96,51 @@ def minimize(
     ``config`` defaults to the original algorithm; ``presets.get("c26")`` (and
     the other names of ``presets.names()``) are the research composites. The
     module docstring lists the phases a composite runs.
+
+    With ``config.variant.anytime`` set, the run never learns ``budget``, which then
+    only caps the calls (:mod:`.anytime`).
     """
+    return _minimize(
+        fun,
+        x0,
+        budget,
+        seed=seed,
+        rng=rng,
+        config=config,
+        profile=profile,
+        bounds=bounds,
+        warm=None,
+    )
+
+
+def _minimize(
+    fun: Callable[[np.ndarray], float],
+    x0: np.ndarray,
+    budget: int,
+    *,
+    seed: int | None,
+    rng: np.random.RandomState | None,
+    config: ATMConfig | None,
+    profile: bool | Profiler,
+    bounds: tuple[object, object] | None,
+    warm: Warm | None,
+) -> OptimizeResult:
+    """:func:`minimize`; ``warm`` (only the anytime mode's hand-over passes one) is
+    what the replay part evaluated, for the phases that would otherwise draw fresh
+    points. Without it (every other run) nothing below reads it."""
+    if config is not None and config.variant.anytime != "off":
+        from .anytime import minimize_anytime
+
+        return minimize_anytime(
+            fun,
+            x0,
+            budget,
+            seed=seed,
+            rng=rng,
+            config=config,
+            profile=profile,
+            bounds=bounds,
+        )
     if rng is None:
         rng = np.random.RandomState(seed)
     x0 = np.asarray(x0, dtype=float)
@@ -116,14 +161,16 @@ def minimize(
             def mapped(u: np.ndarray) -> float:
                 return fun(lo + (np.asarray(u, dtype=float) + 5.0) * span)
 
-            inner = minimize(
+            inner = _minimize(
                 mapped,
                 np.clip((x0 - lo) / span - 5.0, -5.0, 5.0),
                 budget,
+                seed=None,
                 rng=rng,
                 config=config,
                 profile=profile,
                 bounds=(-5.0, 5.0),
+                warm=None if warm is None else warm.mapped(lo, span),
             )
             inner.x = lo + (np.asarray(inner.x, dtype=float) + 5.0) * span
             return inner
@@ -147,6 +194,11 @@ def minimize(
     # Variant ``cma_warm_start``: ATM's evaluations, kept while ``recording[0]``.
     recorded_x: list[np.ndarray] = []
     recorded_f: list[float] = []
+    if warm is not None and config.variant.cma_warm_start:
+        # the anytime hand-over: the first CMA run's shape learns from every point
+        # the earlier stages evaluated, not only from this stage's ATM sample
+        recorded_x.extend(warm.x)
+        recorded_f.extend(warm.f.tolist())
     recording = [False]
     evaluated = fun
     if config.variant.cma_warm_start or config.variant.cma_placement == "mlsl":
@@ -315,6 +367,12 @@ def minimize(
                 )
         if box is not None and not out_of_budget and _prefix_runs(variant, dim, budget):
             prefix_kind = _prefix_kind(variant, dim, budget)
+            init_points = (
+                4 if lean else max(4, int(np.ceil(variant.es_init_factor * dim)))
+            )
+            warm_design: dict[str, Any] = (
+                {} if warm is None else {"design": warm.best(init_points)}
+            )
             # ``prefix_full_per_dim`` (cycle 38): no ATM tail at small budgets
             whole = (
                 variant.prefix_full_min_per_dim * dim
@@ -328,7 +386,7 @@ def minimize(
                 box,
                 (budget if whole else max(1, int(variant.es_fraction * budget)))
                 - spent,
-                4 if lean else max(4, int(np.ceil(variant.es_init_factor * dim))),
+                init_points,
                 prefix_kind,
                 use_model,
                 cma_options,
@@ -375,6 +433,9 @@ def minimize(
                 **({"probe_faces": True} if variant.probe_faces == "tangent" else {}),
                 **({"step_box_check": True} if variant.step_box_check else {}),
                 **_parked2_kw(variant, dim, budget),
+                # the anytime hand-over: the design is the best points evaluated so
+                # far (answered from memory) instead of fresh uniform draws
+                **warm_design,
             )
             x_start, known_cost, width_scale = es.x, es.cost, es.sigma
             explored = True
@@ -394,10 +455,21 @@ def minimize(
             recording[0] = variant.cma_warm_start or variant.cma_placement == "mlsl"
         last_widths: tuple[float, ...] = ()
         last_width = float("nan")
+        # the anytime hand-over: the first search skips the uniform first pool, which
+        # the replay part's points stand in for (and starts with its value known
+        # when ``x0`` is the best point so far)
+        fresh = warm is None
+        if (
+            warm is not None
+            and known_cost is None
+            and np.array_equal(x_start, warm.best_x)
+        ):
+            known_cost = warm.best_f
         while not out_of_budget:
             outcome = search.run(
-                x_start, allocation, known_cost, width_scale, not explored
+                x_start, allocation, known_cost, width_scale, not explored and fresh
             )
+            fresh = True
             width_scale = None
             explored = False
             out_of_budget = outcome.out_of_budget
@@ -490,6 +562,7 @@ def minimize(
                 best_cost=best_cost,
                 a0=_warm_shape(variant, dim, recorded_x, recorded_f),
                 last_widths=last_widths,
+                warm_samples=None if warm is None else (warm.x, warm.f),
             )
             _local_phase(handover, objective)
             best_x, best_cost = handover.best_x, handover.best_cost
@@ -792,6 +865,9 @@ class _Handover:
     sigma_override: list[float] = field(default_factory=list)
     # ``rugged_direct_beta`` (research, gaps3): the finisher's populations start at once
     direct_populations: bool = False
+    # the anytime hand-over: what earlier stages evaluated (points, values), the
+    # sampled restarts' first samples; None in every other run
+    warm_samples: tuple[np.ndarray, np.ndarray] | None = None
 
     def keep(self, x: np.ndarray, cost: float) -> None:
         """Take ``x`` as the best point if it is at least as good."""
@@ -1103,6 +1179,9 @@ def _qn_local_phase(
                 # Smooth with several basins (Gallagher-like): keep restarting
                 # SLSQP for the rest of the budget (``basins_sampled``: from the
                 # best unclaimed sample point, with the gap-scaled stop).
+                warm_samples: dict[str, Any] = (
+                    {} if h.warm_samples is None else {"samples": h.warm_samples}
+                )
                 more = (
                     qn_phase.run_sampled_restarts(
                         objective,
@@ -1118,6 +1197,7 @@ def _qn_local_phase(
                             if variant.sampled_polish_per_dim > 0
                             else {}
                         ),
+                        **warm_samples,
                     )
                     if route.basins_sampled
                     else qn_phase.run_slsqp_restarts(

@@ -533,6 +533,41 @@ def test_the_parabola_vertex_needs_an_interior_convex_bracket():
     assert step_phase._parabola_vertex(t, with_nan) is None
 
 
+def test_one_interval_difficulty_is_the_vectorised_one_bit_for_bit():
+    """``_pair_difficulty`` (inserts) and ``_difficulty`` (re-bases) must agree."""
+    rng = np.random.RandomState(3)
+    t = np.sort(np.concatenate((rng.uniform(-5, 5, 300), [0.0, 1e-12, 2e-12, 1.0])))
+    h = np.abs(rng.standard_cauchy(len(t))) * 10.0 ** rng.randint(-12, 6, len(t))
+    h[::17], h[::23] = 0.0, np.inf
+    vectorised = step_phase._difficulty(t, h)
+    one_by_one = [
+        step_phase._pair_difficulty(t[k], h[k], t[k + 1], h[k + 1])
+        for k in range(len(t) - 1)
+    ]
+    assert np.array_equal(vectorised, np.array(one_by_one))
+    assert np.isinf(vectorised).any() and np.isfinite(vectorised).any()
+
+
+@pytest.mark.parametrize("fun", [sphere, rastrigin, rotated_ellipsoid, np.sum])
+def test_step_chunks_do_not_change_the_search(monkeypatch, fun):
+    """Chunk splits (``_Axis``) must leave every evaluated point as it was."""
+
+    def run(**flags):
+        objective, calls = counted(lambda x: float(np.floor(4 * fun(x))), 10_000)
+        x = np.full(5, 2.3)
+        result = step_phase.run_step_phase(
+            objective, x, float(np.floor(4 * fun(x))), BOX5, 3_000, **flags
+        )
+        return np.array(calls), result.cost, result.stalled
+
+    for flags in ({}, {"parabolic": True, "pair_when_stuck": True, "box_check": True}):
+        whole = run(**flags)
+        monkeypatch.setattr(step_phase, "CHUNK", 3)
+        chunked = run(**flags)
+        monkeypatch.undo()
+        assert np.array_equal(whole[0], chunked[0]) and whole[1:] == chunked[1:]
+
+
 # --------------------------------------------------------------- cma_phase ----
 def test_the_curvature_probe_hands_rugged_functions_over():
     cma_phase.PROBE_LOG.clear()
@@ -683,6 +718,28 @@ def test_sampled_restarts_spend_at_most_their_budget(budget):
     )
     assert result.used == len(calls) <= budget
     assert result.cost == min([two_wells(x)] + [two_wells(c) for c in calls])
+
+
+def test_the_fast_clearance_check_matches_the_norm_scan():
+    """``_clear_of`` answers as ``all(norm(point - c) > radius)``, also at the edge."""
+    rng = np.random.RandomState(5)
+    radius = 1.5
+    for _ in range(200):
+        point = rng.uniform(-5, 5, 7)
+        directions = rng.randn(40, 7)
+        directions /= np.linalg.norm(directions, axis=1)[:, None]
+        # distances well inside, well outside and within a few ulps of the radius
+        lengths = radius * (1 + rng.choice([-0.5, 0.5, 1e-16, -1e-16, 0.0], 40))
+        claimed = [point + u * r for u, r in zip(directions, lengths, strict=True)]
+        rows = np.array(claimed)
+        for first in (0, 20, 39):
+            for count in (first + 1, 40):
+                expected = all(
+                    np.linalg.norm(point - c) > radius for c in claimed[first:count]
+                )
+                found = qn_phase._clear_of(point, claimed[:count], rows, first, radius)
+                assert found == expected
+    assert qn_phase._clear_of(point, claimed, rows, 40, radius)  # nothing to check
 
 
 def test_sampled_restarts_leave_the_incumbents_basin_for_a_deeper_one():

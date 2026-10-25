@@ -30,6 +30,10 @@ def _choose(name: str, value: object, allowed: tuple[str, ...]) -> None:
         raise ValueError(f"{name} must be one of {allowed}, got {value!r}")
 
 
+# ``Variant`` fields added after the freeze of 2026-10-22: ``ATMConfig.config_hash``
+# reads them only when set, so the configurations recorded before keep their hashes.
+HASH_IF_SET = ("anytime", "anytime_start_per_dim", "anytime_factor", "anytime_switch")
+
 # Validation of ``Variant`` is table driven. Each row is checked in order.
 _BOOLS = ("reevaluate_incumbent", "reset_on_success")
 _CHOICES = {
@@ -707,6 +711,20 @@ class Variant:
     pool_min: int = 24
     pool_max: int = 64
     pool_divisor: int = 30
+    # The anytime mode (``docs/ANYTIME.md``; ``minimize(..., anytime=True)``).
+    # ``"off"`` plans the run for ``budget`` (every configuration recorded so far).
+    # ``"replay"`` (``anytime.py``): up to
+    # ``anytime_switch`` evaluations the run never learns its budget. It plans
+    # ``anytime_start_per_dim`` x dim evaluations, and each time those are spent it
+    # plans ``anytime_factor`` times as many in total, rerunning the configuration
+    # from the same start and seed with every earlier point answered from memory.
+    # Once the next plan would exceed ``anytime_switch``, one ordinary run gets
+    # everything left of ``budget``, fed the points evaluated so far. Deterministic
+    # objectives only. Left out of ``config_hash`` at their defaults.
+    anytime: str = "off"
+    anytime_start_per_dim: float = 10.0
+    anytime_factor: float = 2.0
+    anytime_switch: int = 10_000
 
     def __post_init__(self) -> None:
         for name in _BOOLS:
@@ -910,6 +928,16 @@ class Variant:
             raise ValueError("sep_route_low_dim must be >= 2")
         if self.rugged_direct_beta < 0 or self.rugged_direct_min_beta < 0:
             raise ValueError("rugged_direct_beta and _min_beta must be >= 0")
+        _choose("anytime", self.anytime, ("off", "replay"))
+        if (
+            not self.anytime_start_per_dim > 0
+            or not self.anytime_factor > 1
+            or self.anytime_switch < 1
+        ):
+            raise ValueError(
+                "anytime_start_per_dim must be > 0, anytime_factor > 1 and "
+                "anytime_switch >= 1"
+            )
         _choose("centre_point", self.centre_point, ("off", "record", "start"))
         if self.centre_point_min_dim < 1:
             raise ValueError("centre_point_min_dim must be >= 1")
@@ -1149,6 +1177,16 @@ class ATMConfig:
         return cls(**data)
 
     def config_hash(self) -> str:
-        """Short stable fingerprint of :meth:`to_dict` (for result provenance)."""
-        text = json.dumps(self.to_dict(), sort_keys=True)
+        """Short stable fingerprint of :meth:`to_dict` (for result provenance).
+
+        The ``Variant`` fields of ``HASH_IF_SET`` count only when they differ from
+        their defaults, so adding them left every recorded hash as it was (the
+        frozen ``c46`` is still ``2153948ebed51150``).
+        """
+        data = self.to_dict()
+        defaults = Variant()
+        for name in HASH_IF_SET:
+            if getattr(self.variant, name) == getattr(defaults, name):
+                del data["variant"][name]
+        text = json.dumps(data, sort_keys=True)
         return hashlib.sha256(text.encode()).hexdigest()[:16]
