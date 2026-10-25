@@ -36,14 +36,31 @@ import amm_optimizer as amm
 def f(x):
     return float(np.sum((x - 1.0) ** 2))
 
+result = amm.minimize(f, bounds=[(-5, 5)] * 10)
+print(result.x, result.fun, result.nfev)
+```
+
+That is the whole call: the search box is the only thing you must give. Everything else has a default:
+
+| Argument | Default | Meaning |
+|---|---|---|
+| `bounds` | required | the search box: a list of `(low, high)` pairs (as in SciPy), `(lower, upper)` with scalars or arrays, or `scipy.optimize.Bounds`; finite limits |
+| `x0` | the centre of the box | the starting point |
+| `budget` | `100 x D` evaluations (at least 100) | the maximum number of calls of `f`; all are used. Pass what you can afford |
+| `seed` | a fresh seed | a run is deterministic given the seed |
+| `anytime` | `False` | `True` for a run whose budget is not known or that you will cut short, see [docs/ANYTIME.md](docs/ANYTIME.md) |
+| `config` | AMM (`presets.get("c46")`) | `amm.ATMConfig()` runs the original ATM sampler alone and needs no box |
+
+The older, fully spelled-out call still works:
+
+```python
 result = amm.minimize(
     f,
     x0=np.zeros(10),
     budget=100 * 10,                        # maximum number of function evaluations
     seed=0,                                 # runs are deterministic given the seed
-    bounds=(-5, 5),                         # required: the box (scalars or one value per coordinate)
+    bounds=(-5, 5),                         # the box (scalars or one value per coordinate)
 )
-print(result.x, result.fun, result.nfev)
 ```
 
 Called without `config=`, `amm.minimize` runs AMM, the configuration frozen for the paper
