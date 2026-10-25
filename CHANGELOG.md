@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 (2026-10-25)
+
+A simpler call, and the anytime mode. The default algorithm is unchanged: with `anytime=False` every configuration runs bit for bit as in 0.4.0 (408 recorded runs of `c46` and the default match `tests/characterisation.json`; `c46`'s config hash is still `2153948ebed51150`). 0.4.0 was tagged but never uploaded to PyPI; its changes (AMM as the default of `minimize`, the removal of `ATMConfig.improved*`, the author name "Benjamin Jacob Bodner") are part of this release.
+
+- **Simpler `minimize`.** `x0` and `budget` are now optional, so `amm.minimize(f, bounds=[(-5, 5)] * 10)` is a complete call. `x0` defaults to the centre of the box and `budget` to `100 x D` evaluations (at least 100). `bounds` also accepts a list of `(low, high)` pairs (SciPy's form), a NumPy array of shape `(D, 2)` and `scipy.optimize.Bounds`, besides the earlier `(lower, upper)`. A whole float such as `budget=1e4` is accepted. Errors are plain: a non-callable `fun`, a `bounds` and `x0` that disagree on the number of variables, a `budget` that is not a whole number, and a tuple of two length-2 sequences that reads both as pairs and as `(lower, upper)` are refused with a message that names the fix. Every call that worked in 0.4.0 runs unchanged.
+- **Anytime mode** (`minimize(..., anytime=True)`, or `Variant.anytime="replay"`; guide: `docs/ANYTIME.md`). For runs whose budget is not known in advance or that you cut short: up to 10 000 evaluations the run never learns `budget`; it plans 10 x D evaluations and doubles the plan while the run goes on, answering every point already evaluated from memory, then hands over to one ordinary run fed those points. Measured on COCO/bbob: level with the default at 10^4 and 10^5 x D, and .05 to .12 of the target share below it between 30 x D and 1000 x D when the budget is known (so leave it off if you know your budget). The objective must be deterministic; `nfev` counts the calls actually made.
+- **Faster long runs** (same evaluations, bit-identical results): the STEP phase keeps incremental difficulties and a chunked axis store, so its cost per evaluation no longer grows with the run length, and the start search is incremental.
+- `docs/ANYTIME.md` is in the source distribution.
+
 ## 0.4.0 (2026-10-23)
 
 The default of `minimize` is now AMM. No algorithmic change: the engine, `ATMConfig()` and every preset behave exactly as in 0.3.0 (the golden, parity and characterisation tests are untouched).
