@@ -61,6 +61,7 @@ result = amm.minimize(
     seed=0,                                 # runs are deterministic given the seed
     bounds=(-5, 5),                         # the box (scalars or one value per coordinate)
 )
+print(result.fun, result.nfev)
 ```
 
 Called without `config=`, `amm.minimize` runs AMM, the configuration frozen for the paper
