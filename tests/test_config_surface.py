@@ -176,6 +176,10 @@ LEGACY_VALUES = {
     "pool_min": 24,
     "pool_max": 64,
     "pool_divisor": 30,
+    "anytime": "off",
+    "anytime_start_per_dim": 10.0,
+    "anytime_factor": 2.0,
+    "anytime_switch": 10_000,
 }
 
 

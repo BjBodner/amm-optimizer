@@ -12,6 +12,7 @@ spent. Points are clipped onto the box before evaluation.
 from __future__ import annotations
 
 import contextlib
+import heapq
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import Any
@@ -1054,6 +1055,33 @@ def run_scaled_bfgs(
     return EsResult(best_x, best_cost, sigma, used)
 
 
+def _clear_of(
+    point: np.ndarray,
+    claimed: list[np.ndarray],
+    claimed_rows: np.ndarray,
+    first: int,
+    radius: float,
+) -> bool:
+    """``all(np.linalg.norm(point - c) > radius for c in claimed[first:])``, faster.
+
+    The distances come from one vectorised pass (``claimed_rows`` holds the claimed
+    points as rows). Its sum runs in another order than ``np.linalg.norm``'s, so a
+    distance within a relative 1e-9 of ``radius`` (or NaN) is recomputed with
+    ``np.linalg.norm`` and decided as there; every other one is far from where
+    rounding could matter.
+    """
+    rows = claimed_rows[first : len(claimed)]
+    if not len(rows):
+        return True
+    distance = np.sqrt(((rows - point) ** 2).sum(axis=1))
+    if np.any(distance < radius * (1 - 1e-9)):
+        return False
+    unsure = np.flatnonzero(~(distance > radius * (1 + 1e-9)))
+    return all(
+        np.linalg.norm(point - claimed[first + j]) > radius for j in unsure.tolist()
+    )
+
+
 def run_sampled_restarts(
     objective: CountedObjective,
     rng: np.random.RandomState,
@@ -1063,6 +1091,7 @@ def run_sampled_restarts(
     evaluations: int,
     fd_step: float | None = None,
     polish_per_dim: float = 0.0,
+    samples: Any = None,  # (points, values) | None (Any for the callers' **options)
 ) -> EsResult:
     """Restarted SLSQP with sampled starts and a gap-scaled stop (``gal3c``).
 
@@ -1075,10 +1104,20 @@ def run_sampled_restarts(
     descents into known or worse basins end early and the incumbent's basin keeps
     its full precision. The returned sigma follows ``run_slsqp_restarts``.
 
+    ``samples`` (the anytime hand-over): points and values evaluated before this
+    call, in the sample from the start (they cost nothing here).
+
     ``polish_per_dim`` (research, idea #33; 0: off): a descent that ends normally
     (not stopped by the gap rule) below every earlier end and at the incumbent is
     polished by SLSQP from its end with central differences at ``POLISH_H_SHARE`` x
     the box width, for at most ``polish_per_dim`` x dim evaluations.
+
+    The start is found incrementally (post-freeze, 2026-10-23; the same starts as
+    scanning every sample in sorted order against every claimed point, which cost
+    O(descents^2) per descent and held FT4's 10^5 x D runs at D 20-40 to a few
+    evaluations per second): claimed points are never removed, so a sample within
+    the radius of one is out for good, and a sample clear of the first ``seen[k]``
+    claimed points is only checked against the later ones (``_clear_of``).
     """
     from scipy.optimize import minimize
 
@@ -1090,10 +1129,32 @@ def run_sampled_restarts(
     best_start = best_x.copy()
     sample_x: list[np.ndarray] = []
     sample_f: list[float] = []
-    claimed = [best_x.copy()]
+    claimed: list[np.ndarray] = []
+    claimed_rows = np.empty((64, dim))
+    # Samples not yet within the radius of a claimed point, by (NaN last, value,
+    # index): the order of ``np.argsort(sample_f, kind="stable")``.
+    queue: list[tuple[bool, float, int]] = []
+    seen: list[int] = []  # per sample: how many claimed points it is clear of
     end_values: list[float] = []  # every finished descent's best (``polish_per_dim``)
     radius = SAMPLE_GAP_SHARE * width * np.sqrt(dim)
     window = 3 * (dim + 1)
+
+    def claim(point: np.ndarray) -> None:
+        nonlocal claimed_rows
+        if len(claimed) == len(claimed_rows):
+            claimed_rows = np.concatenate((claimed_rows, np.empty_like(claimed_rows)))
+        claimed_rows[len(claimed)] = point
+        claimed.append(point)
+
+    claim(best_x.copy())
+    if samples is not None:  # the anytime hand-over: earlier stages' points join
+        for point, value in zip(*samples, strict=True):
+            missing = value != value
+            key = (missing, 0.0 if missing else float(value), len(sample_f))
+            heapq.heappush(queue, key)
+            sample_f.append(float(value))
+            sample_x.append(np.array(point, dtype=float))
+            seen.append(0)
 
     def evaluate(point: np.ndarray) -> float:
         nonlocal used, best_x, best_cost
@@ -1111,18 +1172,26 @@ def run_sampled_restarts(
         try:
             for _ in range(SAMPLE_PER_DIM * dim):
                 point = box.lower + (box.upper - box.lower) * rng.rand(dim)
-                sample_f.append(evaluate(point))
+                value = evaluate(point)
+                missing = value != value
+                key = (missing, 0.0 if missing else value, len(sample_f))
+                heapq.heappush(queue, key)
+                sample_f.append(value)
                 sample_x.append(point)
+                seen.append(0)
         except _SpentError:
             break
         start = None
-        for k in np.argsort(np.array(sample_f), kind="stable"):
-            if all(np.linalg.norm(sample_x[k] - c) > radius for c in claimed):
+        while queue:
+            k = queue[0][2]
+            if _clear_of(sample_x[k], claimed, claimed_rows, seen[k], radius):
+                seen[k] = len(claimed)
                 start = sample_x[k]
                 break
+            heapq.heappop(queue)
         if start is None:
             start = box.lower + (box.upper - box.lower) * rng.rand(dim)
-        claimed.append(np.array(start))
+        claim(np.array(start))
         incumbent = best_cost
         local: dict[str, Any] = {"best": np.inf, "x": np.array(start), "hist": []}
 
@@ -1161,7 +1230,7 @@ def run_sampled_restarts(
             aborted = True
         except _SpentError:
             break
-        claimed.append(np.array(local["x"]))
+        claim(np.array(local["x"]))
         if polish_per_dim > 0:
             earlier = min(end_values) if end_values else np.inf
             end_values.append(float(local["best"]))

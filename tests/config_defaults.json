@@ -21,6 +21,10 @@
  "variant": {
   "additive_min_dim": 5,
   "amplitude_control": "legacy",
+  "anytime": "off",
+  "anytime_factor": 2.0,
+  "anytime_start_per_dim": 10.0,
+  "anytime_switch": 10000,
   "basin_descents": 0,
   "basin_descents_max_per_dim": 300.0,
   "basin_keep_atm": false,

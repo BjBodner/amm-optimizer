@@ -111,7 +111,10 @@ class ProblemProxy:
     """The few attributes ``run_bbob.solve_problem`` reads, with our own tracking.
 
     No observer is attached, so COCO does not keep the best value; the proxy does,
-    and reports the final target (``f_opt + 1e-8``) as hit like COCO would.
+    and reports the final target (``f_opt + 1e-8``) as hit like COCO would. ``hits``
+    holds the first evaluation that reached each of ``TARGETS`` (-1: not reached),
+    so one run gives its score at every smaller budget (``score_by``), as
+    ``mabbob.Proxy`` does; the values the solver sees are unchanged.
     """
 
     def __init__(self, problem, fopt: float, scale: float = 1.0) -> None:
@@ -123,6 +126,8 @@ class ProblemProxy:
         self.upper_bounds = scale * np.asarray(problem.upper_bounds, dtype=float)
         self.evaluations = 0
         self.best_observed_fvalue1 = float("inf")
+        self.hits = [-1] * len(TARGETS)
+        self._next = 0  # the first target not reached yet (targets descend)
 
     @property
     def final_target_hit(self) -> bool:
@@ -134,8 +139,19 @@ class ProblemProxy:
             self._problem(x if self._scale == 1.0 else np.asarray(x) / self._scale)
         )
         self.evaluations += 1
-        self.best_observed_fvalue1 = min(self.best_observed_fvalue1, value)
+        if value < self.best_observed_fvalue1:
+            self.best_observed_fvalue1 = value
+            precision = value - self._fopt
+            while self._next < len(TARGETS) and precision <= TARGETS[self._next]:
+                self.hits[self._next] = self.evaluations
+                self._next += 1
         return value
+
+
+def score_by(hits: list[int], evaluations: int) -> float:
+    """The share of ``TARGETS`` a run with these ``hits`` had reached by its
+    ``evaluations``-th evaluation (``record_score`` at that budget)."""
+    return float(np.mean([0 < h <= evaluations for h in hits]))
 
 
 # ---------------------------------------------------------------- solvers ----
@@ -1027,6 +1043,7 @@ def run_one(
         "trace_sha256": row["trace_sha256"],
         "objective_seconds": row["objective_seconds"],
         "seconds": seconds,
+        "hits": proxy.hits,
     }
 
 

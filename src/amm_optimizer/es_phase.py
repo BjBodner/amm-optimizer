@@ -89,6 +89,7 @@ def run_es_phase(
     fractal_route: bool = False,
     descent_retries: int = 0,
     low_beta: float = 0.0,
+    design: Any = None,  # np.ndarray | None (Any for the callers' **options)
 ) -> EsResult:
     """Spend up to ``evaluations`` on a uniform design and a local search from its best.
 
@@ -165,6 +166,8 @@ def run_es_phase(
       restarted SLSQP at SciPy's step for the rest (the SLSQP-cells toy's ``fract``).
     * ``low_beta`` (the gaps4 toy): a finite rugged reading below it takes the
       (1+1)-CMA-ES instead of the ``"lq2"`` populations (f23 at 100 x dim).
+    * ``design`` (the anytime hand-over): these points (the best evaluated so far)
+      instead of ``init_points`` uniform draws.
     * ``descent_retries``: the single descent of ``"slsqpdes"`` (outside
       ``small_switch``) and ``"slsqpnm"`` is retried from a uniform point, up to that
       many times, after a descent that did not move, unless its first gradient was
@@ -204,9 +207,12 @@ def run_es_phase(
                 **qn_on,
             )
         kind = "cma"
-    design = box.lower + (box.upper - box.lower) * rng.rand(
-        min(init_points, evaluations - used), dim
-    )
+    if design is None:
+        design = box.lower + (box.upper - box.lower) * rng.rand(
+            min(init_points, evaluations - used), dim
+        )
+    else:  # the anytime hand-over: the best points earlier stages evaluated
+        design = design[: min(init_points, evaluations - used)]
     for candidate in design:
         value = objective.evaluate_point(candidate)
         used += 1
