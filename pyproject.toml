@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "amm-optimizer"
-version = "0.4.0"
+version = "0.5.0"
 description = "Adaptive Multi Mode (AMM): budget-aware routing of derivative-free optimizers by online landscape probes (import amm_optimizer)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -46,7 +46,7 @@ bench = ["coco-experiment", "cocopp"]
 include = [
   "/src", "/tests", "/reference", "/tools",
   "/README.md", "/LICENSE", "/CHANGELOG.md", "/CITATION.cff", "/pyproject.toml", "/conftest.py",
-  "/docs/FREEZE_2026-10-22.md", "/docs/DEVIATIONS.md",
+  "/docs/FREEZE_2026-10-22.md", "/docs/DEVIATIONS.md", "/docs/ANYTIME.md",
 ]
 
 [tool.hatch.build.targets.wheel]
