@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 
 DOCS = Path(__file__).resolve().parents[1] / "docs"
-PAGES = ["legacy.md"]
+# Every page of the docs site with Python examples (mkdocs.yml).
+PAGES = ["index.md", "user-guide.md", "presets.md", "legacy.md"]
 
 
 @pytest.mark.parametrize("page", PAGES)

@@ -36,6 +36,11 @@ mypy
 pytest -m "not slow and not merge and not research" -n auto
 ```
 
+The documentation site (`mkdocs.yml`, pages in `docs/`, the API reference generated from the
+docstrings) builds with `pip install -e ".[docs]"` and `mkdocs build --strict`, as CI's lint
+job and Read the Docs build it; `mkdocs serve` previews it. A page with Python examples is
+listed in `tests/test_docs_examples.py`, which runs them.
+
 Tests are tiered by marker: the default tier is what you run while working, the `merge`
 tier is for pull requests that touch presets, and `slow` is the full tier for releases.
 Tests marked `research` pin research-only options or read the research harness's data

@@ -35,7 +35,7 @@ never win.
 without a `config` (see [DEVIATIONS.md](DEVIATIONS.md)); the default of `amm.minimize` is AMM, not
 the original. `ATMConfig(strict_budget=False)` also restores the original's looser budget
 accounting. Versions up to 0.3.0 ran this sampler when `config` was omitted; see the
-[changelog](../CHANGELOG.md).
+[changelog](https://github.com/BjBodner/amm-optimizer/blob/main/CHANGELOG.md).
 
 ## The composite preset
 

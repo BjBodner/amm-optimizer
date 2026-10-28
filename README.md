@@ -3,6 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/amm-optimizer)](https://pypi.org/project/amm-optimizer/)
 [![Python versions](https://img.shields.io/pypi/pyversions/amm-optimizer)](https://pypi.org/project/amm-optimizer/)
 [![CI](https://github.com/BjBodner/amm-optimizer/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BjBodner/amm-optimizer/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/BjBodner/amm-optimizer/graph/badge.svg?branch=main)](https://codecov.io/gh/BjBodner/amm-optimizer)
 [![License: Apache-2.0](https://img.shields.io/pypi/l/amm-optimizer)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/BjBodner/amm-optimizer/badge)](https://scorecard.dev/viewer/?uri=github.com/BjBodner/amm-optimizer)
 
@@ -146,11 +147,13 @@ python benchmarks/block_profile.py   # where the time goes, per algorithm block
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs lint, type checks, the quick tests on Windows (Python 3.13), Linux (3.12, 3.14)
-and macOS (3.12), and a packaging job (build, `twine check`, an sdist size gate, and a smoke test of the installed wheel
-and sdist). The bit-exact snapshot tests only hold in the environment that recorded them and skip themselves elsewhere;
+and macOS (3.12), a floor leg on Linux 3.12 with the oldest supported NumPy and SciPy (2.0 and 1.18.0), and a packaging
+job (build, `twine check`, an sdist size gate, and a smoke test of the installed wheel and sdist). The Linux 3.12 leg's
+coverage goes to Codecov. The bit-exact snapshot tests only hold in the environment that recorded them and skip themselves elsewhere;
 a Windows 3.12 leg pinned to that environment reports but does not gate, because GitHub's runners differ in CPU generation
 and so in the last bits. Run the same checks locally with `python tools/ci.py` (the default tier), `python tools/ci.py --tier merge`
-or `--tier full`; see [CONTRIBUTING.md](CONTRIBUTING.md). Releases are built in `release.yml` and published with Trusted Publishing.
+or `--tier full`; see [CONTRIBUTING.md](CONTRIBUTING.md). Releases are built in `release.yml` and published with Trusted Publishing;
+the tag then gets a GitHub Release with its CHANGELOG section, the wheel, the sdist and a CycloneDX SBOM.
 Security reports: [SECURITY.md](SECURITY.md). Contributors follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 Licensed under Apache-2.0 (see [LICENSE](LICENSE) and [NOTICE](NOTICE)).

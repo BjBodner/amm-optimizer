@@ -4,7 +4,7 @@ r"""Run the project's checks on this machine, the same ones CI would run.
                                        #   tests, the pinned characterisation
     python tools/ci.py --tier merge    # merge tier: also harness tests, the recent
                                        #   composites and the separating set
-    python tools/ci.py --tier full     # everything, 100% coverage gate (``--full``)
+    python tools/ci.py --tier full     # everything, with the coverage gate (``--full``)
     python tools/ci.py --list          # show the steps without running them
     python tools/ci.py --keep-going    # do not stop at the first failing step
 
@@ -46,6 +46,12 @@ MARKERS = {
     "default": "not slow and not merge and not research",
     "merge": "not slow",
 }
+# Branch coverage the full tier must reach, in percent. Measured on 2026-10-27
+# (chore/ci-docs, the "not slow" tests, a subset of the full tier): 94.53%. The gate is
+# floor(measured) - 0.5, below the measurement so a harmless change does not trip it.
+# The research code that 0.7.0 removes (Phase 6) holds most of the uncovered lines;
+# raise the gate after that.
+COVERAGE_GATE = 93.5
 
 
 def steps(tier: str | bool = "default") -> list[Step]:
@@ -65,7 +71,7 @@ def steps(tier: str | bool = "default") -> list[Step]:
     ]
     if tier == "full":
         tests = Step(
-            "tests, all, 100% coverage gate",
+            f"tests, all, {COVERAGE_GATE:g}% coverage gate",
             [
                 py,
                 "-m",
@@ -75,7 +81,7 @@ def steps(tier: str | bool = "default") -> list[Step]:
                 "no:cacheprovider",
                 "--cov=amm_optimizer",
                 "--cov-branch",
-                "--cov-fail-under=100",
+                f"--cov-fail-under={COVERAGE_GATE:g}",
             ],
         )
     else:

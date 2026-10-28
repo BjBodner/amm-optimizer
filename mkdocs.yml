@@ -1,0 +1,86 @@
+# The documentation site: https://amm-optimizer.readthedocs.io (.readthedocs.yaml builds it).
+# Build locally with `pip install -e ".[docs]"` and `mkdocs build --strict` (or
+# `mkdocs serve`); CI's lint job runs the strict build, so a broken link or reference
+# fails the pull request.
+site_name: amm-optimizer
+site_description: "Adaptive Multi Mode (AMM): budget-aware routing of derivative-free optimizers by online landscape probes"
+site_author: Benjamin Jacob Bodner
+site_url: https://amm-optimizer.readthedocs.io/
+repo_url: https://github.com/BjBodner/amm-optimizer
+repo_name: BjBodner/amm-optimizer
+edit_uri: edit/main/docs/
+copyright: Copyright 2026 Benjamin Jacob Bodner. Apache-2.0.
+
+docs_dir: docs
+
+nav:
+  - Getting started: index.md
+  - User guide: user-guide.md
+  - The anytime mode: ANYTIME.md
+  - Presets: presets.md
+  - API reference: api.md
+  - The original ATM sampler: legacy.md
+  - Background:
+      - The frozen configuration: FREEZE_2026-10-22.md
+      - Deviations from the original ATM: DEVIATIONS.md
+  - Changelog: changelog.md
+  - Deprecation policy: deprecation-policy.md
+  - Citing: citing.md
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.footer
+    - navigation.sections
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  # The changelog page includes CHANGELOG.md from the repository root; the plugin
+  # rewrites its relative links (docs/ANYTIME.md) to work from docs/.
+  - include-markdown
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_root_heading: true
+            show_root_full_path: true
+            show_source: false
+            show_signature_annotations: true
+            separate_signature: true
+            members_order: source
+            merge_init_into_class: true
+            filters: ["!^_"]
+            heading_level: 3
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+
+# Strict builds fail on every warning; these make dead links and anchors warnings.
+validation:
+  omitted_files: warn
+  absolute_links: info
+  unrecognized_links: warn
+  anchors: warn

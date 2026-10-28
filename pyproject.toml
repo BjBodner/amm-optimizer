@@ -35,6 +35,7 @@ dependencies = ["numpy>=2.0", "scipy>=1.18"]
 
 [project.urls]
 Homepage = "https://github.com/BjBodner/amm-optimizer"
+Documentation = "https://amm-optimizer.readthedocs.io"
 Source = "https://github.com/BjBodner/amm-optimizer"
 Issues = "https://github.com/BjBodner/amm-optimizer/issues"
 Changelog = "https://github.com/BjBodner/amm-optimizer/blob/main/CHANGELOG.md"
@@ -44,6 +45,16 @@ Changelog = "https://github.com/BjBodner/amm-optimizer/blob/main/CHANGELOG.md"
 # that the hook, `python tools/ci.py` and CI format alike; bump both together.
 dev = ["pytest>=8", "pytest-cov", "hypothesis", "ruff==0.17.1", "mypy", "coco-experiment"]
 bench = ["coco-experiment", "cocopp"]
+# The documentation site (mkdocs.yml, .readthedocs.yaml): `mkdocs build --strict`. The
+# lower bounds are the versions the strict build was checked with. The cap: MkDocs 2 is
+# announced without the plugin system that Material and mkdocstrings build on.
+docs = [
+  "mkdocs>=1.6.1,<2",
+  "mkdocs-material>=9.8",
+  "mkdocstrings>=1.0.8",
+  "mkdocstrings-python>=2.0.10",
+  "mkdocs-include-markdown-plugin>=7.3",
+]
 
 # The sdist holds the library, its documentation and the metadata files. The tests,
 # their snapshot data, reference/ and tools/ stay in the repository: the snapshot tests
