@@ -55,7 +55,9 @@ DIAGONAL_WINDOW = 3
 # ``probe_at``: probe scales (times sigma, along A z directions) and directions.
 PROBE_SCALES = (10.0, 30.0, 100.0)
 PROBE_DIRECTIONS = 4
-# Diagnostics: beta at each probe.
+# Diagnostics: beta at each probe, recorded only while ``RECORD_PROBES`` is true
+# (the log is process-global; off, it stays empty and no run grows it).
+RECORD_PROBES = False
 PROBE_LOG: list[float] = []
 # ``placement="mlsl"``: GLOBAL's single-linkage critical distance at level alpha,
 # scanning the best ELITE_SHARE (at most ELITE_MAX) of the archive.
@@ -673,7 +675,8 @@ def run_cma(
                 if len(ok) >= 2
                 else float("nan")
             )
-            PROBE_LOG.append(beta)
+            if RECORD_PROBES:
+                PROBE_LOG.append(beta)
             if (
                 probe_beta > 0
                 and beta < probe_beta

@@ -234,3 +234,19 @@ def test_the_handover_maps_its_archive_onto_a_normalised_box():
     pts = np.array(seen.points)
     assert 550 <= len(pts) <= 600 and pts.min() >= 0.0 and pts.max() <= 1.0
     assert result.fun < 1e-6
+
+
+def test_the_stage_log_holds_the_stages_of_the_last_run_only():
+    """Review B4: the log was process-global and never cleared."""
+    config = presets.with_changes("c46", anytime="replay")
+
+    def stages(seed):
+        minimize(rosenbrock, np.full(2, 3.0), 200, seed=seed, config=config, bounds=BOX)
+        return [dict(entry) for entry in anytime.LAST_STAGES]
+
+    alone = stages(2)
+    for seed in range(3):
+        last = stages(seed)
+    assert anytime.STAGE_LOG is anytime.LAST_STAGES
+    assert last == alone
+    assert [entry["stage"] for entry in last] == list(range(len(last)))

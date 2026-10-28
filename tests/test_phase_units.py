@@ -569,7 +569,8 @@ def test_step_chunks_do_not_change_the_search(monkeypatch, fun):
 
 
 # --------------------------------------------------------------- cma_phase ----
-def test_the_curvature_probe_hands_rugged_functions_over():
+def test_the_curvature_probe_hands_rugged_functions_over(monkeypatch):
+    monkeypatch.setattr(cma_phase, "RECORD_PROBES", True)
     cma_phase.PROBE_LOG.clear()
     objective, calls = counted(rastrigin, 10_000)
     x = np.full(5, 2.2)
@@ -590,7 +591,8 @@ def test_the_curvature_probe_hands_rugged_functions_over():
     assert result.cost == min([rastrigin(x)] + [rastrigin(c) for c in calls])
 
 
-def test_the_curvature_probe_keeps_smooth_functions_and_logs_beta():
+def test_the_curvature_probe_keeps_smooth_functions_and_logs_beta(monkeypatch):
+    monkeypatch.setattr(cma_phase, "RECORD_PROBES", True)
     cma_phase.PROBE_LOG.clear()
     objective, calls = counted(rotated_ellipsoid, 10_000)
     x = np.full(5, 2.0)
@@ -609,7 +611,28 @@ def test_the_curvature_probe_keeps_smooth_functions_and_logs_beta():
     assert result.used == len(calls) == 1_000
 
 
-def test_a_probe_cut_short_by_the_budget_ends_the_run():
+def test_the_probe_log_records_nothing_unless_asked():
+    """Review B4: ``PROBE_LOG`` grew on every probe of every run."""
+    cma_phase.PROBE_LOG.clear()
+    assert not cma_phase.RECORD_PROBES
+    objective, _ = counted(rotated_ellipsoid, 10_000)
+    x = np.full(5, 2.0)
+    cma_phase.run_cma(
+        objective,
+        np.random.RandomState(0),
+        x,
+        rotated_ellipsoid(x),
+        0.5,
+        BOX5,
+        1_000,
+        probe_at=150,
+        probe_beta=1.3,
+    )
+    assert not cma_phase.PROBE_LOG
+
+
+def test_a_probe_cut_short_by_the_budget_ends_the_run(monkeypatch):
+    monkeypatch.setattr(cma_phase, "RECORD_PROBES", True)
     cma_phase.PROBE_LOG.clear()
     objective, calls = counted(sphere, 160)
     x = np.full(5, 2.0)

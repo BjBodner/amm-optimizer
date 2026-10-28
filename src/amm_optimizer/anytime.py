@@ -31,8 +31,10 @@ Only the points of the replay part are kept (a few thousand per D), so the memor
 stays small whatever the budget.
 
 The objective must be deterministic: a remembered value stands for a new call.
-``STAGE_LOG`` (one dict per stage, cleared by nobody) records what each stage
-planned, called and replayed, for the benchmark's diagnostics.
+``LAST_STAGES`` (one dict per stage) records what each stage of the most recent
+anytime run planned, called and replayed, for the benchmark's diagnostics. Every run
+clears it first, so it never holds more than one run. ``STAGE_LOG`` is the same list
+under its old name.
 """
 
 from __future__ import annotations
@@ -44,10 +46,14 @@ from typing import Any
 import numpy as np
 
 from .config import ATMConfig
+from .objective import copying
 from .profiling import Profiler, resolve_profiler
 from .result import OptimizeResult
 
-STAGE_LOG: list[dict[str, Any]] = []
+#: The stages of the most recent anytime run in this process (one dict per stage).
+LAST_STAGES: list[dict[str, Any]] = []
+#: The old name of :data:`LAST_STAGES` (the same list).
+STAGE_LOG = LAST_STAGES
 # Where the hand-over run starts: ``"start"`` (the run's own x0) or ``"best"``
 # (the best point of the replay part). Fixed by the calibration of 2026-10-24
 # (experiment 106; see ``docs/ANYTIME.md``).
@@ -91,7 +97,7 @@ class _Store:
     and the replay part's points, and answers remembered points from memory."""
 
     def __init__(self, fun: Callable[[np.ndarray], float], cap: int) -> None:
-        self.fun = fun
+        self.fun = copying(fun)  # ``x`` is kept below, after ``fun`` has seen it
         self.cap = cap
         self.calls = 0
         self.best_x: np.ndarray | None = None
@@ -168,6 +174,7 @@ def minimize_anytime(
     stages after the first (the hand-over included)."""
     from .api import _minimize, minimize
 
+    LAST_STAGES.clear()
     if budget < 1:
         raise ValueError(f"budget must be at least 1, got {budget}")
     if rng is None:
@@ -190,7 +197,7 @@ def minimize_anytime(
             before = store.calls
             entry: dict[str, Any] = {"stage": stage, "plan": plan, "before": before}
             store.begin_stage()
-            STAGE_LOG.append(entry)
+            LAST_STAGES.append(entry)
             try:
                 minimize(
                     store.replaying,
@@ -214,7 +221,7 @@ def minimize_anytime(
             # the hand-over: the normal path on everything left, fed the archive
             entry = {"stage": stage, "handover": budget - store.calls}
             entry["before"] = store.calls
-            STAGE_LOG.append(entry)
+            LAST_STAGES.append(entry)
             warm = store.warm()
             store.keeping = False
             start = (

@@ -19,9 +19,7 @@ PATH = re.compile(r"(?<![\w./-])((?:docs|benchmarks)/[\w./-]*\w)")
 SKIP_DIRS = {".git", ".venv", "venv", "build", "dist", "node_modules", "__pycache__"}
 # Known dead ends in files this branch does not edit. Fix the reference, then delete
 # its entry here.
-PENDING = {
-    ("src/amm_optimizer/api.py", "docs/research/toys/parked2.md"),
-}
+PENDING: set[tuple[str, str]] = set()
 
 
 def scanned_files() -> list[Path]:
