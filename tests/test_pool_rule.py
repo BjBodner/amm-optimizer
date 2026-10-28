@@ -18,6 +18,8 @@ def test_pool_size_follows_the_budget(budget, pool):
     assert pool_size(BUDGET_RULE, budget) == pool
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 @pytest.mark.parametrize(("lo", "hi"), [(12, 64), (24, 64), (8, 32)])
 def test_pool_size_is_a_multiple_of_four_between_the_limits_and_monotone(lo, hi):
     variant = Variant(pool_rule="budget", pool_min=lo, pool_max=hi)
@@ -49,6 +51,8 @@ def test_other_fields_survive_resolving():
     assert resolved.second_best == "exclude_winner"
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_a_fixed_pool_is_resolved_to_itself_for_any_other_flag():
     config = ATMConfig(variant=Variant(targeted_gate="any"))
     assert resolve_config(config, 600, 5) is config

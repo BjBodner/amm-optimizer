@@ -48,6 +48,8 @@ def test_repeated_selection_of_correlated_steps_learns_the_direction():
     assert values[-1] / values[0] > 10
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_eigenvalue_ratio_is_capped():
     capped = Variant(
         amplitude_control="success_rate",
@@ -63,6 +65,8 @@ def test_the_eigenvalue_ratio_is_capped():
     assert values[-1] / values[0] <= 50.0 * (1 + 1e-9)
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_a_single_selected_step_barely_moves_the_covariance():
     cov, _ = shape_of(
         Variant(
@@ -134,6 +138,8 @@ def test_a_run_learns_an_elongated_shape_on_a_rotated_ellipsoid(monkeypatch):
     assert values[-1] / values[0] > 30  # far from the unit sphere it started as
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_covariance_is_not_learned_above_the_dimension_limit(monkeypatch):
     calls = []
     original = section.update_covariance

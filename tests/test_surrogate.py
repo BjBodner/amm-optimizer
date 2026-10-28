@@ -16,6 +16,9 @@ from amm_optimizer.surrogate import (
     kendall_tau,
 )
 
+# research-only options, deprecated in 0.6.0 (they warn when set)
+pytestmark = pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
+
 
 def test_kendall_tau_of_orderings():
     a = np.arange(6.0)

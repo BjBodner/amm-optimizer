@@ -5,7 +5,7 @@ All notable changes to amm-optimizer are documented in this file. The format fol
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version is 0.x, a minor
 release may change behaviour, with notice here; a patch release never changes results.
 Public API is deprecated, with a warning, for at least one minor release before it is removed
-(the deprecation policy will be written out in CONTRIBUTING.md).
+(see "Deprecation policy" in [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ## [Unreleased]
 
@@ -39,6 +39,44 @@ Bug fixes and a SciPy-compatible API. Every run that starts inside the box and g
 - `minimize`'s docstring documents the new arguments and recommends `callback` or `ftarget`, not an exception raised inside `fun`, for cutting an anytime run short.
 - **An `x0` outside `bounds` is clipped onto the box, with a `UserWarning`**, on every box. On the bbob box `[-5, 5]` it used to be evaluated as given; on any other box it was already clipped, silently, so those runs are unchanged. `amm_optimizer.api.minimize`, the engine, does not check `x0`.
 
+### Deprecated
+
+- **95 research-only `Variant` fields and 29 research-only values of the other fields** emit a
+  `FutureWarning` when set and will be removed in 0.7.0 (`warnings.filterwarnings("ignore",
+  "Variant", FutureWarning)` silences them meanwhile). No shipped configuration (`c23`-`c46`,
+  `ATMConfig()`, `ATMConfig.composite()`, `anytime=True`) uses them, so none of those warns,
+  and their config hashes and results are unchanged. The lists are `config.RESEARCH_FIELDS` and
+  `config.RESEARCH_CHOICES`, measured by `tools/research_fields.py`. Fields: `targeted_gate`,
+  `targeted_amplitude`, `reset_on_success`, `sr_eta`, `sr_targets`, `sr_widths`,
+  `sr_max_width`, `es_init_factor`, `es_small_dim`, `es_small_max_budget_per_dim`,
+  `scale_learning`, `scale_rate`, `scale_cap`, `cov_cap`, `cov_steps`, `cov_path`,
+  `cov_max_dim`, `local_force`, `fork_seed`, `prefix_plateau_rugged`, `chain_min_per_dim`,
+  `sep_route_min_per_dim`, `additive_min_dim`, `basin_max_dim`, `basin_min_per_dim`,
+  `basin_descents_max_per_dim`, `small_engine_max_per_dim`, `small_engine_radius`,
+  `rugged_try_cap_per_dim`, `rugged_try_max_per_dim`, `prefix_ridge_radius`,
+  `small_switch_max_dim`, `small_switch_max_per_dim`, `small_switch_cos`,
+  `small_switch_radius`, `small_switch_rest`, `sampled_polish_per_dim`, `qn_false_success`,
+  `qn_floor`, `probe_faces`, `eval_memo`, `step_box_check`, `box_steps`,
+  `prefix_nan_min_per_dim`, `prefix_nan_clip`, `prefix_nan_reprobe`, `prefix_plateau_ties`,
+  `prefix_fractal_min_dim`, `prefix_fractal_min_per_dim`, `stage_extend_restart`,
+  `stage_extend_max_per_dim`, `sep_route_low`, `sep_route_low_dim`, `centre_point`,
+  `centre_point_min_dim`, `smooth_bfgs_second`, `cma_restart`, `cma_model_max_dim`,
+  `cma_lq_max_dim`, `cma_model_sigma`, `cma_handoff_cap_min_dim`,
+  `cma_handoff_cap_low_per_dim`, `cma_handoff_cap_low_max_per_dim`, `es_lean_start`,
+  `cma_regimes`, `cma_placement`, `cma_placement_max_dim`, `cma_local_nonsep_min_dim`,
+  `sep_parabolic`, `sep_parabolic_late`, `sep_parabolic_scope`, `sep_share`,
+  `sep_min_budget_per_dim`, `width_units`, `crossover`, `noise`, `skip_starved`, `width_mode`,
+  `sr_shared_target`, `restart_mode`, `stag_tolfun`, `stag_tolx`, `ipop_factor`,
+  `ipop_max_pool`, `local_method`, `simplex_max_dim`, `nm_refine_max_dim`, `refine_fraction`,
+  `refine_min_budget_per_dim`, `refine_max_dim`, `pool_max`, `pool_divisor`,
+  `anytime_start_per_dim`, `anytime_factor`, `anytime_switch`. Values: `amplitude_control`
+  `"success_rate"`; `es_kind` `"slsqplq10"`, `"slsqplq10hk"`; `cma_local_nonsep` `"ipop"`,
+  `"population"`, `"qn"`, `"qn2"`, `"qn5"`, `"qn6"`, `"qn10"`, `"qn11"`, `"qn13"`, `"qn13n"`,
+  `"qn15"`; `nm_stage` `"qnprefix"`, `"qnprefix30g"`; `cma_model` `"lq"`; `cma_restart_rule`
+  `"economy"`; `cma_local` `"population"`, `"ipop"`; `sep_check` `"pair"`; `pop_lambda`
+  `"cap4"`, `"budget"`, `"steps"`, `"ipop4"`, `"stepsgrow"`; `pop_switch_start` `"carry"`;
+  `rugged_try_rest` `"cut"`; `prefix_nan_reading` `"smooth"`.
+
 ### Fixed
 
 - **`fun` gets its own copy of every point**, as in SciPy. It used to receive writeable views of the optimizer's buffers, so an objective that wrote into `x` changed the search, and one that kept `x` saw it change.
@@ -47,6 +85,7 @@ Bug fixes and a SciPy-compatible API. Every run that starts inside the box and g
 - **Warnings raised by `fun` reach the caller** on the COBYQA and basin routes, which used to ignore every warning. SciPy's own overflow warnings from finite differences over a failed evaluation are no longer shown.
 - **The diagnostic logs stay bounded.** `anytime.LAST_STAGES` (alias `STAGE_LOG`) holds the stages of the most recent anytime run only; `cma_phase.PROBE_LOG` records only while `cma_phase.RECORD_PROBES` is true.
 - The `minimize` docstring has a thread-safety note.
+- **Runs in separate threads no longer share the step unit** of `Variant.box_steps`. It was the module global `qn_phase.X_UNIT`, which every call wrote, so two threads on different boxes used whichever unit was written last; it is now a context variable (`qn_phase.set_x_unit` / `qn_phase.x_unit()`), one per thread. Every run is bit for bit as before.
 
 ## [0.5.0] - 2026-10-25
 

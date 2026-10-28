@@ -9,7 +9,11 @@ from amm_optimizer.api import minimize
 from amm_optimizer.config import Variant
 
 # Pins research-only options: deselected in the default tier (tools/ci.py).
-pytestmark = pytest.mark.research
+pytestmark = [
+    pytest.mark.research,
+    # the options it pins are research-only, deprecated in 0.6.0 (FutureWarning)
+    pytest.mark.filterwarnings("ignore:Variant:FutureWarning"),
+]
 
 ORIGINAL = qn_phase.run_slsqp_restarts
 

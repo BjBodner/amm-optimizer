@@ -12,7 +12,11 @@ from amm_optimizer.objective import CountedObjective
 from amm_optimizer.step_phase import run_step_phase
 
 # Pins research-only options: deselected in the default tier (tools/ci.py).
-pytestmark = pytest.mark.research
+pytestmark = [
+    pytest.mark.research,
+    # the options it pins are research-only, deprecated in 0.6.0 (FutureWarning)
+    pytest.mark.filterwarnings("ignore:Variant:FutureWarning"),
+]
 
 BOX5 = Box.make((-5.0, 5.0), 5)
 
@@ -115,7 +119,7 @@ def test_new_options_off_leave_c44_unchanged(budget):
             sphere, np.full(5, 3.0), budget, seed=1, config=arm, bounds=(-5, 5)
         )
         assert a.fun == b.fun and np.array_equal(a.x, b.x) and a.nfev == b.nfev
-    assert qn_phase.X_UNIT == 1.0
+    assert qn_phase.x_unit() == 1.0
 
 
 def test_box_normalize_maps_a_scaled_box_back():
@@ -135,8 +139,8 @@ def test_box_normalize_maps_a_scaled_box_back():
 def test_box_steps_sets_and_resets_the_unit():
     config = presets.with_changes("c43", box_steps=True)
     minimize(sphere, np.full(5, 3.0), 60, seed=0, config=config, bounds=(-50, 50))
-    assert qn_phase.X_UNIT == 10.0
+    assert qn_phase.x_unit() == 10.0
     minimize(
         sphere, np.full(5, 3.0), 60, seed=0, config=presets.get("c43"), bounds=(-50, 50)
     )
-    assert qn_phase.X_UNIT == 1.0
+    assert qn_phase.x_unit() == 1.0

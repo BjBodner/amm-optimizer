@@ -7,6 +7,9 @@ import amm_optimizer as atm
 from amm_optimizer.config import ATMConfig, Variant
 from amm_optimizer.control import update_covariance
 
+# research-only options, deprecated in 0.6.0 (they warn when set)
+pytestmark = pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
+
 COV = dict(
     amplitude_control="success_rate_targeted",
     covariance="rank_mu",

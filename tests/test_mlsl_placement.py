@@ -11,6 +11,9 @@ from amm_optimizer.cma_phase import critical_distance, mlsl_start
 from amm_optimizer.config import ATMConfig
 from preset_cases import wave5_variant
 
+# research-only options, deprecated in 0.6.0 (they warn when set)
+pytestmark = pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
+
 BOX = (-5.0, 5.0)
 
 

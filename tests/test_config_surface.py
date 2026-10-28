@@ -313,6 +313,8 @@ def test_corner_clip_needs_the_fold():
     Variant(bounds="fold", corner_clip=0.25)
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_which_variants_need_the_box():
     assert not Variant().needs_box
     assert not Variant(targeted_gate="any").needs_box

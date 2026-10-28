@@ -436,7 +436,7 @@ def run_es_phase(
         from . import qn_phase
         from .qn_phase import SCIPY_FD_STEP, SwitchReader
 
-        step = (fd_step if fd_step is not None else SCIPY_FD_STEP) * qn_phase.X_UNIT
+        step = (fd_step if fd_step is not None else SCIPY_FD_STEP) * qn_phase.x_unit()
         return SwitchReader(step, dim, small_switch)
 
     def cobyqa_rest(x: np.ndarray, cost: float, used: int, sigma: float) -> EsResult:

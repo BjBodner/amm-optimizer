@@ -138,6 +138,8 @@ def test_without_restarts_it_returns_at_the_first_stagnation():
     assert result.used == objective.calls < 5000
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_alternating_with_atm_spends_the_budget_and_keeps_the_best():
     seen = []
 

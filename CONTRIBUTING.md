@@ -70,6 +70,41 @@ a pull request. Fixes that leave every trace unchanged (crashes, validation, pac
 documentation, speed-ups that are bit-identical) are welcome, and `pytest` must show that
 no snapshot moved.
 
+## Deprecation policy
+
+amm-optimizer follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while
+the version is 0.x, the minor number plays the role of the major one.
+
+* **Patch releases never change results.** A run with the same inputs, configuration and
+  environment gives the same `x`, `fun` and `nfev` bit for bit, and every shipped
+  configuration keeps its `config_hash`. A patch release can fix crashes, validate inputs,
+  and improve documentation, packaging or speed, as long as no trace moves.
+* **Minor releases may change behaviour**, with an entry in `CHANGELOG.md` that says what
+  changes and for which runs.
+* **Public API is deprecated before it is removed.** Something deprecated in minor release
+  N keeps working throughout N and warns when it is used; it is removed in N+1 at the
+  earliest. The CHANGELOG lists it under *Deprecated* in N and under *Removed* in the
+  release that removes it, and its warning names the release.
+* **The warning:** `DeprecationWarning` for API that code calls (functions, arguments,
+  attributes), and `FutureWarning` for configuration values that a user writes, such as
+  `Variant` fields, so that people running scripts see it too. Each warning names what is
+  deprecated and the release that removes it.
+* **What counts as public:** everything documented in `amm_optimizer.__all__`,
+  `amm_optimizer.presets`, `ATMConfig` and its methods, and the `Variant` fields that a
+  shipped configuration uses (the presets, `ATMConfig()`, `ATMConfig.composite()` and
+  `anytime=True`). Modules and names starting with `_`, and the internal phase modules,
+  can change in any minor release.
+* **Research-only options.** The `Variant` fields and values that no shipped configuration
+  uses are listed in `config.RESEARCH_FIELDS` and `config.RESEARCH_CHOICES`, which
+  `tools/research_fields.py` measures (a test keeps the lists current). They were
+  deprecated in 0.6.0 and are removed in 0.7.0. When an option is removed, its old
+  default is kept for `config_hash`, so the hashes of shipped configurations, and the
+  results recorded with them, stay valid.
+* **Tests of deprecated behaviour** say so with
+  `pytest.mark.filterwarnings("ignore:...:FutureWarning")` (or `DeprecationWarning`) on the
+  test or the module; `pyproject.toml` makes every other such warning an error, so a shipped
+  configuration that starts to warn fails the tests.
+
 ## Pull requests
 
 * One change per pull request, with a test that fails before and passes after.

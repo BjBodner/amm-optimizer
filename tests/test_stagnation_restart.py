@@ -8,6 +8,9 @@ from amm_optimizer.config import ATMConfig, Variant
 from amm_optimizer.plan import ipop_pool, with_pool
 from amm_optimizer.restart import stagnated, stagnation_window
 
+# research-only options, deprecated in 0.6.0 (they warn when set)
+pytestmark = pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
+
 BASE = dict(
     amplitude_control="success_rate_targeted",
     bounds="fold",

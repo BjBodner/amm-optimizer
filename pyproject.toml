@@ -82,7 +82,12 @@ markers = [
   "snapshot: bit-exact or trajectory-pinned; valid only in the environment of tests/characterisation.json (skipped elsewhere, see tests/conftest.py)",
   "research: research-only options or data (benchmarks/arms, benchmarks/quick_scan.py, tests/characterisation_arms.json); deselected in the default tier, and skipped where the data is absent",
 ]
-filterwarnings = ["error::DeprecationWarning"]
+filterwarnings = [
+  "error::DeprecationWarning",
+  # the research-only Variant options (config.RESEARCH_FIELDS) warn when set: a test
+  # that sets one says so with its own filter, so a shipped configuration never warns
+  'error:Variant\.:FutureWarning',
+]
 
 [tool.ruff]
 line-length = 88

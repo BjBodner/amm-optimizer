@@ -15,7 +15,11 @@ from amm_optimizer.es_phase import EsResult, _guarded_descents, run_es_phase
 from amm_optimizer.objective import CountedObjective
 
 # Pins research-only options: deselected in the default tier (tools/ci.py).
-pytestmark = pytest.mark.research
+pytestmark = [
+    pytest.mark.research,
+    # the options it pins are research-only, deprecated in 0.6.0 (FutureWarning)
+    pytest.mark.filterwarnings("ignore:Variant:FutureWarning"),
+]
 
 BOX5 = Box.make((-5.0, 5.0), 5)
 BOX2 = Box.make((-5.0, 5.0), 2)

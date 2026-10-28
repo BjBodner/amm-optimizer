@@ -78,6 +78,16 @@ class Timings:
         return self.blocks[name].self_s / wall if wall > 0 else 0.0
 
     def to_dict(self) -> dict[str, dict[str, float]]:
+        """Every block's statistics as plain numbers, for JSON.
+
+        Returns
+        -------
+        dict
+            Block name to ``{"calls", "total_s", "self_s", "min_s", "max_s",
+            "share"}``: the call count, the inclusive and exclusive time, the
+            shortest and longest call (seconds) and the exclusive share of the
+            wall time.
+        """
         return {
             name: {
                 "calls": b.calls,
@@ -113,7 +123,17 @@ class Timings:
 
 
 class Profiler(Protocol):
-    """What the optimizer needs from a profiler."""
+    """What the optimizer needs from a profiler (``minimize(..., profile=...)``).
+
+    :class:`TimingProfiler` and :class:`NullProfiler` implement it; any object with
+    these members can be passed as ``profile=``.
+
+    Attributes
+    ----------
+    enabled : bool
+        Whether anything is measured; with ``False`` the optimizer skips its timers
+        around the objective.
+    """
 
     enabled: bool
 
@@ -148,12 +168,15 @@ class NullProfiler:
     enabled = False
 
     def block(self, name: str) -> _NullBlock:
+        """Return a shared context manager that does nothing."""
         return _NULL_BLOCK
 
     def record(self, name: str, elapsed_ns: int, calls: int = 1) -> None:
+        """Do nothing."""
         return None
 
     def report(self) -> Timings | None:
+        """Return ``None``: nothing was measured."""
         return None
 
 
@@ -198,7 +221,22 @@ class _Entry:
 
 
 class TimingProfiler:
-    """Accumulates call counts and inclusive / exclusive time per block name."""
+    """Accumulates call counts and inclusive / exclusive time per block name.
+
+    ``minimize(..., profile=True)`` uses a fresh one and puts its report on the
+    result (``result.timings``); pass an instance as ``profile=`` to accumulate
+    several runs on it.
+
+    Examples
+    --------
+    >>> from amm_optimizer.profiling import TimingProfiler
+    >>> profiler = TimingProfiler()
+    >>> with profiler.block("total"):
+    ...     profiler.record("objective", 1_000_000)  # 1 ms measured elsewhere
+    >>> timings = profiler.report()
+    >>> timings.blocks["objective"].calls, timings.blocks["total"].calls
+    (1, 1)
+    """
 
     enabled = True
 
@@ -213,14 +251,49 @@ class TimingProfiler:
         return entry
 
     def block(self, name: str) -> _Entry:
+        """Time the code inside ``with profiler.block(name):`` under ``name``.
+
+        Blocks nest: the time of a nested block counts as inclusive time of the
+        enclosing one but not as its exclusive time. The same name may be entered
+        again from inside itself.
+
+        Parameters
+        ----------
+        name : str
+            The block's name; repeated uses of a name accumulate.
+
+        Returns
+        -------
+        context manager
+            Measures from ``__enter__`` to ``__exit__``.
+        """
         return self._entry(name)
 
     def record(self, name: str, elapsed_ns: int, calls: int = 1) -> None:
+        """Add time measured elsewhere to ``name``, inside the innermost open block.
+
+        Parameters
+        ----------
+        name : str
+            The block's name.
+        elapsed_ns : int
+            The time measured, in nanoseconds (``time.perf_counter_ns``).
+        calls : int, default 1
+            How many calls that time covers; the minimum and maximum are kept per
+            call.
+        """
         self._entry(name).add(elapsed_ns, 0, calls)
         if self._stack:
             self._stack[-1][1] += elapsed_ns
 
     def report(self) -> Timings:
+        """Return a snapshot of everything measured so far.
+
+        Returns
+        -------
+        Timings
+            Per-block statistics in seconds; the profiler keeps accumulating.
+        """
         return Timings(
             {
                 name: BlockStats(
@@ -236,7 +309,11 @@ class TimingProfiler:
 
 
 def resolve_profiler(profile: bool | Profiler) -> Profiler:
-    """``False`` -> no profiling, ``True`` -> a fresh timer, else use as given."""
+    """Return the profiler for ``profile=``.
+
+    ``False`` gives no profiling, ``True`` a fresh :class:`TimingProfiler`, and a
+    profiler is used as given.
+    """
     if profile is False:
         return NULL_PROFILER
     if profile is True:

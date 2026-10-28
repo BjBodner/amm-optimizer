@@ -8,6 +8,9 @@ from amm_optimizer.control import LADDER, start_log_widths, update_log_widths
 from amm_optimizer.sampler import ModeParams, sample_options, two_mode_samples
 from amm_optimizer.state import SamplerState
 
+# research-only options, deprecated in 0.6.0 (they warn when set)
+pytestmark = pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
+
 SR = dict(amplitude_control="success_rate_targeted")
 
 

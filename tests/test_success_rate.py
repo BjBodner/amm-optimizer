@@ -1,5 +1,7 @@
 """``amplitude_control`` (E02): success-rate control of the random-search width."""
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -11,7 +13,13 @@ from amm_optimizer.state import SamplerState
 from test_sampler_options import draw, params
 from variant_cases import SHORT, run_case
 
-SR = Variant(amplitude_control="success_rate")
+# research-only options, deprecated in 0.6.0 (they warn when set)
+pytestmark = pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
+
+# research-only options (deprecated in 0.6.0): constructing them warns
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", "Variant", FutureWarning)
+    SR = Variant(amplitude_control="success_rate")
 SR2 = Variant(amplitude_control="success_rate_targeted")
 
 
