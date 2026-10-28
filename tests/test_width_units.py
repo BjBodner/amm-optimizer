@@ -11,6 +11,9 @@ from amm_optimizer.config import ATMConfig
 from amm_optimizer.plan import in_box_units
 from preset_cases import wave5_variant
 
+# research-only options, deprecated in 0.6.0 (they warn when set)
+pytestmark = pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
+
 
 def with_changes(**changes):
     return ATMConfig(variant=dataclasses.replace(wave5_variant(), **changes))

@@ -50,6 +50,8 @@ JOBS = os.environ.get("ATM_CHARACTERISATION_JOBS", "2")
 ARM_KEYS = sorted(set(ARMS["configs"]) - set(cc.REMOVED_BY_MERGE))
 research = [
     pytest.mark.research,
+    # the recorded arms set research-only options, deprecated in 0.6.0
+    pytest.mark.filterwarnings("ignore:Variant:FutureWarning"),
     pytest.mark.skipif(
         cc.RESEARCH_DATA_MISSING is not None,
         reason=f"research data not in this checkout: {cc.RESEARCH_DATA_MISSING}",

@@ -15,6 +15,29 @@ import numpy as np
 
 @dataclass(frozen=True)
 class ConductorConfig:
+    """How the samples of an iteration are shared between the samplers.
+
+    Each sampler is a mass held near an equal share by a spring; the samplers that
+    improved the cost most pull samples toward themselves, and the total stays
+    fixed. The defaults are the original's.
+
+    Attributes
+    ----------
+    total_resources : int, default 60
+        Samples per iteration, shared between the samplers. ``pool_rule="budget"``
+        sets it from the budget.
+    n_algorithms : int, default 4
+        The number of samplers.
+    mass : float, default 10.0
+        The inertia of each sampler's share.
+    self_spring : float, default 10.0
+        The pull of each share back toward its equal share.
+    interaction_spring : float, default 40.0
+        How strongly an improvement moves samples between samplers.
+    min_samples : int, default 1
+        Every sampler keeps at least this many samples.
+    """
+
     total_resources: int = 60
     n_algorithms: int = 4
     mass: float = 10.0

@@ -36,7 +36,19 @@ def _rastrigin(x: np.ndarray) -> float:
 
 @pytest.mark.parametrize("budget", BUDGETS)
 @pytest.mark.parametrize("dim", DIMS)
-@pytest.mark.parametrize("name", CONFIGS)
+@pytest.mark.parametrize(
+    "name",
+    [
+        # local_stages sets research-only options (deprecated in 0.6.0)
+        pytest.param(
+            name,
+            marks=pytest.mark.filterwarnings("ignore:Variant:FutureWarning"),
+        )
+        if name == "local_stages"
+        else name
+        for name in CONFIGS
+    ],
+)
 def test_a_shipped_config_runs_in_small_dimensions(name: str, dim: int, budget: int):
     config, bounds = CONFIGS[name]()
     seen: list[tuple[np.ndarray, float]] = []

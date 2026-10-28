@@ -12,6 +12,7 @@ spent. Points are clipped onto the box before evaluation.
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import heapq
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -177,26 +178,38 @@ SCIPY_FD_STEP = 1.4901161193847656e-08  # SLSQP's default ``eps``
 # in x (finite-difference steps, the scaled BFGS's step range, COBYQA's final radius,
 # STEP's smallest interval, the basin descents' step), as a multiple of their bbob
 # values: the box width / 10. ``minimize`` sets it per call (``set_x_unit``); 1.0
-# (bbob's box, or the option off) multiplies every step by exactly 1.
-X_UNIT = 1.0
+# (bbob's box, or the option off) multiplies every step by exactly 1. A context
+# variable, so that runs in separate threads (each has its own context) do not share
+# it; a new thread starts at 1.0.
+_X_UNIT: contextvars.ContextVar[float] = contextvars.ContextVar(
+    "amm_optimizer_x_unit", default=1.0
+)
 
 
 def set_x_unit(unit: float) -> None:
-    """Set :data:`X_UNIT` (``minimize`` does, at the start of every call)."""
-    global X_UNIT
-    X_UNIT = float(unit)
+    """Set the step unit of the current context (``minimize`` does, at the start of
+    every call); :func:`x_unit` reads it."""
+    _X_UNIT.set(float(unit))
+
+
+def x_unit() -> float:
+    """The length unit of the absolute steps in x for the current run (1.0 unless
+    ``Variant.box_steps``; see :func:`set_x_unit`)."""
+    return _X_UNIT.get()
 
 
 def _eps_option(fd_step: float | None) -> dict[str, float]:
     """SLSQP's ``eps`` option: ``fd_step`` (SciPy's default when None) in x units;
     nothing (SciPy's own default) when that is the default at the bbob scale."""
-    if X_UNIT == 1.0:
+    unit = _X_UNIT.get()
+    if unit == 1.0:
         return {"eps": fd_step} if fd_step is not None else {}
-    return {"eps": (fd_step if fd_step is not None else SCIPY_FD_STEP) * X_UNIT}
+    return {"eps": (fd_step if fd_step is not None else SCIPY_FD_STEP) * unit}
 
 
 def _step_range() -> tuple[float, float]:
-    return SCALED_STEP_RANGE[0] * X_UNIT, SCALED_STEP_RANGE[1] * X_UNIT
+    unit = _X_UNIT.get()
+    return SCALED_STEP_RANGE[0] * unit, SCALED_STEP_RANGE[1] * unit
 
 
 class StallMonitor:
@@ -511,7 +524,7 @@ def run_slsqp_restarts(
     floor_hist: list[float] = []  # ``floor_bfgs``: the first descent's running best
     floor_window = FLOOR_WINDOW * (dim + 1)
     monitor = (
-        StallMonitor((fd_step if fd_step is not None else SCIPY_FD_STEP) * X_UNIT)
+        StallMonitor((fd_step if fd_step is not None else SCIPY_FD_STEP) * x_unit())
         if extend_to is not None or ridge_after > 0
         else None
     )
@@ -1369,7 +1382,7 @@ def run_lbfgsb_restarts(
                         "maxcor": LBFGSB_MAXCOR,
                         "ftol": 0.0,
                         "gtol": 0.0,
-                        "eps": fd_step * X_UNIT,
+                        "eps": fd_step * x_unit(),
                         "maxfun": evaluations,
                         "maxiter": evaluations,
                     },

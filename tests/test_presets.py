@@ -15,6 +15,8 @@ research = pytest.mark.skipif(
     reason=f"research data not in this checkout: {cc.RESEARCH_DATA_MISSING}",
 )
 COMPOSITES = [name for name in presets.names(research=True) if name[1:].isdigit()]
+# arms that set research-only options, deprecated in 0.6.0 (FutureWarning)
+research_options = pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 
 
 @pytest.mark.research
@@ -63,6 +65,7 @@ def test_get_refuses_what_is_not_a_preset_name(name):
         presets.get(name)
 
 
+@research_options
 @pytest.mark.research
 @research
 @pytest.mark.parametrize("name", list(cc.NAMED))
@@ -72,6 +75,7 @@ def test_each_named_snapshot_is_the_config_text_it_was_recorded_with(name):
     assert cc.named_config(name).config_hash() == recorded.config_hash()
 
 
+@research_options
 @pytest.mark.research
 @research
 def test_a_preset_with_changes_is_the_arm_built_on_it():
@@ -80,6 +84,7 @@ def test_a_preset_with_changes_is_the_arm_built_on_it():
     assert presets.get("c26").variant.cma_local_nonsep == "qn3"  # unchanged
 
 
+@research_options
 @pytest.mark.research
 @research
 def test_the_harness_reads_presets_with_overrides():

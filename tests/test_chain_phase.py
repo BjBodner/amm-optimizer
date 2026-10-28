@@ -234,6 +234,8 @@ def test_the_routes_keep_the_budget():
     assert api is not None
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_a_fork_seed_keeps_the_run_up_to_the_hand_over_and_changes_the_rest():
     def run(**changes):
         calls = []

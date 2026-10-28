@@ -13,6 +13,9 @@ from amm_optimizer.pop_cma import default_population, run_population_cma
 from amm_optimizer.regimes import run_regimes
 from preset_cases import wave5_variant
 
+# research-only options, deprecated in 0.6.0 (they warn when set)
+pytestmark = pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
+
 BOX = (-5.0, 5.0)
 
 

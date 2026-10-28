@@ -167,7 +167,7 @@ def _slsqp(fun: _Counted, x: np.ndarray, box: Box) -> tuple[np.ndarray, float]:
             np.clip(np.asarray(x, dtype=float), box.lower, box.upper),
             method="SLSQP",
             bounds=list(zip(box.lower, box.upper, strict=True)),
-            options={"eps": 1e-9 * qn_phase.X_UNIT, "ftol": 1e-14, "maxiter": 10**5},
+            options={"eps": 1e-9 * qn_phase.x_unit(), "ftol": 1e-14, "maxiter": 10**5},
         )
     return np.clip(res.x, box.lower, box.upper), float(res.fun)
 

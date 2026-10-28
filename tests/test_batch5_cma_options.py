@@ -14,7 +14,11 @@ from amm_optimizer.objective import CountedObjective
 from preset_cases import wave5_variant
 
 # Pins research-only options: deselected in the default tier (tools/ci.py).
-pytestmark = pytest.mark.research
+pytestmark = [
+    pytest.mark.research,
+    # the options it pins are research-only, deprecated in 0.6.0 (FutureWarning)
+    pytest.mark.filterwarnings("ignore:Variant:FutureWarning"),
+]
 
 BOX = (-5.0, 5.0)
 

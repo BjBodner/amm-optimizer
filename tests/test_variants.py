@@ -53,6 +53,9 @@ def test_the_flag_changes_the_search(name):
 def test_invariants(name, scenario):
     with warnings.catch_warnings():
         warnings.simplefilter("error")
+        # a research option warns again where minimize rebuilds the variant
+        # (width_units="box"); deprecated in 0.6.0
+        warnings.filterwarnings("ignore", "Variant", FutureWarning)
         costs, _, result = run_case(config_of(name), scenario)
     assert result.nfev == len(costs) <= scenario.budget
     assert np.isfinite(result.x).all()
@@ -148,4 +151,8 @@ def test_knowing_the_box_changes_nothing_for_the_default(scenario):
 
 # The merge tier (tools/ci.py --tier merge): subprocess or golden sweeps, not needed
 # for a research cycle that leaves ``atm``'s core and the harness alone.
-pytestmark = pytest.mark.merge
+pytestmark = [
+    pytest.mark.merge,
+    # research-only options, deprecated in 0.6.0 (they warn when set)
+    pytest.mark.filterwarnings("ignore:Variant:FutureWarning"),
+]

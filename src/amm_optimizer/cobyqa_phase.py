@@ -78,7 +78,7 @@ def run_cobyqa_restarts(
                         "maxfev": left,
                         "maxiter": 10 * left,
                         "initial_tr_radius": radius,
-                        "final_tr_radius": FINAL_RADIUS * qn_phase.X_UNIT,
+                        "final_tr_radius": FINAL_RADIUS * qn_phase.x_unit(),
                     },
                 )
         except _SpentError:
@@ -149,7 +149,7 @@ def run_cobyqa_from(
                         "maxfev": left,
                         "maxiter": 10 * left,
                         "initial_tr_radius": radius,
-                        "final_tr_radius": FINAL_RADIUS * qn_phase.X_UNIT,
+                        "final_tr_radius": FINAL_RADIUS * qn_phase.x_unit(),
                     },
                 )
         except _SpentError:

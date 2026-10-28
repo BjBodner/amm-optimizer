@@ -9,6 +9,9 @@ from amm_optimizer.config import Variant
 from amm_optimizer.objective import CountedObjective
 from amm_optimizer.simplex import run_nelder_mead
 
+# research-only options, deprecated in 0.6.0 (they warn when set)
+pytestmark = pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
+
 BOX2 = Box.make((-5.0, 5.0), 2)
 BOX3 = Box.make((-5.0, 5.0), 3)
 

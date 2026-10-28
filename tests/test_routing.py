@@ -78,6 +78,8 @@ def budgets(dim):
     return sorted({int(m * dim) for m in per_dim} | set(absolute))
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 @pytest.mark.parametrize(
     ("es_kind", "nm_stage"), list(itertools.product(ES_KINDS, NM_STAGES))
 )
@@ -114,6 +116,8 @@ def test_the_c27_prefix_routes_by_dimension_and_budget(dim, budget, expected):
     assert api._prefix_kind(variant, dim, budget) == expected
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_prefix_runs_only_up_to_its_budget_limit():
     variant = Variant(
         amplitude_control="success_rate",
@@ -263,6 +267,8 @@ def test_a_route_rejects_an_unknown_extension():
         qn_phase.QnRoute(extend="forever")
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_cma_options_follow_the_variant():
     variant = Variant(
         cma_model="lq",

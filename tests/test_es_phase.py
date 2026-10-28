@@ -137,6 +137,8 @@ def test_es_parameters_are_validated(kwargs):
         Variant(**kwargs)
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_es_needs_the_controller_and_the_box():
     with pytest.raises(ValueError, match="amplitude_control"):
         Variant(es_phase="prefix")
@@ -210,6 +212,8 @@ def test_the_es_is_skipped_above_the_budget_limit():
     )
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_small_dimensions_use_their_own_budget_limit():
     base = Variant(**{**ES.to_dict(), "es_max_budget_per_dim": 1000.0})
     small = Variant(
@@ -246,6 +250,8 @@ def test_small_dimensions_use_their_own_budget_limit():
     assert not same(points(small, 4, 400), points(no_es, 4, 400))
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_design_follows_the_factor_and_has_at_least_four_points(monkeypatch):
     import amm_optimizer as atm
     import amm_optimizer.api

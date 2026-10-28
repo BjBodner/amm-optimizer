@@ -212,7 +212,7 @@ def _difficulty(t: np.ndarray, h: np.ndarray) -> np.ndarray:
     Every operation is elementwise, so a slice gives the values the whole axis would.
     """
     widths = np.diff(t)
-    ok = widths > MIN_WIDTH * qn_phase.X_UNIT
+    ok = widths > MIN_WIDTH * qn_phase.x_unit()
     ha, hb = np.maximum(h[:-1], 0) + EPS, np.maximum(h[1:], 0) + EPS
     difficulty = ((np.sqrt(ha) + np.sqrt(hb)) / np.where(ok, widths, 1.0)) ** 2
     return np.where(ok & np.isfinite(difficulty), difficulty, np.inf)
@@ -225,7 +225,7 @@ def _pair_difficulty(t1: Any, h1: Any, t2: Any, h2: Any) -> float:
     ``** 2``), so the same value as the vectorised form gives for that interval.
     """
     width = t2 - t1
-    if not width > MIN_WIDTH * qn_phase.X_UNIT:
+    if not width > MIN_WIDTH * qn_phase.x_unit():
         return math.inf
     q = (math.sqrt(max(h1, 0.0) + EPS) + math.sqrt(max(h2, 0.0) + EPS)) / width
     difficulty = float(q * q)
@@ -436,7 +436,7 @@ def _bracket_vertex(
     gap = 0.01 * (c - a)
     if not a + gap < vertex < c - gap:
         return None
-    return vertex, max(gap, MIN_WIDTH * qn_phase.X_UNIT)
+    return vertex, max(gap, MIN_WIDTH * qn_phase.x_unit())
 
 
 def _parabola_vertex(t: np.ndarray, h: np.ndarray) -> float | None:

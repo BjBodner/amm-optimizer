@@ -18,7 +18,11 @@ from amm_optimizer.pop_cma import run_population_cma
 
 # Pins research-only options: deselected in the default tier (tools/ci.py). It reads
 # a recorded arm of the research harness, so it skips where that is absent.
-pytestmark = pytest.mark.research
+pytestmark = [
+    pytest.mark.research,
+    # the options it pins are research-only, deprecated in 0.6.0 (FutureWarning)
+    pytest.mark.filterwarnings("ignore:Variant:FutureWarning"),
+]
 ARM = Path(__file__).parents[1] / "benchmarks" / "arms" / "audit_b8.json"
 if not ARM.exists():
     pytest.skip(

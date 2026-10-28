@@ -87,12 +87,16 @@ def test_a_positive_coordinate_opens_both_gates():
     assert ledger_a == ledger_b
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_variant_maps_to_the_option():
     assert sample_options(Variant(targeted_gate="any")) == SampleOptions(
         targeted_gate_any=True
     )
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_variant_maps_the_amplitude_to_the_option():
     assert sample_options(Variant(targeted_amplitude="loguniform")) == SampleOptions(
         targeted_loguniform=True
@@ -116,6 +120,8 @@ def test_loguniform_targeted_step_is_a_bounded_multiple_of_the_move():
     assert np.abs(original).max() > 10 * np.abs(change).max()  # unbounded by comparison
 
 
+# research-only options (deprecated in 0.6.0)
+@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_variant_maps_no_reset_to_the_option():
     assert sample_options(Variant(reset_on_success=False)) == SampleOptions(
         keep_random_growth=True

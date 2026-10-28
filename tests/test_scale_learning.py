@@ -1,5 +1,7 @@
 """``scale_learning="diagonal"`` (E14): widths learned from accepted moves."""
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -9,7 +11,13 @@ from amm_optimizer.control import learned_scales, update_scale_moment
 from amm_optimizer.sampler import SampleOptions, sample_options
 from test_sampler_options import draw
 
-DIAG = Variant(amplitude_control="success_rate_targeted", scale_learning="diagonal")
+# research-only options, deprecated in 0.6.0 (they warn when set)
+pytestmark = pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
+
+# research-only options (deprecated in 0.6.0): constructing them warns
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", "Variant", FutureWarning)
+    DIAG = Variant(amplitude_control="success_rate_targeted", scale_learning="diagonal")
 
 
 def test_the_scales_have_geometric_mean_one_and_equal_moments_give_ones():
