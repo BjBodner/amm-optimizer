@@ -147,8 +147,7 @@ def run_es_phase(
     (``Variant.step_box_check``): the separable search's early check
     (``run_step_phase(box_check=True)``).
 
-    Research options of the parked2 toy (``docs/research/toys/parked2.md``), each off
-    by default:
+    Research options from a second screen of parked ideas, each off by default:
 
     * ``nan_clip``: with ``nan_reading`` not ``"rugged"``, an undefined reading goes
       that way only when clipping explains it (no probe pair whose mirror stayed inside

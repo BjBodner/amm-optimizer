@@ -2,7 +2,7 @@
 
 COBYQA (Ragonneau and Zhang; SciPy >= 1.14) is Powell's derivative-free trust-region
 SQP on quadratic models interpolating 2 D + 1 points, the family HCMA uses (NEWUOA) for
-its first evaluations. In the small-budget toy (``docs/research/toys/small_budget.md``)
+its first evaluations. In a small-budget study of the engines
 an initial trust radius of 0.25 of the box width led every other engine at 10 x D; at
 D 2 it leads ``c42`` there by +.020 (RESULTS, "Small-budget engines toy against c42").
 """

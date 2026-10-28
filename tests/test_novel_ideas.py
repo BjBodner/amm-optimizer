@@ -1,4 +1,4 @@
-"""The novel-ideas toy's options (``docs/research/toys/novel_ideas.md``): face-tangent
+"""The options of a screen of new ideas: face-tangent
 probes, the evaluation memo, STEP's early check, box-relative steps and the box
 normalisation; all off by default, so the presets are unchanged."""
 
@@ -10,6 +10,9 @@ from amm_optimizer.api import minimize
 from amm_optimizer.bounds import Box
 from amm_optimizer.objective import CountedObjective
 from amm_optimizer.step_phase import run_step_phase
+
+# Pins research-only options: deselected in the default tier (tools/ci.py).
+pytestmark = pytest.mark.research
 
 BOX5 = Box.make((-5.0, 5.0), 5)
 

@@ -3,3 +3,6 @@ contact_links:
   - name: Security vulnerability
     url: https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability
     about: Report it privately through the Security tab, not as an issue.
+  - name: Documentation and results
+    url: https://github.com/BjBodner/amm-optimizer#readme
+    about: How to call minimize, the presets, the anytime mode, and links to the measured results.

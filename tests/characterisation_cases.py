@@ -1,26 +1,29 @@
-"""Bit-exact characterisation of the research composites on COCO bbob problems.
+"""Bit-exact characterisation of the shipped configurations on COCO bbob problems.
 
 Shared by ``tests/test_characterisation.py`` and ``tools/record_characterisation.py``.
-Each case runs ``atm.minimize`` once on a bbob problem (via ``cocoex``) with the
-quick-scan box ``[-5, 5]`` and records SHA-256 digests of every evaluated point and
+Each case runs ``amm_optimizer.api.minimize`` once on a bbob problem (via ``cocoex``)
+with the box ``[-5, 5]`` and records SHA-256 digests of every evaluated point and
 value, exactly (float64 bytes, no rounding). A refactor must reproduce them bit for
 bit on the recording platform; the tests skip when NumPy, SciPy or the platform
 differ from the recording (``_meta``).
 
 Two sets:
 
-* ``NAMED``: the confirmed composites ``c23``-``c46``, the default configuration and
-  the recorded routes built on them (``cma_local_nonsep`` and the cycles 16-26
-  prefix, plateau, separability and population options) on a grid of functions,
-  dimensions and budgets (``GRID``).
-* ``arm_configs()``: every distinct ATM configuration of ``benchmarks/arms/*.json``
-  (keyed by ``ATMConfig.config_hash``) on four probe problems (``ARM_PROBES``), so
-  that every recorded arm stays reproducible (``pytest -m slow``).
+* ``NAMED``: the shipped configurations, ``ATMConfig()`` (``"default"``), the presets
+  ``c23``-``c46`` and ``ATMConfig.composite()`` (``"refactor_composite"``), on a grid
+  of functions, dimensions and budgets (``GRID``), in ``tests/characterisation.json``.
+  Each entry keeps the configuration text it was first recorded with.
+* ``arm_configs()`` (research): every distinct configuration of the recorded research
+  arms (``benchmarks/arms/*.json``, keyed by ``override_key``) on four probe problems
+  (``ARM_PROBES``), in ``tests/characterisation_arms.json``. It, and everything else
+  that reads ``benchmarks/arms`` or ``benchmarks/quick_scan.py`` (``parse``,
+  ``composite``, ``arm``), needs the research data (``RESEARCH_DATA_MISSING``); the
+  tests that use it carry the ``research`` marker and skip without it.
 
-The test tiers (``tools/ci.py --tier``; ``docs/TRIM_REVIEW_2026-10-21.md``):
+The test tiers (``tools/ci.py --tier``):
 
-* research (default selection minus ``slow`` and ``merge``): the whole grid for
-  ``PINNED`` (the default configuration and the current best composite);
+* default (``-m "not slow and not merge and not research"``): the whole grid for
+  ``PINNED`` (the default configuration and the current composite, ``c46``);
 * merge (``-m "not slow"``): also the whole grid for ``RECENT`` and the
   ``SEPARATING`` cases for every named config;
 * full: every named config on the whole grid and every recorded arm.
@@ -28,12 +31,14 @@ The test tiers (``tools/ci.py --tier``; ``docs/TRIM_REVIEW_2026-10-21.md``):
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import importlib.util
 import json
 import platform
 import struct
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -47,16 +52,24 @@ ROOT = Path(__file__).resolve().parents[1]
 ARMS = ROOT / "benchmarks" / "arms"
 NAMED_SNAPSHOTS = Path(__file__).parent / "characterisation.json"
 ARM_SNAPSHOTS = Path(__file__).parent / "characterisation_arms.json"
+QUICK_SCAN = ROOT / "benchmarks" / "quick_scan.py"
 BOX = (-5.0, 5.0)
+
+# The research data: the recorded arms, the benchmark harness that parses their
+# config texts, and the arm snapshots. They leave this repository with the research
+# code; the tests that read them skip when they are gone.
+_RESEARCH_PATHS = (ARMS, QUICK_SCAN, ARM_SNAPSHOTS)
+RESEARCH_DATA_MISSING: str | None = (
+    ", ".join(p.relative_to(ROOT).as_posix() for p in _RESEARCH_PATHS if not p.exists())
+    or None
+)
 
 
 def _load_quick_scan() -> Any:
     """``benchmarks/quick_scan.py`` as a module (its ``parse_config`` reads arms)."""
     if "quick_scan" in sys.modules:
         return sys.modules["quick_scan"]
-    spec = importlib.util.spec_from_file_location(
-        "quick_scan", ROOT / "benchmarks" / "quick_scan.py"
-    )
+    spec = importlib.util.spec_from_file_location("quick_scan", QUICK_SCAN)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules["quick_scan"] = module
@@ -75,41 +88,20 @@ def arm(file: str, name: str) -> str:
     return str(arms[name]["config"])
 
 
-def _with(base: str, override: str) -> str:
-    return f"{composite(base)},{override}"
-
-
-# Config texts as ``quick_scan --config`` takes them (later keys win).
-NAMED: dict[str, str] = {
-    "default": "",
-    **{f"c{k}": composite(f"c{k}") for k in range(23, 47)},
-    # Cycles 16-18 (Batches 42-45), each ``c26`` with one change.
-    "qn6": arm("audit_b42", "qn6"),
-    "qn7": arm("audit_b42", "qn7"),
-    "slsqplq10": arm("audit_b43", "tenx"),
-    "qnprefix": arm("audit_b43", "lowd"),
-    "slsqplq10c": arm("audit_b44", "tenx2"),
-    "qn8": arm("audit_b45", "plat"),
-    # Cycles 19-26 (Batches 46-53).
-    "qnprefix30g": arm("audit_b46", "d2pre"),
-    "qn9": arm("audit_b47", "h9loc"),
-    "slsqplq10h": arm("audit_b47", "h9pre"),
-    "qn10": arm("audit_b48", "qn10"),
-    "qn11_stepsgrow": arm("audit_b49", "grow"),
-    "sep_pair": arm("audit_b50", "pairsep"),
-    "slsqplq10hk": arm("audit_b53", "ctr"),
-    # Cycles 28-31 (Batches 54-57): c32 and c33 are named composites above.
-    "qn15": arm("audit_b55", "rug"),
-    "sep_stall": arm("audit_b55", "rugs"),
-    # Routes in the code that no arm has run, on ``c31``.
-    "qn13": _with("c31", "variant.cma_local_nonsep=qn13"),
-    "qn13n": _with("c31", "variant.cma_local_nonsep=qn13n"),
-    # The other recorded routes of the ``cma_local_nonsep`` chain, on ``c26``.
-    "qn": _with("c26", "variant.cma_local_nonsep=qn"),
-    "qn2": _with("c26", "variant.cma_local_nonsep=qn2"),
-    "qn5": _with("c26", "variant.cma_local_nonsep=qn5"),
-    "nonsep_ipop": _with("c26", "variant.cma_local_nonsep=ipop"),
+# The presets, oldest first (``presets.get`` reads each one).
+COMPOSITES: tuple[str, ...] = tuple(f"c{k}" for k in range(23, 47))
+# The shipped configurations by snapshot name.
+SHIPPED: dict[str, Callable[[], atm.ATMConfig]] = {
+    "default": atm.ATMConfig,
+    **{name: functools.partial(presets.get, name) for name in COMPOSITES},
+    # ``ATMConfig.composite()``, first recorded as the ``refactor`` line's preset.
+    "refactor_composite": atm.ATMConfig.composite,
 }
+
+
+def named_config(name: str) -> atm.ATMConfig:
+    """The configuration of the named snapshot ``name``."""
+    return SHIPPED[name]()
 
 
 def text_of(config: atm.ATMConfig) -> str:
@@ -129,10 +121,20 @@ def text_of(config: atm.ATMConfig) -> str:
     return ",".join(items)
 
 
-# The ``refactor`` line's presets (merged 2026-10-19; recorded at its tip 330e7bb).
-NAMED |= {
-    "refactor_composite": text_of(atm.ATMConfig.composite()),
-}
+def _recorded_texts() -> dict[str, str]:
+    """Each shipped configuration's text as recorded (``text_of`` for a new one)."""
+    stored: dict[str, Any] = {}
+    if NAMED_SNAPSHOTS.exists():
+        stored = json.loads(NAMED_SNAPSHOTS.read_text(encoding="utf-8"))["configs"]
+    return {
+        name: stored[name]["config"] if name in stored else text_of(make())
+        for name, make in SHIPPED.items()
+    }
+
+
+# The named snapshots and the config texts they were recorded with (provenance: with
+# the research data, ``parse(NAMED[name]) == named_config(name)``, test_presets.py).
+NAMED: dict[str, str] = _recorded_texts()
 
 
 @dataclass(frozen=True)
@@ -198,29 +200,22 @@ ARM_PROBES = [
 ]
 
 
-# The test tiers. ``CURRENT`` is the newest composite of ``atm.presets``.
-CURRENT: str = presets.names()[-1]
+# The test tiers. ``CURRENT`` is the newest composite, the default of ``minimize``.
+CURRENT: str = COMPOSITES[-1]
 PINNED: tuple[str, ...] = ("default", CURRENT)
 RECENT: tuple[str, ...] = (
-    *presets.names()[-3:],
+    *COMPOSITES[-3:],
     "refactor_composite",
 )
-# Each named config against the one it was built on (consecutive composites, the
-# routes on their composite; the rest of the routes are ``c26`` with one change).
+# Each named config against the one it was built on (consecutive composites).
 BASES: dict[str, str] = {
     "default": "c23",
-    **{b: a for a, b in zip(presets.names(), presets.names()[1:], strict=False)},
-    "qn15": "c31",
-    "sep_stall": "qn15",
-    "qn11_stepsgrow": "c29",
-    "qn13": "c31",
-    "qn13n": "c31",
+    **{b: a for a, b in zip(COMPOSITES, COMPOSITES[1:], strict=False)},
     "refactor_composite": "default",
 }
-# ``stepsgrow`` differs from ``steps`` only at a population restart with at least
-# 2000 x D evaluations left, which no grid case reaches; ``test_routing`` pins it.
-SAME_AS_BASE_ON_THE_GRID = {"qn11_stepsgrow"}
-# Ten grid cases on which every other named config differs from its base (a greedy
+# Named configs that equal their base on every grid case (none of the shipped ones).
+SAME_AS_BASE_ON_THE_GRID: set[str] = set()
+# Twelve grid cases on which every other named config differs from its base (a greedy
 # cover over the 2026-10-21 snapshots; ``test_the_separating_set_...`` re-checks it).
 SEPARATING = [
     Case(21, 20, 300.0),
@@ -252,6 +247,7 @@ def environment() -> dict[str, str]:
 
 
 def parse(text: str) -> atm.ATMConfig:
+    """A ``quick_scan --config`` text as a configuration (needs the research data)."""
     return _load_quick_scan().parse_config(text)  # type: ignore[no-any-return]
 
 
@@ -336,8 +332,7 @@ def override_key(config: atm.ATMConfig) -> str:
 
 # Recorded arm configs that use an option the 2026-10-19 merge removed (allocation,
 # early_accept; refactor 40222d9). Their contract snapshots stay in the arms file;
-# the code at ``pre-merge-2026-10-19/research`` reproduces them
-# (docs/MERGE_2026-10-19.md).
+# the code at ``pre-merge-2026-10-19/research`` reproduces them.
 REMOVED_BY_MERGE = {
     "a407991e5885678a": "wave2b:w2_fixed12_credit",
     "c3f2b2404f877823": "wave2c:w2_early4",
@@ -354,7 +349,7 @@ REMOVED_BY_MERGE = {
     "c58917f38d3110c7": "wave2d:w2_e6_c100_p16",
     "b6eabc4536f0127c": "wave3:w3_es30_early6",
     # Dead code 4 (2026-10-21): ``race`` and ``pop_first_share`` (Batches 20-22); the
-    # code at ``pre-deadcode-2026-10-21`` reproduces them (docs/TRIM_REVIEW_2026-10-21)
+    # code at ``pre-deadcode-2026-10-21`` reproduces them
     "b86fe3e5508023a6": "audit_b20:race",
     "de1b8134feacab16": "audit_b20:race5",
     "0f8aebd8e5012464": "audit_b21:racelate",

@@ -1,4 +1,4 @@
-"""The f13 toy's options (``docs/research/toys/f13_cells.md``): the ridge reading of the
+"""The options of a study of bbob f13 (sharp ridge): the ridge reading of the
 prefix's SLSQP descent and the continued rugged try; off by default, so the presets
 are unchanged."""
 
@@ -8,6 +8,9 @@ import pytest
 from amm_optimizer import api, cobyqa_phase, es_phase, presets, qn_phase
 from amm_optimizer.bounds import Box
 from amm_optimizer.objective import CountedObjective
+
+# Pins research-only options: deselected in the default tier (tools/ci.py).
+pytestmark = pytest.mark.research
 
 BOX5 = Box.make((-5.0, 5.0), 5)
 

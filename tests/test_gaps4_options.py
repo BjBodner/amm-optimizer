@@ -1,4 +1,4 @@
-"""The gaps4 toy's opt-in options (``docs/research/toys/gaps4.md``): ``centre_point``,
+"""The gaps4 study's opt-in options: ``centre_point``,
 ``smooth_bfgs_second`` and ``prefix_low_beta``. Each default is c45's, which the last
 test checks against c45's recorded runs."""
 
@@ -14,6 +14,9 @@ import characterisation_cases as cc
 from amm_optimizer import presets
 from amm_optimizer.api import minimize
 from amm_optimizer.config import Variant
+
+# Pins research-only options: deselected in the default tier (tools/ci.py).
+pytestmark = pytest.mark.research
 
 
 def griewank_rosenbrock_like(x):

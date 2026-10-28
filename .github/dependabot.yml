@@ -9,6 +9,17 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+  # The hook revisions of .pre-commit-config.yaml. A ruff bump must also change the
+  # ruff pin of the dev extra in pyproject.toml (the two are kept equal).
+  - package-ecosystem: pre-commit
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      pre-commit:
+        patterns: ["*"]
   # No pip updater on purpose: the dependency ranges in pyproject.toml are minimum
   # supported versions of a library (as open as possible), and Dependabot would raise
   # them to the newest release. Vulnerability alerts still arrive as Dependabot alerts.

@@ -11,6 +11,9 @@ from amm_optimizer.api import minimize
 from amm_optimizer.bounds import Box
 from amm_optimizer.objective import CountedObjective
 
+# Pins research-only options: deselected in the default tier (tools/ci.py).
+pytestmark = pytest.mark.research
+
 BOX5 = Box.make((-5.0, 5.0), 5)
 
 

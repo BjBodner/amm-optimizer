@@ -101,7 +101,7 @@ SAMPLE_PER_DIM = 10
 SAMPLE_GAP_SHARE = 0.1
 GAP_STOP_SHARE = 0.01
 # Research (``sampled_polish_per_dim``, idea #33 of the retrospective, the multistart
-# toy's ``G3CD``; docs/research/toys/ideas132.md): a sampled-restart descent that ends
+# study's ``G3CD``): a sampled-restart descent that ends
 # normally below every earlier end is polished by SLSQP with central differences at
 # ``POLISH_H_SHARE`` x the mean box width (Gallagher's quartic global peak; a forward
 # difference at 1e-9 floors its last targets).
@@ -254,7 +254,7 @@ class StallMonitor:
 
 @dataclass(frozen=True)
 class SmallSwitch:
-    """``small_switch`` (research toy ``docs/research/toys/small10.md``).
+    """``small_switch`` (research option, from a study of budgets up to 10 x D).
 
     The prefix's first SLSQP descent is read at two checkpoints, the first probe of
     the gradient after its first and after its second line search (no extra

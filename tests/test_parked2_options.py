@@ -1,4 +1,4 @@
-"""The parked2 toy's opt-in prefix options (``docs/research/toys/parked2.md``).
+"""The opt-in prefix options of a second screen of parked ideas (parked2).
 
 Each option is off by default, so ``c43`` and ``c44`` keep their recorded traces (the
 characterisation tests); these tests pin what each option does when it is on.
@@ -13,6 +13,9 @@ from amm_optimizer import api, presets, qn_phase, step_phase
 from amm_optimizer.bounds import Box
 from amm_optimizer.es_phase import EsResult, _guarded_descents, run_es_phase
 from amm_optimizer.objective import CountedObjective
+
+# Pins research-only options: deselected in the default tier (tools/ci.py).
+pytestmark = pytest.mark.research
 
 BOX5 = Box.make((-5.0, 5.0), 5)
 BOX2 = Box.make((-5.0, 5.0), 2)

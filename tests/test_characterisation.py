@@ -1,15 +1,19 @@
-"""The research composites and every recorded arm reproduce their bbob runs exactly.
+"""The shipped configurations and the recorded arms reproduce their bbob runs exactly.
 
 Refactors of ``atm`` must keep these snapshots bit for bit (``docs/DEVIATIONS.md``);
 a deliberate behaviour change re-records them with
 ``tools/record_characterisation.py`` in its own commit. See ``characterisation_cases``
 for what is hashed and for the tiers (``tools/ci.py --tier``):
 
-* research (``-m "not slow and not merge"``): the whole grid for ``PINNED`` (the
-  default configuration and the current best composite);
+* default (``-m "not slow and not merge and not research"``): the whole grid for
+  ``PINNED`` (the default configuration and the current composite);
 * merge (``-m "not slow"``): also the whole grid for ``RECENT``, the ``SEPARATING``
   cases for every named config, and the arm-snapshot completeness check;
 * full (``-m slow`` included): every named config on the grid, every recorded arm.
+
+The arm tests are ``research``: they need ``benchmarks/arms``,
+``benchmarks/quick_scan.py`` and ``tests/characterisation_arms.json``, and skip
+without them.
 
 Each test item checks one config (or arm) on all of its cases and lists the cases
 that differ. The fixtures record only the configs of the selected items, so ``-k``
@@ -36,10 +40,27 @@ pytestmark = pytest.mark.snapshot
 import characterisation_cases as cc  # noqa: E402
 
 NAMED = json.loads(cc.NAMED_SNAPSHOTS.read_text(encoding="utf-8"))
-ARMS = json.loads(cc.ARM_SNAPSHOTS.read_text(encoding="utf-8"))
+ARMS = (
+    json.loads(cc.ARM_SNAPSHOTS.read_text(encoding="utf-8"))
+    if cc.ARM_SNAPSHOTS.exists()
+    else {"_meta": {}, "configs": {}}
+)
 RECORDER = cc.ROOT / "tools" / "record_characterisation.py"
 JOBS = os.environ.get("ATM_CHARACTERISATION_JOBS", "2")
 ARM_KEYS = sorted(set(ARMS["configs"]) - set(cc.REMOVED_BY_MERGE))
+research = [
+    pytest.mark.research,
+    pytest.mark.skipif(
+        cc.RESEARCH_DATA_MISSING is not None,
+        reason=f"research data not in this checkout: {cc.RESEARCH_DATA_MISSING}",
+    ),
+]
+
+
+def _research(test):
+    for mark in research:
+        test = mark(test)
+    return test
 
 
 def _same_environment(meta):
@@ -138,6 +159,7 @@ def test_the_snapshots_cover_every_named_config_and_case():
 
 
 @pytest.mark.merge
+@_research
 def test_every_recorded_arm_has_a_snapshot():
     stored = ARMS["configs"]
     current = set(cc.arm_configs())
@@ -183,7 +205,7 @@ def test_the_in_process_runner_matches_the_recorder(pinned_runs):
     without SLSQP (so without the BLAS-threading caveat)."""
     case = cc.FAST[0]  # f1 at D 2, 100 x D: the prefix's Nelder-Mead and the (1+1)
     want = pinned_runs["configs"]["default"]["cases"][case.name]
-    assert cc.run(cc.parse(cc.NAMED["default"]), case) == want
+    assert cc.run(cc.named_config("default"), case) == want
 
 
 @pytest.mark.parametrize("name", cc.PINNED)
@@ -217,6 +239,7 @@ def test_named_grid(grid_runs, name):
 
 
 @pytest.mark.slow
+@_research
 @pytest.mark.parametrize("key", ARM_KEYS)
 def test_recorded_arm(arm_runs, key):
     differing = _differing(arm_runs, ARMS, key)

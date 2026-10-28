@@ -4,7 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "amm-optimizer"
-version = "0.5.0"
+# The version is read from src/amm_optimizer/__init__.py ([tool.hatch.version]); a
+# release changes it there and in CITATION.cff (tests/test_version.py checks both).
+dynamic = ["version"]
 description = "Adaptive Multi Mode (AMM): budget-aware routing of derivative-free optimizers by online landscape probes (import amm_optimizer)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -23,9 +25,9 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Mathematics",
   "Typing :: Typed",
 ]
-# SciPy: SLSQP, L-BFGS-B and Nelder-Mead stages of the research presets (c25 on),
-# and the lq2 surrogate. 1.16 ported SLSQP to C, which changed some exit statuses;
-# c32's fallback routes on them and was calibrated with 1.18. SciPy 1.16.0 fails 11
+# SciPy: AMM's SLSQP, L-BFGS-B, COBYQA and Nelder-Mead stages and its surrogate model.
+# SciPy 1.16 ported SLSQP to C, which changed some exit statuses; AMM's fallback from
+# SLSQP to L-BFGS-B reads them and was calibrated with 1.18. SciPy 1.16.0 fails 11
 # pinned tests (trajectories differ, two behavioural), so the floor is the version the
 # results were recorded with. SciPy 1.18 needs Python >= 3.12 and NumPy >= 2.0. Widen
 # only after a CI cell at the lower bound passes.
@@ -38,16 +40,24 @@ Issues = "https://github.com/BjBodner/amm-optimizer/issues"
 Changelog = "https://github.com/BjBodner/amm-optimizer/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-cov", "hypothesis", "ruff", "mypy", "coco-experiment"]
+# ruff is pinned to the rev of the ruff-pre-commit hook in .pre-commit-config.yaml, so
+# that the hook, `python tools/ci.py` and CI format alike; bump both together.
+dev = ["pytest>=8", "pytest-cov", "hypothesis", "ruff==0.17.1", "mypy", "coco-experiment"]
 bench = ["coco-experiment", "cocopp"]
 
-# The repository holds hundreds of MB of benchmark results; PyPI files may not exceed 100 MB.
+# The sdist holds the library, its documentation and the metadata files. The tests,
+# their snapshot data, reference/ and tools/ stay in the repository: the snapshot tests
+# hold only in the environment that recorded them, and a git checkout runs all of them.
+[tool.hatch.version]
+path = "src/amm_optimizer/__init__.py"
+
 [tool.hatch.build.targets.sdist]
 include = [
-  "/src", "/tests", "/reference", "/tools",
-  "/README.md", "/LICENSE", "/CHANGELOG.md", "/CITATION.cff", "/pyproject.toml", "/conftest.py",
-  "/docs/FREEZE_2026-10-22.md", "/docs/DEVIATIONS.md", "/docs/ANYTIME.md",
+  "/src", "/docs",
+  "/README.md", "/LICENSE", "/NOTICE", "/CHANGELOG.md", "/CITATION.cff", "/pyproject.toml",
 ]
+# Hatchling always adds the .gitignore it reads its exclusions from; `exclude` cannot
+# drop it (it is a force-include), so the sdist carries it.
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/amm_optimizer"]
@@ -57,8 +67,9 @@ testpaths = ["tests"]
 addopts = "-ra"
 markers = [
   "slow: the full tier (nightly / release): every named config and recorded arm",
-  "merge: the merge tier, deselected in the research tier (-m \"not slow and not merge\")",
+  "merge: the merge tier, deselected in the default tier (-m \"not slow and not merge and not research\")",
   "snapshot: bit-exact or trajectory-pinned; valid only in the environment of tests/characterisation.json (skipped elsewhere, see tests/conftest.py)",
+  "research: research-only options or data (benchmarks/arms, benchmarks/quick_scan.py, tests/characterisation_arms.json); deselected in the default tier, and skipped where the data is absent",
 ]
 filterwarnings = ["error::DeprecationWarning"]
 

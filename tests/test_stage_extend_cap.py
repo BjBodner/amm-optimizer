@@ -8,6 +8,9 @@ from amm_optimizer import presets, qn_phase
 from amm_optimizer.api import minimize
 from amm_optimizer.config import Variant
 
+# Pins research-only options: deselected in the default tier (tools/ci.py).
+pytestmark = pytest.mark.research
+
 ORIGINAL = qn_phase.run_slsqp_restarts
 
 
