@@ -53,10 +53,11 @@ That is the whole call: the search box is the only thing you must give. Everythi
 |---|---|---|
 | `bounds` | required | the search box: a list of `(low, high)` pairs (as in SciPy), `(lower, upper)` with scalars or arrays, or `scipy.optimize.Bounds`; finite limits |
 | `x0` | the centre of the box | the starting point |
-| `budget` | `100 x D` evaluations (at least 100) | the maximum number of calls of `f`; all are used. Pass what you can afford |
-| `seed` | a fresh seed | a run is deterministic given the seed |
+| `budget` | `100 x D` evaluations (at least 100) | the maximum number of calls of `f`; all are used unless `ftarget` or `callback` stops the run. Pass what you can afford |
+| `ftarget`, `callback` | none | stop early: at a target value, or when `callback(intermediate_result)` raises `StopIteration` |
+| `seed` | a fresh seed, recorded in `result.seed` | a run is deterministic given the seed; `rng=` also takes a NumPy `Generator` |
 | `anytime` | `False` | `True` for a run whose budget is not known or that you will cut short, see [docs/ANYTIME.md](docs/ANYTIME.md) |
-| `config` | AMM (`presets.get("c46")`) | `amm.ATMConfig()` runs the original ATM sampler alone and needs no box |
+| `config` | `"default"` (AMM, frozen as `c46`) | a preset name (`presets.names()`) or an `ATMConfig`; `"atm"` runs the original ATM sampler alone and needs no box |
 
 The older, fully spelled-out call still works:
 

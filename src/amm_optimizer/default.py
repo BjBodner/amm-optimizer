@@ -328,13 +328,10 @@ def minimize(
 
     Notes
     -----
-    Thread safety: runs in separate threads are safe with the shipped presets
-    (``presets.names()``, ``ATMConfig()``, ``ATMConfig.composite()``). Every run
-    sets the module-global step unit ``qn_phase.X_UNIT``, which only research
-    variants with ``box_steps=True`` make anything but 1.0; do not run those in
-    threads. Warnings that ``fun`` raises reach the caller, except inside SciPy's
-    quasi-Newton calls, where floating-point overflow and divide-by-zero warnings
-    are silenced.
+    Thread safety: runs in separate threads are independent; the run's step
+    unit is a per-thread context variable, not a module global. Warnings that
+    ``fun`` raises reach the caller, except inside SciPy's quasi-Newton calls,
+    where floating-point overflow and divide-by-zero warnings are silenced.
 
     Version 0.6.0 made the result a :class:`scipy.optimize.OptimizeResult`,
     added ``callback``, ``ftarget``, ``catch_interrupt``, preset names as

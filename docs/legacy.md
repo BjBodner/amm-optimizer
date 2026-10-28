@@ -27,9 +27,8 @@ print(result.x, result.fun, result.nfev)
 
 `budget` is the maximum number of function evaluations, and ATM uses all of them (the best point
 found is kept even if the budget ends mid-iteration). Pass `seed=` (or an
-`rng=np.random.RandomState`) for reproducible runs. A starting point where the function is NaN or
-infinite raises `ValueError`; NaN or infinite values elsewhere count as failed evaluations and
-never win.
+`rng=np.random.RandomState`) for reproducible runs. NaN or infinite values count as failed
+evaluations and never win, at the starting point too.
 
 `ATMConfig()` reproduces the original ATM exactly, and so does `amm_optimizer.api.minimize` called
 without a `config` (see [DEVIATIONS.md](DEVIATIONS.md)); the default of `amm.minimize` is AMM, not

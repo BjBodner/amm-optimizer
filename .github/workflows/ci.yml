@@ -36,8 +36,8 @@ jobs:
           python-version: "3.12"
           enable-cache: true
       - run: uv venv && uv pip install -e ".[dev,docs]"
-      - run: uv run --no-sync ruff check src tests tools benchmarks
-      - run: uv run --no-sync ruff format --check src tests tools benchmarks
+      - run: uv run --no-sync ruff check src tests tools benchmarks examples
+      - run: uv run --no-sync ruff format --check src tests tools benchmarks examples
       - run: uv run --no-sync mypy
       - name: Docs (mkdocs build --strict, as Read the Docs builds them)
         env:

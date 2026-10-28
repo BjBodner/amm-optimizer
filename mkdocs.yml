@@ -23,6 +23,7 @@ nav:
   - Background:
       - The frozen configuration: FREEZE_2026-10-22.md
       - Deviations from the original ATM: DEVIATIONS.md
+      - History of the presets: HISTORY.md
   - Changelog: changelog.md
   - Deprecation policy: deprecation-policy.md
   - Citing: citing.md

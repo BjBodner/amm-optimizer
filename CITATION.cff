@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below (the paper's reference will be added when it is public)."
 title: "Adaptive Multi Mode (AMM): budget-aware routing of optimizers by online landscape probes"
-version: 0.5.0
-date-released: "2026-10-25"
+version: 0.6.0
+date-released: "2026-10-28"
 license: Apache-2.0
 type: software
 repository-code: "https://github.com/BjBodner/amm-optimizer"
