@@ -4,14 +4,53 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from time import perf_counter_ns
+from typing import Any
 
 import numpy as np
 
 from .profiling import NULL_PROFILER, Profiler
 
 
+def real_scalar(value: Any) -> float:
+    """``value`` (what ``fun`` returned) as a real number, or a plain ``TypeError``.
+
+    A float (NumPy's ``float64`` included) is returned as it is; any other real
+    scalar (``float32``, ``int``, ``Fraction``) as ``float(value)``.
+    """
+    if isinstance(value, float):
+        return value
+    if np.ndim(value) != 0:
+        raise TypeError(
+            f"fun must return a real scalar, got {type(value).__name__} of shape "
+            f"{np.shape(value)}"
+        )
+    if np.iscomplexobj(value):
+        raise TypeError(f"fun must return a real scalar, got {type(value).__name__}")
+    try:
+        return float(value)
+    except TypeError:
+        raise TypeError(
+            f"fun must return a real scalar, got {type(value).__name__}"
+        ) from None
+
+
+def copying(fun: Callable[[np.ndarray], float]) -> Callable[[np.ndarray], float]:
+    """``fun`` called on a fresh float copy of its argument, as SciPy does, and its
+    value checked by :func:`real_scalar`.
+
+    The optimizer passes views of its own buffers (a column of the sample matrix,
+    an incumbent); a ``fun`` that writes into its argument, or keeps it, must not
+    see or change them.
+    """
+
+    def call(x: np.ndarray) -> float:
+        return real_scalar(fun(np.array(x, dtype=float)))
+
+    return call
+
+
 class CountedObjective:
-    """Counts calls to ``fun`` against a budget.
+    """Counts calls to ``fun`` against a budget; ``fun`` gets a copy of each point.
 
     ``calls`` is the true number of calls. With ``strict`` accounting every call
     is charged and at most ``allowed`` calls are made. Without it the original's
@@ -28,7 +67,7 @@ class CountedObjective:
         profiler: Profiler = NULL_PROFILER,
         memo: bool = False,
     ) -> None:
-        self._fun = fun
+        self._fun = copying(fun)
         self._profiler = profiler
         self._strict = strict
         self._limit = allowed if strict else allowed + 1
@@ -88,10 +127,10 @@ class CountedObjective:
             self._charged += 1
         if self._profiler.enabled:
             start = perf_counter_ns()
-            value = self._fun(x)
+            value = float(self._fun(x))
             self._profiler.record("objective", perf_counter_ns() - start)
             return value
-        return self._fun(x)
+        return float(self._fun(x))
 
     @property
     def remaining(self) -> int:

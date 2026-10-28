@@ -9,6 +9,21 @@ Public API is deprecated, with a warning, for at least one minor release before 
 
 ## [Unreleased]
 
+Bug fixes. Every run that starts inside the box and gets well-behaved inputs is bit for bit as in 0.5.0 (`c46`'s config hash is still `2153948ebed51150`).
+
+### Changed
+
+- **An `x0` outside `bounds` is clipped onto the box, with a `UserWarning`**, on every box. On the bbob box `[-5, 5]` it used to be evaluated as given; on any other box it was already clipped, silently, so those runs are unchanged. `amm_optimizer.api.minimize`, the engine, does not check `x0`.
+
+### Fixed
+
+- **`fun` gets its own copy of every point**, as in SciPy. It used to receive writeable views of the optimizer's buffers, so an objective that wrote into `x` changed the search, and one that kept `x` saw it change.
+- **Bad inputs fail before any evaluation, with plain errors**: a non-finite `x0` (`ValueError`); a `config` that is not an `ATMConfig` (`TypeError` naming `presets.get`); an `rng` that is not a `RandomState` (`TypeError` naming `seed=`); a `seed` that is not an integer (`TypeError`) or is outside `[0, 2**32)` (`ValueError`); a `bool` `budget` (`TypeError`, it was taken as 1). A `fun` that returns an array, a list, a complex number or `None` gets a `TypeError` that says what it returned. A non-finite value at the starting point still raises `ValueError`.
+- **The value at the starting point is a `float`** like every other value; a `fun` returning `Fraction` no longer crashes.
+- **Warnings raised by `fun` reach the caller** on the COBYQA and basin routes, which used to ignore every warning. SciPy's own overflow warnings from finite differences over a failed evaluation are no longer shown.
+- **The diagnostic logs stay bounded.** `anytime.LAST_STAGES` (alias `STAGE_LOG`) holds the stages of the most recent anytime run only; `cma_phase.PROBE_LOG` records only while `cma_phase.RECORD_PROBES` is true.
+- The `minimize` docstring has a thread-safety note.
+
 ## [0.5.0] - 2026-10-25
 
 A simpler call, and the anytime mode. The default algorithm is unchanged: with `anytime=False`

@@ -40,7 +40,8 @@ def run_cobyqa_restarts(
     Returns the best point, its value, sigma 0 (no step-size state to hand over) and
     the evaluations used.
     """
-    from scipy.optimize import minimize as scipy_minimize  # type: ignore[import-untyped]
+    from scipy.optimize import OptimizeWarning  # type: ignore[import-untyped]
+    from scipy.optimize import minimize as scipy_minimize
 
     dim = len(x)
     radius = radius_share * float(np.mean(box.upper - box.lower))
@@ -66,7 +67,8 @@ def run_cobyqa_restarts(
         before, left = used, evaluations - used
         try:
             with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
+                # SciPy's notices only: the objective's warnings get through (B5)
+                warnings.filterwarnings("ignore", category=OptimizeWarning)
                 scipy_minimize(
                     fun,
                     start,
@@ -102,6 +104,7 @@ def run_cobyqa_from(
     itself, is not evaluated again (COBYQA moves a start that lies within one radius
     of a bound). The best point starts as (``x``, ``cost``).
     """
+    from scipy.optimize import OptimizeWarning
     from scipy.optimize import minimize as scipy_minimize
 
     dim = len(x)
@@ -135,7 +138,8 @@ def run_cobyqa_from(
         before, left = used, evaluations - used + 1
         try:
             with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
+                # SciPy's notices only: the objective's warnings get through (B5)
+                warnings.filterwarnings("ignore", category=OptimizeWarning)
                 scipy_minimize(
                     fun,
                     start,

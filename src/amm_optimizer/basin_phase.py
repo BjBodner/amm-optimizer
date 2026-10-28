@@ -77,7 +77,10 @@ def _draw(sobol: Any, n: int) -> np.ndarray:
     import warnings
 
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
+        # only SciPy's notice that n is not a power of 2 (review B5)
+        warnings.filterwarnings(
+            "ignore", message="The balance properties of Sobol", category=UserWarning
+        )
         return np.asarray(sobol.random(n))
 
 
@@ -150,10 +153,15 @@ def critical_radius(n: int, box: Box, sigma: float = MLSL_SIGMA) -> float:
 def _slsqp(fun: _Counted, x: np.ndarray, box: Box) -> tuple[np.ndarray, float]:
     import warnings
 
-    from scipy.optimize import minimize as scipy_minimize  # type: ignore[import-untyped]
+    from scipy.optimize import OptimizeWarning  # type: ignore[import-untyped]
+    from scipy.optimize import minimize as scipy_minimize
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
+    with warnings.catch_warnings(), qn_phase.quiet_differences():
+        # SciPy's own notices only: the objective's warnings get through (review B5)
+        warnings.filterwarnings("ignore", category=OptimizeWarning)
+        warnings.filterwarnings(
+            "ignore", message="Values in x were outside bounds", category=RuntimeWarning
+        )
         res = scipy_minimize(
             fun,
             np.clip(np.asarray(x, dtype=float), box.lower, box.upper),

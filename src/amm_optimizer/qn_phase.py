@@ -593,13 +593,15 @@ def run_slsqp_restarts(
         if reader is not None:
             reader.start_descent(len(ends))
         try:
-            res = minimize(
-                fun,
-                start,
-                method="SLSQP",
-                bounds=bounds,
-                options={"maxiter": evaluations, "ftol": FTOL} | _eps_option(fd_step),
-            )
+            with quiet_differences():
+                res = minimize(
+                    fun,
+                    start,
+                    method="SLSQP",
+                    bounds=bounds,
+                    options={"maxiter": evaluations, "ftol": FTOL}
+                    | _eps_option(fd_step),
+                )
         except _SpentError:
             break
         except _FloorError:  # ``floor_bfgs``: the first descent sits on its floor
@@ -1219,13 +1221,15 @@ def run_sampled_restarts(
 
         aborted = False
         try:
-            minimize(
-                fun,
-                start,
-                method="SLSQP",
-                bounds=bounds,
-                options={"maxiter": evaluations, "ftol": FTOL} | _eps_option(fd_step),
-            )
+            with quiet_differences():
+                minimize(
+                    fun,
+                    start,
+                    method="SLSQP",
+                    bounds=bounds,
+                    options={"maxiter": evaluations, "ftol": FTOL}
+                    | _eps_option(fd_step),
+                )
         except _AbortDescentError:
             aborted = True
         except _SpentError:
@@ -1287,7 +1291,7 @@ def _central_polish(
             grad[i] = (fun(up) - fun(down)) / (up[i] - down[i])
         return grad
 
-    with contextlib.suppress(_PolishDoneError):
+    with contextlib.suppress(_PolishDoneError), quiet_differences():
         minimize(
             fun,
             x,
@@ -1296,6 +1300,14 @@ def _central_polish(
             bounds=list(zip(box.lower, box.upper, strict=True)),
             options={"maxiter": cap, "ftol": FTOL},
         )
+
+
+def quiet_differences() -> np.errstate:
+    """``np.errstate`` for SciPy's quasi-Newton methods: their finite differences
+    over the 1e300 that stands for a failed evaluation overflow, and the warning
+    tells the caller nothing (review B5). Only warnings change, never a value; the
+    objective's own overflow and divide warnings are silenced inside it too."""
+    return np.errstate(over="ignore", divide="ignore")
 
 
 def failure_majority(statuses: list[int]) -> bool:
@@ -1347,20 +1359,21 @@ def run_lbfgsb_restarts(
 
     while used < evaluations - dim - 1:
         try:
-            minimize(
-                fun,
-                start,
-                method="L-BFGS-B",
-                bounds=bounds,
-                options={
-                    "maxcor": LBFGSB_MAXCOR,
-                    "ftol": 0.0,
-                    "gtol": 0.0,
-                    "eps": fd_step * X_UNIT,
-                    "maxfun": evaluations,
-                    "maxiter": evaluations,
-                },
-            )
+            with quiet_differences():
+                minimize(
+                    fun,
+                    start,
+                    method="L-BFGS-B",
+                    bounds=bounds,
+                    options={
+                        "maxcor": LBFGSB_MAXCOR,
+                        "ftol": 0.0,
+                        "gtol": 0.0,
+                        "eps": fd_step * X_UNIT,
+                        "maxfun": evaluations,
+                        "maxiter": evaluations,
+                    },
+                )
         except _SpentError:
             break
         start = box.lower + (box.upper - box.lower) * rng.rand(dim)

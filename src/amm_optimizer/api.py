@@ -85,13 +85,15 @@ def minimize(
     the original code, which used NumPy's global state).
 
     ``profile=True`` times the named blocks of the algorithm and returns them as
-    ``result.timings``; pass a :class:`~atm.profiling.TimingProfiler` to
+    ``result.timings``; pass a :class:`~amm_optimizer.profiling.TimingProfiler` to
     accumulate over several runs. Profiling does not change the result.
 
     ``bounds=(lower, upper)`` (scalars or one value per coordinate) tells the
     optimizer the search box. It is not enforced and changes nothing by itself;
     only variants that use the box (``initial_design``, ``bounds``) read it, and
-    they raise ``ValueError`` without it.
+    they raise ``ValueError`` without it. This engine does not check ``x0`` against
+    the box; :func:`amm_optimizer.minimize` clips an ``x0`` outside it onto the box,
+    with a ``UserWarning``.
 
     ``config`` defaults to the original algorithm; ``presets.get("c26")`` (and
     the other names of ``presets.names()``) are the research composites. The
@@ -204,9 +206,10 @@ def _minimize(
     if config.variant.cma_warm_start or config.variant.cma_placement == "mlsl":
 
         def evaluated(x: np.ndarray) -> float:
+            kept = np.array(x, dtype=float)  # before ``fun``, which may write into x
             value = fun(x)
             if recording[0]:
-                recorded_x.append(np.array(x, dtype=float))
+                recorded_x.append(kept)
                 recorded_f.append(float(value))
             return value
 
@@ -734,8 +737,8 @@ def _prefix_ridge_kw(variant: Variant, dim: int, budget: int) -> dict[str, Any]:
 
 
 def _parked2_kw(variant: Variant, dim: int, budget: int) -> dict[str, Any]:
-    """``run_es_phase``'s research options of the parked2 toy, passed only when on so
-    every other call stays exactly as recorded (``docs/research/toys/parked2.md``)."""
+    """``run_es_phase``'s research options (off in every preset), passed only when on so
+    every other call stays exactly as recorded."""
     on: dict[str, Any] = {}
     if variant.prefix_nan_clip:
         on["nan_clip"] = True

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import operator
+import warnings
 from collections.abc import Callable
 from typing import Any
 
@@ -117,6 +118,9 @@ def _resolve(
         start = np.asarray(x0, dtype=float)
         if start.ndim != 1 or start.size == 0:
             raise ValueError(f"x0 must be a 1-d array, got shape {start.shape}")
+        if not np.all(np.isfinite(start)):
+            # checked before any evaluation is spent (review B6, decision D2 a)
+            raise ValueError(f"x0 must be finite, got {start}")
         if box is not None:
             for side in box:
                 if side.ndim == 1 and side.size != start.size:
@@ -124,8 +128,21 @@ def _resolve(
                         f"bounds describe {side.size} coordinates but x0 has "
                         f"{start.size}"
                     )
+            lower, upper = box
+            if np.any(start < lower) or np.any(start > upper):
+                # one policy on every box (review B2): ``fun`` only sees points in it
+                warnings.warn(
+                    "x0 is outside bounds; clipped to the box",
+                    UserWarning,
+                    stacklevel=3,
+                )
+                start = np.clip(start, lower, upper)
     if budget is None:
         count = max(DEFAULT_BUDGET_MIN, DEFAULT_BUDGET_PER_DIM * start.size)
+    elif isinstance(budget, bool | np.bool_):
+        raise TypeError(
+            f"budget must be a whole number of evaluations, got the bool {budget!r}"
+        )
     else:
         try:
             count = operator.index(budget)  # type: ignore[arg-type]
@@ -137,6 +154,33 @@ def _resolve(
                     f"budget must be a whole number of evaluations, got {budget!r}"
                 ) from None
     return start, count, box
+
+
+def _check_options(seed: object, rng: object, config: object) -> None:
+    """Plain errors for a ``seed``, ``rng`` or ``config`` of the wrong kind, raised
+    before the run starts (review B6)."""
+    if config is not None and not isinstance(config, ATMConfig):
+        hint = f"presets.get({config!r})" if isinstance(config, str) else "presets.get"
+        raise TypeError(
+            f"config must be an ATMConfig, got {type(config).__name__}; for a named "
+            f"configuration use {hint}"
+        )
+    if rng is not None and not isinstance(rng, np.random.RandomState):
+        raise TypeError(
+            f"rng must be a numpy.random.RandomState, got {type(rng).__name__}; to "
+            "seed the run pass seed=<int> instead"
+        )
+    if seed is None:
+        return
+    allowed = "seed must be an integer in [0, 2**32)"
+    if isinstance(seed, bool | np.bool_):
+        raise TypeError(f"{allowed}, got the bool {seed!r}")
+    try:
+        value = operator.index(seed)  # type: ignore[arg-type]
+    except TypeError:
+        raise TypeError(f"{allowed}, got {type(seed).__name__} {seed!r}") from None
+    if not 0 <= value < 2**32:
+        raise ValueError(f"{allowed}, got {value}")
 
 
 def minimize(
@@ -171,9 +215,12 @@ def minimize(
         The objective, ``fun(x) -> float`` for an array ``x`` of shape ``(D,)``. It
         must be deterministic: the probes compare function values, so noise
         misleads them. Non-finite values count as failed evaluations and never win;
-        a non-finite value at the starting point raises ``ValueError``.
+        a non-finite value at the starting point raises ``ValueError``. ``fun`` gets
+        its own copy of ``x`` and must return a real scalar (``float``, a NumPy
+        float, ``int``); anything else raises ``TypeError``.
     x0 : array_like, optional
-        The starting point, shape ``(D,)``. Default: the centre of the box.
+        The starting point, shape ``(D,)``. Default: the centre of the box. An ``x0``
+        outside ``bounds`` is clipped onto the box, with a ``UserWarning``.
     budget : int, optional
         The maximum number of calls of ``fun``. All of them are used; the best point
         evaluated is returned even if the budget ends mid-iteration. A whole float
@@ -189,8 +236,9 @@ def minimize(
         only sees points inside it. With ``x0`` omitted, give one ``(low, high)``
         pair per coordinate so the number of variables is known.
     seed : int, optional
-        Seed for a reproducible run. A run is deterministic given the seed, the
-        platform and the BLAS thread count. Default: a fresh seed.
+        Seed for a reproducible run, an integer in ``[0, 2**32)``. A run is
+        deterministic given the seed, the platform and the BLAS thread count.
+        Default: a fresh seed.
     anytime : bool, optional
         ``True`` turns on the anytime (replay) mode, for runs whose budget is not
         known in advance or that you will cut short (for example by raising an
@@ -223,13 +271,26 @@ def minimize(
     ValueError
         If ``config`` is not given and ``bounds`` is missing, if neither ``x0`` nor
         per-coordinate ``bounds`` say how many variables there are, if ``x0`` and
-        ``bounds`` disagree on that number, if ``budget`` is not a whole number or is
-        below 1, or if ``fun`` is not finite at the starting point.
+        ``bounds`` disagree on that number, if ``x0`` is not finite, if ``budget`` is
+        not a whole number or is below 1, if ``seed`` is outside ``[0, 2**32)``, or
+        if ``fun`` is not finite at the starting point. All but the last are raised
+        before ``fun`` is called.
     TypeError
-        If ``fun`` is not callable.
+        If ``fun`` is not callable, if ``config`` is not an ``ATMConfig`` (use
+        ``presets.get(name)`` for a named one), if ``rng`` is not a
+        ``numpy.random.RandomState``, if ``seed`` is not an integer, if ``budget`` is
+        a ``bool``, or if ``fun`` returns something other than a real scalar.
 
     Notes
     -----
+    Thread safety: runs in separate threads are safe with the shipped presets
+    (``presets.names()``, ``ATMConfig()``, ``ATMConfig.composite()``). Every run
+    sets the module-global step unit ``qn_phase.X_UNIT``, which only research
+    variants with ``box_steps=True`` make anything but 1.0; do not run those in
+    threads. Warnings that ``fun`` raises reach the caller, except inside SciPy's
+    quasi-Newton calls, where floating-point overflow and divide-by-zero warnings
+    are silenced.
+
     Version 0.5.0 made ``x0`` and ``budget`` optional and added the SciPy forms of
     ``bounds`` and ``anytime``; every call that worked before runs unchanged.
     Version 0.4.0 changed the default configuration: earlier releases ran the
@@ -254,6 +315,7 @@ def minimize(
     """
     if not callable(fun):
         raise TypeError(f"fun must be callable, got {type(fun).__name__}")
+    _check_options(seed, rng, config)
     start, count, box = _resolve(x0, budget, bounds)
     if config is None:
         if box is None:
