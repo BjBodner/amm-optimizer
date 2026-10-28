@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping
 from time import perf_counter_ns
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 import numpy as np
 
 from .profiling import NULL_PROFILER, Profiler
+from .result import OptimizeResult
 
 
 def real_scalar(value: Any) -> float:
@@ -47,6 +49,87 @@ def copying(fun: Callable[[np.ndarray], float]) -> Callable[[np.ndarray], float]
         return real_scalar(fun(np.array(x, dtype=float)))
 
     return call
+
+
+class _Stop(Exception):  # noqa: N818  (a signal, not an error)
+    """Ends a run early (``ftarget`` reached, or the callback raised ``StopIteration``).
+
+    Raised from inside ``fun`` by :class:`Watch` and caught by
+    :func:`amm_optimizer.api.minimize`. Like the phases' own ``_SpentError``, no
+    phase catches it, so it unwinds every phase and SciPy call at once.
+    ``nrestarts`` is filled in on the way out by the run that knows it.
+    """
+
+    def __init__(self, status: int, watch: Watch) -> None:
+        super().__init__(status)
+        self.status = status
+        self.watch = watch  # the run it stops
+        self.nrestarts = 0
+
+
+class Watch:
+    """The user's ``fun`` as a run calls it: counts the calls and the improvements.
+
+    With ``keep`` (or a ``callback`` or an ``ftarget``) it also keeps a copy of the
+    best point. Each evaluation that improves the best finite value calls
+    ``callback`` with an :class:`~amm_optimizer.OptimizeResult` holding ``x``,
+    ``fun``, ``nfev`` and ``nit``; ``StopIteration`` from it, or a best value at or
+    below ``ftarget``, raises :class:`_Stop`. It never draws random numbers, so the
+    run's evaluations are the same with or without it.
+    """
+
+    def __init__(
+        self,
+        fun: Callable[[np.ndarray], Any],
+        callback: Callable[[Any], object] | None = None,
+        ftarget: float | None = None,
+        keep: bool = False,
+    ) -> None:
+        self._fun = fun
+        self._callback = callback
+        self._ftarget = ftarget
+        self._keep = keep or callback is not None or ftarget is not None
+        self.calls = 0
+        self.improvements = 0
+        self.best_f = float("inf")
+        self.best_x: np.ndarray | None = None
+
+    def __call__(self, x: np.ndarray) -> float:
+        if not self._keep:
+            value = real_scalar(self._fun(x))
+            self.calls += 1
+            if value < self.best_f and value > -math.inf:  # NaN compares False
+                self.best_f = value
+                self.improvements += 1
+            return value
+        kept = np.array(x, dtype=float)  # before ``fun``, which may write into x
+        value = real_scalar(self._fun(x))
+        self.calls += 1
+        if value < self.best_f and value > -math.inf:
+            self.best_f, self.best_x = value, kept
+            self.improvements += 1
+            self._improved()
+        return value
+
+    def _improved(self) -> None:
+        status = None
+        if self._callback is not None:
+            assert self.best_x is not None
+            try:
+                self._callback(
+                    OptimizeResult(
+                        x=self.best_x.copy(),
+                        fun=self.best_f,
+                        nfev=self.calls,
+                        nit=self.improvements,
+                    )
+                )
+            except StopIteration:
+                status = 2
+        if self._ftarget is not None and self.best_f <= self._ftarget:
+            status = 1
+        if status is not None:
+            raise _Stop(status, self)
 
 
 class CountedObjective:
@@ -248,3 +331,23 @@ class CountedObjective:
             if count:
                 self._profiler.record("objective", spent, count)
         return cost, True
+
+
+class restarts_on_stop:  # noqa: N801  (used as a context manager, like a function)
+    """On a :class:`_Stop` leaving the block, record ``count()`` as its ``nrestarts``.
+
+    ``count`` reads the run's restart counter when the stop passes, so the result
+    of a stopped run reports the restarts made up to then.
+    """
+
+    def __init__(self, count: Callable[[], int]) -> None:
+        self._count = count
+
+    def __enter__(self) -> None:
+        return None
+
+    def __exit__(
+        self, kind: object, error: BaseException | None, trace: object
+    ) -> None:
+        if isinstance(error, _Stop):
+            error.nrestarts = self._count()

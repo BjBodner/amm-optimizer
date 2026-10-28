@@ -9,7 +9,15 @@ Public API is deprecated, with a warning, for at least one minor release before 
 
 ## [Unreleased]
 
-Bug fixes. Every run that starts inside the box and gets well-behaved inputs is bit for bit as in 0.5.0 (`c46`'s config hash is still `2153948ebed51150`).
+Bug fixes and a SciPy-compatible API. Every run that starts inside the box and gets well-behaved inputs is bit for bit as in 0.5.0 (`c46`'s config hash is still `2153948ebed51150`).
+
+### Added
+
+- **Early stopping.** `minimize(..., callback=, ftarget=)`: `callback(intermediate_result)` is called after every evaluation that improves the best value, with an `OptimizeResult` holding `x`, `fun`, `nfev` and `nit`; raising `StopIteration` from it ends the run. `ftarget` ends the run once the best value is at or below it. Either way the best point so far is returned, with `status` 2 or 1, and no evaluation follows the stop. `catch_interrupt=True` (opt-in) turns Ctrl-C into a result too (`status` 3, `success=False`, a `RuntimeWarning`). Without these arguments every run is bit for bit as before: the callback path draws no random numbers and changes no evaluation.
+- **`rng` accepts a `numpy.random.Generator`** (the run's seed is one draw, `rng.integers(2**32)`), and **`seed` accepts a `numpy.random.SeedSequence`**. A run without a seed draws one from the operating system and records it, so **`result.seed`** repeats any run (`seed=result.seed`); it is `None` only when a `RandomState` was continued.
+- **Preset names in `config=`**: `config="default"` (AMM, the default preset, frozen as `c46`), `"c46"`, `"atm"` (`ATMConfig()`), `"composite"` (`ATMConfig.composite()`) or a research preset; `presets.get` takes the same names. Anything else that is not an `ATMConfig` is a `TypeError`.
+- `examples/` with three short scripts: `quickstart.py`, `scipy_migration.py` and `early_stopping.py`.
+- `docs/HISTORY.md`: how the research composites `c23` to `c46` came about (from the `presets` module docstring, which is now a short list).
 
 ### Added
 
@@ -25,12 +33,16 @@ Bug fixes. Every run that starts inside the box and gets well-behaved inputs is 
 
 ### Changed
 
+- **The result is a `scipy.optimize.OptimizeResult`** (`amm_optimizer.OptimizeResult` subclasses it): `r.x` works as before, and `r["x"]`, `r.keys()` and `dict(r)` work as in SciPy. New fields: `nit` (the number of evaluations that improved the best value, the times `callback` is called), `success`, `status` (0 budget used or plan finished, 1 `ftarget` reached, 2 stopped by the callback, 3 interrupted), `message` and `seed`. It is no longer a dataclass, so code that called `dataclasses.replace` or `dataclasses.asdict` on a result needs `dict(r)` or item assignment instead.
+- **A non-finite value at the starting point is a failed evaluation**, like a non-finite value anywhere else: the run carries on, and any finite value beats it. It used to raise `ValueError`, so only runs that failed before behave differently; an objective undefined at the centre of the box now works. A run in which every value fails returns `fun=inf` at the starting point.
+- **`presets.names()` lists the presets on display**, `("default", "c46", "atm", "composite")`; `presets.names(research=True)` adds the research composites `c23` to `c45`, which all stay loadable with `presets.get`.
+- `minimize`'s docstring documents the new arguments and recommends `callback` or `ftarget`, not an exception raised inside `fun`, for cutting an anytime run short.
 - **An `x0` outside `bounds` is clipped onto the box, with a `UserWarning`**, on every box. On the bbob box `[-5, 5]` it used to be evaluated as given; on any other box it was already clipped, silently, so those runs are unchanged. `amm_optimizer.api.minimize`, the engine, does not check `x0`.
 
 ### Fixed
 
 - **`fun` gets its own copy of every point**, as in SciPy. It used to receive writeable views of the optimizer's buffers, so an objective that wrote into `x` changed the search, and one that kept `x` saw it change.
-- **Bad inputs fail before any evaluation, with plain errors**: a non-finite `x0` (`ValueError`); a `config` that is not an `ATMConfig` (`TypeError` naming `presets.get`); an `rng` that is not a `RandomState` (`TypeError` naming `seed=`); a `seed` that is not an integer (`TypeError`) or is outside `[0, 2**32)` (`ValueError`); a `bool` `budget` (`TypeError`, it was taken as 1). A `fun` that returns an array, a list, a complex number or `None` gets a `TypeError` that says what it returned. A non-finite value at the starting point still raises `ValueError`.
+- **Bad inputs fail before any evaluation, with plain errors**: a non-finite `x0` (`ValueError`); a `config` that is neither an `ATMConfig` nor a preset name (`TypeError`), or names no preset (`ValueError`); an `rng` that is not a NumPy `Generator` or `RandomState` (`TypeError` naming `seed=`); a `seed` that is not an integer or a `SeedSequence` (`TypeError`) or is outside `[0, 2**32)` (`ValueError`); a `bool` `budget` (`TypeError`, it was taken as 1). A `fun` that returns an array, a list, a complex number or `None` gets a `TypeError` that says what it returned.
 - **The value at the starting point is a `float`** like every other value; a `fun` returning `Fraction` no longer crashes.
 - **Warnings raised by `fun` reach the caller** on the COBYQA and basin routes, which used to ignore every warning. SciPy's own overflow warnings from finite differences over a failed evaluation are no longer shown.
 - **The diagnostic logs stay bounded.** `anytime.LAST_STAGES` (alias `STAGE_LOG`) holds the stages of the most recent anytime run only; `cma_phase.PROBE_LOG` records only while `cma_phase.RECORD_PROBES` is true.

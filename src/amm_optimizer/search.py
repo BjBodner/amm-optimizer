@@ -23,18 +23,55 @@ from .state import SamplerState, SearchState
 
 @dataclass
 class SearchOutcome:
+    """What one :meth:`Search.run` ended with.
+
+    Attributes
+    ----------
+    x : numpy.ndarray
+        The best point of the search.
+    cost : float
+        Its value (``inf`` when every evaluation failed).
+    restarted : bool
+        Whether the restart policy ended the search.
+    out_of_budget : bool
+        Whether the budget ended it.
+    widths : tuple of float
+        The samplers' final widths (success-rate control only; else empty).
+    width : float
+        The geometric mean of the samplers' final widths (``nan`` for the
+        original sampler, whose widths are a schedule).
+    """
+
     x: np.ndarray
     cost: float
     restarted: bool
     out_of_budget: bool
-    # The samplers' final widths (success-rate control only; else empty).
     widths: tuple[float, ...] = ()
-    # Geometric mean of the samplers' final widths (``nan`` for the original
-    # sampler, whose widths are a schedule).
     width: float = float("nan")
 
 
 class Search:
+    """The ATM sampler: one search, from a start point, until a restart or the budget.
+
+    Four samplers draw candidates around the incumbent; their hyperparameters are
+    updated between sections of iterations (:class:`~.meta.HyperparameterSearch`).
+
+    Parameters
+    ----------
+    objective : CountedObjective
+        The objective, with the budget bookkeeping.
+    rng : numpy.random.RandomState
+        The run's random stream (shared with the other phases).
+    config : ATMConfig
+        The configuration.
+    total_iterations : int or None
+        The iteration limit, or ``None`` to run until the budget or a restart.
+    profiler : Profiler, optional
+        Where the named blocks are timed.
+    box : Box, optional
+        The search box, for the variants that read it.
+    """
+
     def __init__(
         self,
         objective: CountedObjective,
@@ -59,11 +96,29 @@ class Search:
         width_scale: float | None = None,
         initial_design: bool = True,
     ) -> SearchOutcome:
-        """Search from ``x_start``; ``known_cost`` skips re-evaluating it.
+        """Search from ``x_start`` until a restart or the end of the budget.
 
-        ``width_scale`` multiplies the starting widths of the success-rate
-        controller (a step size learned before this search). ``initial_design``
-        False skips the variant's uniform first pool (something already explored).
+        Parameters
+        ----------
+        x_start : numpy.ndarray
+            The start point.
+        allocation : numpy.ndarray
+            The samples per iteration of each of the four samplers.
+        known_cost : float, optional
+            The value at ``x_start``, if known (it is then not evaluated again).
+            A non-finite value, given or evaluated, counts as a failed
+            evaluation: the search goes on from ``x_start`` with cost ``inf``.
+        width_scale : float, optional
+            Multiplies the starting widths of the success-rate controller (a step
+            size learned before this search).
+        initial_design : bool, optional
+            ``False`` skips the variant's uniform first pool (something already
+            explored).
+
+        Returns
+        -------
+        SearchOutcome
+            The best point, its value and why the search ended.
         """
         self._section.initial_design = initial_design
         rng = self._rng
@@ -90,10 +145,9 @@ class Search:
             if start_cost is None:
                 start_cost = self._objective.evaluate_start(x_start)
             if not np.isfinite(start_cost):
-                raise ValueError(
-                    "the objective must be finite at the starting point, "
-                    f"got {start_cost}"
-                )
+                # a failed evaluation, as anywhere else (decision D2 b): the
+                # search goes on, and any finite value beats the start
+                start_cost = float("inf")
             variant = self._config.variant
             learn_covariance = (
                 variant.covariance != "none" and n_params <= variant.cov_max_dim
