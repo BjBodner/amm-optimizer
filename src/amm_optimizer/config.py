@@ -294,7 +294,7 @@ class Variant:
     small_engine_max_dim: int = 2
     small_engine_max_per_dim: float = 10.0
     small_engine_radius: float = 0.25
-    # The f13 toy (``docs/research/toys/f13_cells.md``): what follows the local
+    # From a study of bbob f13 (sharp ridge): what follows the local
     # phase's capped rugged try (``QnRoute.rugged_try_per_dim``, D 5-9). ``"none"``:
     # the finisher's populations; ``"cut"``: a try still descending at its cap goes
     # on, the same scaled-FD BFGS descent, to the end of the budget; ``"cutkink"``:
@@ -324,7 +324,7 @@ class Variant:
     # (``"slsqpdes"``) below ``des_max_per_dim`` x dim (and ``QN_MIN_BUDGET``); the
     # default 30 is ``q7ed``'s 10 x D envelope.
     des_max_per_dim: float = 30.0
-    # Research (``small_switch``, the small10 toy, ``docs/research/toys/small10.md``):
+    # Research (``small_switch``, from a study of budgets up to 10 x D):
     # at budgets up to ``small_switch_max_per_dim`` x dim and dim up to
     # ``small_switch_max_dim``, the prefix's first SLSQP descent is read at two
     # checkpoints (the first probe after its first / second line search) and hands
@@ -343,14 +343,14 @@ class Variant:
     small_switch_keep_unit: bool = False
     small_switch_radius: float = 0.25
     small_switch_rest: bool = True
-    # Cycle 64 (the SLSQP-cells toy, ``docs/research/toys/slsqp_cells.md``):
+    # Cycle 64 (from a study of the cells where SLSQP leads):
     # ``prefix_nan_reading`` says where an undefined curvature reading of the
     # ``slsqplq`` / ``slsqplqc`` prefix goes (NaN beta: fewer than two positive
     # mirrored losses, mostly probe pairs clipped at a box face): ``"rugged"`` (c43),
     # ``"smooth"``, or ``"plateau"`` (smooth unless one ``plateau_check`` then reads
     # a plateau, f7). On ids 1-3, 14 of f13's 24 readings at D 40, 100 x D were NaN.
     prefix_nan_reading: str = "rugged"
-    # Research (the 132-ideas stream, ``docs/research/toys/ideas132.md``; 0 / False:
+    # Research (from a screen of 132 ideas; 0 / False:
     # off, the composites unchanged):
     # * ``sampled_polish_per_dim`` (idea #33): in the multi-basin route's sampled
     #   restarts (``qn20``), a descent that ends normally below every earlier end is
@@ -370,7 +370,7 @@ class Variant:
     sampled_polish_per_dim: float = 0.0
     qn_false_success: bool = False
     qn_floor: str = "none"
-    # Research (the novel-ideas toy, ``docs/research/toys/novel_ideas.md``):
+    # Research (from a screen of new ideas):
     # ``probe_faces`` says how ``qn_phase.curvature_beta`` treats a probe centre near a
     # box face. ``"clip"`` (c44): probe points are clipped onto the box, so a pair is
     # no longer mirrored. ``"tangent"``: each random direction is first made feasible
@@ -392,7 +392,7 @@ class Variant:
     # ``box_normalize`` (the novel-ideas toy): ``minimize`` maps any box onto bbob's
     # [-5, 5]^D coordinate by coordinate and runs there (bbob's box: unchanged).
     box_normalize: bool = False
-    # Research (the parked2 toy, ``docs/research/toys/parked2.md``; all opt-in):
+    # Research (from a second screen of parked ideas; all opt-in):
     # ``prefix_nan_min_per_dim``: ``prefix_nan_reading`` applies only from that budget
     # per dim (100: where the prefix's rugged kind is lq2 populations, not the (1+1)).
     # ``prefix_nan_clip``: an undefined reading goes that way only when clipping at the
@@ -421,7 +421,7 @@ class Variant:
     # budgets up to that many x dim (Batch 89: at 1000 x D the extended restart took
     # the finisher's evaluations on f9 / f14 / f17 / f18 runs at D 10).
     stage_extend_max_per_dim: float = 0.0
-    # Research (gaps3 toy, ``docs/research/toys/gaps3.md``): ``sep_route_low`` also
+    # Research (from a study of the cells AMM trailed): ``sep_route_low`` also
     # takes the pair test below ``additive_min_dim``, at dim >= ``sep_route_low_dim``
     # from ``sep_route_min_per_dim`` x dim: ``"route"`` sends a separable reading to
     # ``sep_route``'s restarted STEP (HCMA's STEP leads f3 at D 2); ``"strict"`` only
@@ -440,7 +440,7 @@ class Variant:
     # ``rugged_direct_min_beta`` (0: none): only readings at or above it (rough
     # readings near 0, f19 / f23 / f24, keep the (1+1) first, which gained there).
     rugged_direct_min_beta: float = 0.0
-    # Research (gaps4 toy, ``docs/research/toys/gaps4.md``): ``centre_point`` spends
+    # Research (from a study of the cells AMM trailed): ``centre_point`` spends
     # the run's first evaluation on the centre of the box (a design-of-experiments
     # centre point; COCO's ``initial_solution``). ``"record"``: the rest of the run is
     # unchanged (one evaluation fewer) and the centre only counts as a candidate for
@@ -1138,8 +1138,8 @@ class ATMConfig:
         pool, bounds folded into the box with a 25 % corner clip, a pool sized
         from the budget (at least 12) and no re-evaluation of the incumbent. It
         stays within ATM's own sampler. Gains over the defaults on untouched
-        bbob instances: +.101 (``docs/HOLDOUT.md``), +.097 and +.099
-        (``docs/HOLDOUT_TIER4.md``, ``docs/HOLDOUT_TIER5.md``); the gain shrinks
+        bbob instances: +.101, +.097 and +.099 on three held-out sets of COCO
+        instances; the gain shrinks
         with dimension (+.033 to +.038 at D = 40).
 
         It uses the search box, so call ``minimize(..., bounds=(lower, upper))``.

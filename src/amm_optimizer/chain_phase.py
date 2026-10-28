@@ -13,7 +13,7 @@ nonlinear one (Rosenbrock f8). ``run_coord_hess`` runs global line searches alon
 the columns of M^-1, from a finite-difference Hessian. Each such direction moves one
 decoupled coordinate.
 
-Calibration-id toy (docs/research/toys/f20_engines.md; ids 1-3, cold start):
+A calibration study on bbob instances 1-3 (cold start):
 * ``run_coord_hess`` solved f20 in 120 of 120 runs at 3000 x D, D 5-40, a median of
   168-289 x D, +.78 over ``c36`` at 300-3000 x D.
 * The pair test read f1-f5 separable 300 of 300 times, f20 a chain 60 of 60 times,
@@ -403,8 +403,7 @@ def _progressed(f_new: float, f_old: float) -> bool:
 
 
 class _CoordHess:
-    """The toy's ``coord_hess`` (docs/research/toys/f20_engines.md), one run per
-    ``solve``.
+    """The calibration study's ``coord_hess`` search, one run per ``solve``.
 
     1. Warm-up: at least ``warm`` cheap sweeps along the axes (``warm_grid`` points,
        ``warm_refine`` evaluations), towards a coordinate-wise minimum, where the

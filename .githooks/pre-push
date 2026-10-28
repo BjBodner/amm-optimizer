@@ -3,7 +3,7 @@
 #   enable : git config core.hooksPath .githooks
 #   disable: git config --unset core.hooksPath
 #   skip once: git push --no-verify
-# Runs the research tier (a few minutes); run `python tools/ci.py --tier merge` before
+# Runs the default tier (a few minutes); run `python tools/ci.py --tier merge` before
 # merging to main and `--tier full` before a release.
 cd "$(git rev-parse --show-toplevel)" || exit 1
 for py in .venv/Scripts/python.exe .venv/bin/python python; do

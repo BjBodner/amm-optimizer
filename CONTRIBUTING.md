@@ -2,13 +2,14 @@
 
 Thanks for looking. Bug reports, failing examples and documentation fixes are the most
 useful contributions; for a change to the algorithm itself please open an issue first
-(see "The algorithm is frozen" below).
+(see "The algorithm is frozen" below). Everyone taking part follows the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Set up
 
 ```bash
-git clone <repository-url>
-cd <repository>
+git clone https://github.com/BjBodner/amm-optimizer.git
+cd amm-optimizer
 uv venv
 uv pip install -e ".[dev]" coco-experiment pytest-xdist
 ```
@@ -27,17 +28,32 @@ export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1   # PowerShell
 ## Checks
 
 ```bash
-python tools/ci.py                # lint, format, types, research-tier tests
+python tools/ci.py                # lint, format, types, default-tier tests
 python tools/ci.py --tier merge   # also the harness tests and the recent presets
 python tools/ci.py --tier full    # everything incl. the 400-case parity sweep; before a release
 ruff check . && ruff format .
 mypy
-pytest -m "not slow and not merge" -n auto
+pytest -m "not slow and not merge and not research" -n auto
 ```
 
-Tests are tiered by marker: the default research tier is what you run while working, the
-`merge` tier is for pull requests that touch presets, and `slow` is the full tier for
-releases. A test that needs `cocoex` skips itself when it is not installed.
+Tests are tiered by marker: the default tier is what you run while working, the `merge`
+tier is for pull requests that touch presets, and `slow` is the full tier for releases.
+Tests marked `research` pin research-only options or read the research harness's data
+(`benchmarks/arms`, `benchmarks/quick_scan.py`, `tests/characterisation_arms.json`); the
+default tier leaves them out, the merge and full tiers run them, and they skip where that
+data is absent. A test that needs `cocoex` skips itself when it is not installed.
+
+Two optional hooks run checks before a push; neither is enabled by default:
+
+* `pre-commit install --hook-type pre-commit --hook-type pre-push` installs the hooks of
+  `.pre-commit-config.yaml` (whitespace, YAML and TOML checks, ruff on every commit,
+  the quick tests before a push);
+* `git config core.hooksPath .githooks` makes `.githooks/pre-push` run
+  `python tools/ci.py` before every push (`git config --unset core.hooksPath` turns it
+  off; `git push --no-verify` skips it once).
+
+Use one or the other: while `core.hooksPath` is set, git ignores the hooks that
+`pre-commit install` wrote.
 
 ## The algorithm is frozen
 
@@ -52,8 +68,16 @@ no snapshot moved.
 ## Pull requests
 
 * One change per pull request, with a test that fails before and passes after.
-* `ruff`, `mypy` and the research-tier tests are green.
-* Describe what a user would notice; add a line to `CHANGELOG.md` under "Unreleased".
+* `ruff`, `mypy` and the default-tier tests are green.
+* Describe what a user would notice; add a line to `CHANGELOG.md` under `## [Unreleased]`,
+  in its `### Added`, `Changed`, `Deprecated`, `Removed` or `Fixed` group
+  ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/)).
+* Commits: one logical change each, with a subject line in the imperative or as a
+  short label ("Fix ...", "sdist: ..."), at most about 72 characters, and a body that
+  says why. Keep refactors and behaviour changes in separate commits.
+* Branches: `fix/...`, `feat/...`, `chore/...`, `docs/...` or `refactor/...`, from
+  `main`. Pull requests are rebased onto `main` when merged, so keep the history of
+  your branch readable.
 * Do not commit generated data. Result files belong in a release asset or an archive, not in
   git (`pre-commit` rejects files above 500 kB).
 

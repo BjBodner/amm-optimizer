@@ -13,6 +13,9 @@ from amm_optimizer.config import ATMConfig
 from amm_optimizer.objective import CountedObjective
 from preset_cases import wave5_variant
 
+# Pins research-only options: deselected in the default tier (tools/ci.py).
+pytestmark = pytest.mark.research
+
 BOX = (-5.0, 5.0)
 
 

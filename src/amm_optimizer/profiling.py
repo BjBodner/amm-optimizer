@@ -10,7 +10,7 @@ Blocks are placed at iteration granularity (about every 60 objective calls); the
 only per-call timer is the one around the user's objective, and it is only used
 when profiling is on.
 
-Block names (see ``docs/PERF.md`` for the tree)::
+Block names (the tree of timed blocks)::
 
     total
       init                  samplers, hyperparameter start values, first objective call

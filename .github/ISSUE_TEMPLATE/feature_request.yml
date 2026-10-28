@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest an option, an interface change or a documentation improvement
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The default algorithm is frozen (see CONTRIBUTING.md, "The algorithm is frozen"):
+        a change to its results needs a pre-registered evaluation, so please describe
+        the problem first and leave the method open.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: What you are trying to do, and where amm-optimizer gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+      description: The interface or behaviour you have in mind, ideally as a short code example.
+      render: python
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Workarounds, or how SciPy, cma or Nevergrad handle the same need.
+    validations:
+      required: false

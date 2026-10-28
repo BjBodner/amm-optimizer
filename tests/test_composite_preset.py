@@ -10,7 +10,7 @@ import amm_optimizer as atm
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "benchmarks"))
 
-# The exact string the holdout (docs/HOLDOUT.md) was run with.
+# The exact string the first held-out evaluation was run with.
 HOLDOUT_CONFIG = (
     "variant.amplitude_control=success_rate_targeted,"
     "variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,"
@@ -23,6 +23,11 @@ def rastrigin(x):
     return float(10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x)))
 
 
+@pytest.mark.research
+@pytest.mark.skipif(
+    not (Path(__file__).resolve().parents[1] / "benchmarks" / "quick_scan.py").exists(),
+    reason="the research harness (benchmarks/quick_scan.py) is not in this checkout",
+)
 def test_preset_is_exactly_the_configuration_that_was_held_out():
     import quick_scan
 
@@ -71,7 +76,7 @@ def test_preset_runs_inside_the_box_and_spends_exactly_the_budget():
 
 
 def test_preset_beats_the_defaults_on_a_smooth_box_problem():
-    """A sanity check with a fixed seed, not a benchmark (see docs/HOLDOUT.md)."""
+    """A sanity check with a fixed seed, not a benchmark."""
 
     def sphere(x):
         return float(np.sum((np.asarray(x) - 1.0) ** 2))

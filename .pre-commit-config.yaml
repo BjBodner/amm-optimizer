@@ -11,6 +11,7 @@ repos:
         exclude: '\.(json|gz|png|svg|info)$'
       - id: trailing-whitespace
         exclude: '\.(json|gz|png|svg|info|md)$'
+  # Keep this rev equal to the ruff pin of the dev extra in pyproject.toml.
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.17.1
     hooks:
@@ -19,11 +20,11 @@ repos:
       - id: ruff-format
   - repo: local
     hooks:
-      # The research tier is the contributor loop; `python tools/ci.py` runs the same
-      # gate CI runs. The merge and slow tiers are for releases.
-      - id: pytest-research-tier
-        name: pytest (not slow, not merge)
-        entry: python -m pytest -q -m "not slow and not merge" -x
+      # The default tier is the contributor loop; `python tools/ci.py` runs the same
+      # tests plus lint and types. The merge and full tiers are for releases.
+      - id: pytest-default-tier
+        name: pytest (not slow, not merge, not research)
+        entry: python -m pytest -q -m "not slow and not merge and not research" -x
         language: system
         pass_filenames: false
         stages: [pre-push]

@@ -1,4 +1,4 @@
-"""The gaps3 toy's opt-in options (``docs/research/toys/gaps3.md``): ``sep_route_low``
+"""The gaps3 study's opt-in options: ``sep_route_low``
 and ``rugged_direct_beta`` / ``rugged_direct_min_beta``. Each default is c44's."""
 
 import numpy as np
@@ -9,6 +9,9 @@ from amm_optimizer.api import minimize
 from amm_optimizer.bounds import Box
 from amm_optimizer.config import Variant
 from amm_optimizer.objective import CountedObjective
+
+# Pins research-only options: deselected in the default tier (tools/ci.py).
+pytestmark = pytest.mark.research
 
 
 def separable(x):

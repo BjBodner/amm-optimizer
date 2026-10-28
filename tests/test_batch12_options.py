@@ -16,10 +16,17 @@ from amm_optimizer.config import ATMConfig
 from amm_optimizer.objective import CountedObjective
 from amm_optimizer.pop_cma import run_population_cma
 
+# Pins research-only options: deselected in the default tier (tools/ci.py). It reads
+# a recorded arm of the research harness, so it skips where that is absent.
+pytestmark = pytest.mark.research
+ARM = Path(__file__).parents[1] / "benchmarks" / "arms" / "audit_b8.json"
+if not ARM.exists():
+    pytest.skip(
+        f"research data not in this checkout: {ARM.name}", allow_module_level=True
+    )
+
 BOX = (-5.0, 5.0)
-FINAL = json.loads(
-    (Path(__file__).parents[1] / "benchmarks" / "arms" / "audit_b8.json").read_text()
-)["final_candidate"]["config"]
+FINAL = json.loads(ARM.read_text())["final_candidate"]["config"]
 
 
 def final(**changes):

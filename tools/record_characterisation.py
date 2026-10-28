@@ -8,12 +8,13 @@ Usage (from the repo root, ``PYTHONPATH=src``):
     python tools/record_characterisation.py --set named --cases d3 --jobs 4
     python tools/record_characterisation.py --set arms --missing      # new arms only
 
-``named`` writes ``tests/characterisation.json`` (the composites and routes of
+``named`` writes ``tests/characterisation.json`` (the shipped configurations of
 ``tests/characterisation_cases.NAMED`` on its ``GRID``; ``--cases`` records a subset:
 ``fast`` / ``sep`` (``FAST`` / ``SEPARATING``) or ``d3`` (the D 3 cases), merged into
-the stored entries case by case); ``arms`` writes ``tests/characterisation_arms.json``
-(every recorded arm config on ``ARM_PROBES``; ``--missing`` records only the arm
-configs the file lacks, as ``benchmarks/run_arms.py`` does when a batch starts). With
+the stored entries case by case); ``arms`` (research) writes
+``tests/characterisation_arms.json`` (every recorded arm config on ``ARM_PROBES``;
+``--missing`` records only the arm configs the file lacks, as the research harness
+does when a batch starts). With
 ``--only`` the other entries of an existing file are kept; ``--emit PATH`` writes the
 snapshots there instead (the tests use it). These pin this package's behaviour, not
 a correct one: re-record only for a deliberate behaviour change, in its own commit,
@@ -21,7 +22,7 @@ and say why in the message (``docs/DEVIATIONS.md``).
 
 The BLAS libraries run single-threaded, as in ``benchmarks/quick_scan.py``: OpenBLAS
 with several threads splits its reductions differently, which changes the last bits
-of SLSQP's steps (``docs/CODE_REVIEW_2026-10-19.md``, finding 10). The variables are
+of SLSQP's steps (found in the 2026-10-19 code review). The variables are
 set before NumPy and SciPy load, so this script must run in a fresh process.
 
 With ``--jobs N`` every set runs in one process pool (``benchmarks/process_pool.py``),
@@ -57,8 +58,11 @@ Task = tuple[str, str, str, cc.Case]  # (set, key, config text, case)
 
 
 def _work(task: Task) -> tuple[Task, dict[str, Any]]:
-    _, _, text, case = task
-    return task, cc.run(cc.parse(text), case)
+    which, key, text, case = task
+    # A shipped configuration is built by the package itself; only an arm's config
+    # text needs the research harness's parser.
+    config = cc.named_config(key) if which == "named" else cc.parse(text)
+    return task, cc.run(config, case)
 
 
 CASES = {

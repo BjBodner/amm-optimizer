@@ -1,4 +1,4 @@
-"""The 132-ideas stream's research options (``docs/research/toys/ideas132.md``): the
+"""The research options of a screen of 132 ideas: the
 central-difference polish of the sampled restarts (#33), the false-success guard
 (#23) and the floor hand-over (#24 / #32); off by default, so the presets are
 unchanged."""
@@ -11,6 +11,9 @@ from amm_optimizer.api import minimize
 from amm_optimizer.bounds import Box
 from amm_optimizer.config import Variant
 from amm_optimizer.objective import CountedObjective
+
+# Pins research-only options: deselected in the default tier (tools/ci.py).
+pytestmark = pytest.mark.research
 
 BOX5 = Box.make((-5.0, 5.0), 5)
 

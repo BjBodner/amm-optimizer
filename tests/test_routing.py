@@ -12,7 +12,6 @@ from dataclasses import replace
 
 import pytest
 
-import characterisation_cases as cc
 from amm_optimizer import api, presets, qn_phase
 from amm_optimizer.config import Variant
 from amm_optimizer.qn_phase import QN_MIN_BUDGET, QN_MIN_BUDGET_PER_DIM
@@ -111,7 +110,7 @@ def test_prefix_kind_equals_the_legacy_expression(es_kind, nm_stage):
     ],
 )
 def test_the_c27_prefix_routes_by_dimension_and_budget(dim, budget, expected):
-    variant = cc.parse(cc.composite("c27")).variant
+    variant = presets.get("c27").variant  # its recorded composite (test_presets)
     assert api._prefix_kind(variant, dim, budget) == expected
 
 

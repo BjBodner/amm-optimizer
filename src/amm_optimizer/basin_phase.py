@@ -4,8 +4,7 @@ At D 2-3, ``c37`` trails the field on Gallagher's functions (bbob f21, f22) at
 100-1000 x D, where many smooth basins of different depths defeat one descent and the
 populations alike. MLSL (Rinnooy Kan and Timmer 1987) starts SLSQP only from sample
 points that no better point within the critical radius r_N beats, and keeps sampling.
-The D 2 toy (docs/research/toys/d2_multimodal.md, calibration ids 1-3) routed to it
-with two readings:
+A D 2 calibration study (on bbob instances 1-3) routed to it with two readings:
 * the design's rank-quadratic fit (``r2q`` at most ``GATE_R2Q``): many basins;
 * ``local_reading`` at the design's best point (``lcurv`` at most ``GATE_LCURV``, not
   flat): smooth at small scales, unlike the rugged f16, f19 and f23 that read alike on
