@@ -30,7 +30,9 @@ before is fed into it (``Warm``):
 Only the points of the replay part are kept (a few thousand per D), so the memory
 stays small whatever the budget.
 
-The objective must be deterministic: a remembered value stands for a new call.
+The objective must be deterministic: a remembered value stands for a new call. To cut
+a run short, pass ``callback`` (raise ``StopIteration``) or ``ftarget`` to
+``minimize``; the best point so far is returned.
 ``LAST_STAGES`` (one dict per stage) records what each stage of the most recent
 anytime run planned, called and replayed, for the benchmark's diagnostics. Every run
 clears it first, so it never holds more than one run. ``STAGE_LOG`` is the same list
@@ -46,7 +48,7 @@ from typing import Any
 import numpy as np
 
 from .config import ATMConfig
-from .objective import copying
+from .objective import _Stop, copying
 from .profiling import Profiler, resolve_profiler
 from .result import OptimizeResult
 
@@ -172,7 +174,7 @@ def minimize_anytime(
     """:func:`~.api.minimize` for ``config.variant.anytime="replay"``. ``budget``
     caps the calls and is planned only by the hand-over; ``nrestarts`` counts the
     stages after the first (the hand-over included)."""
-    from .api import _minimize, minimize
+    from .api import _minimize
 
     LAST_STAGES.clear()
     if budget < 1:
@@ -199,14 +201,16 @@ def minimize_anytime(
             store.begin_stage()
             LAST_STAGES.append(entry)
             try:
-                minimize(
+                _minimize(
                     store.replaying,
                     x0,
                     plan,
+                    seed=None,
                     rng=np.random.RandomState(stage_seed),
                     config=inner,
                     profile=profiler,
                     bounds=bounds,
+                    warm=None,
                 )
             finally:
                 entry.update(
@@ -246,6 +250,9 @@ def minimize_anytime(
                 )
     except _CapReachedError:
         pass
+    except _Stop as stop:  # ``ftarget`` or the callback: the stages so far
+        stop.nrestarts = max(0, stage - 1)
+        raise
     best_x = x0 if store.best_x is None else store.best_x
     return OptimizeResult(
         x=np.array(best_x),

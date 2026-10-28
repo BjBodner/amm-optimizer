@@ -32,6 +32,8 @@ constants as attributes of that module, so tests can monkeypatch either.
 
 from __future__ import annotations
 
+import operator
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -50,7 +52,7 @@ from .es_phase import (
     run_es,
     run_es_phase,
 )
-from .objective import CountedObjective
+from .objective import CountedObjective, Watch, _Stop, restarts_on_stop
 from .plan import in_box_units, ipop_pool, iteration_limit, resolve_config, with_pool
 from .pop_cma import run_population_restarts
 from .profiling import Profiler, resolve_profiler
@@ -62,7 +64,7 @@ from .qn_phase import (
     QnRoute,
 )
 from .regimes import run_regimes
-from .result import OptimizeResult
+from .result import BUDGET, INTERRUPTED, MESSAGES, OptimizeResult
 from .search import Search
 from .simplex import run_nelder_mead
 
@@ -72,47 +74,120 @@ def minimize(
     x0: np.ndarray,
     budget: int,
     *,
-    seed: int | None = None,
-    rng: np.random.RandomState | None = None,
-    config: ATMConfig | None = None,
+    seed: int | np.random.SeedSequence | None = None,
+    rng: np.random.RandomState | np.random.Generator | None = None,
+    config: ATMConfig | str | None = None,
     profile: bool | Profiler = False,
     bounds: tuple[object, object] | None = None,
+    callback: Callable[[OptimizeResult], object] | None = None,
+    ftarget: float | None = None,
+    catch_interrupt: bool = False,
 ) -> OptimizeResult:
     """Minimise ``fun`` starting from ``x0`` with about ``budget`` evaluations.
 
+    The engine behind :func:`amm_optimizer.minimize`, which documents every
+    argument. It takes ``x0`` and ``budget`` explicitly, reads ``bounds`` only as
+    ``(lower, upper)`` and does not check ``x0`` against the box (the public
+    function clips it onto the box, with a ``UserWarning``).
+
     Pass ``seed`` for a reproducible run, or an existing ``RandomState`` as
     ``rng`` to continue its stream (this is how results are compared against
-    the original code, which used NumPy's global state).
-
-    ``profile=True`` times the named blocks of the algorithm and returns them as
-    ``result.timings``; pass a :class:`~amm_optimizer.profiling.TimingProfiler` to
-    accumulate over several runs. Profiling does not change the result.
+    the original code, which used NumPy's global state); a ``Generator`` as
+    ``rng`` gives the run a seed drawn from it.
 
     ``bounds=(lower, upper)`` (scalars or one value per coordinate) tells the
     optimizer the search box. It is not enforced and changes nothing by itself;
     only variants that use the box (``initial_design``, ``bounds``) read it, and
-    they raise ``ValueError`` without it. This engine does not check ``x0`` against
-    the box; :func:`amm_optimizer.minimize` clips an ``x0`` outside it onto the box,
-    with a ``UserWarning``.
+    they raise ``ValueError`` without it.
 
-    ``config`` defaults to the original algorithm; ``presets.get("c26")`` (and
-    the other names of ``presets.names()``) are the research composites. The
-    module docstring lists the phases a composite runs.
-
-    With ``config.variant.anytime`` set, the run never learns ``budget``, which then
-    only caps the calls (:mod:`.anytime`).
+    ``config`` defaults to the original algorithm (``ATMConfig()``), unlike the
+    public function; a string is a preset name (``presets.get``). The module
+    docstring lists the phases a composite runs. With ``config.variant.anytime``
+    set, the run never learns ``budget``, which then only caps the calls
+    (:mod:`.anytime`).
     """
-    return _minimize(
-        fun,
-        x0,
-        budget,
+    if isinstance(config, str):
+        from . import presets
+
+        config = presets.get(config)
+    seed, rng = _resolve_seed(seed, rng)
+    profiler = resolve_profiler(profile)
+    watch = Watch(fun, callback, ftarget, keep=catch_interrupt)
+    try:
+        result = _minimize(
+            watch,
+            x0,
+            budget,
+            seed=seed,
+            rng=rng,
+            config=config,
+            profile=profiler,
+            bounds=bounds,
+            warm=None,
+        )
+        status = BUDGET
+        if not watch.improvements:  # every value failed: no point beats another
+            result.fun = float("inf")
+    except _Stop as stop:
+        if stop.watch is not watch:  # pragma: no cover  (another run's stop)
+            raise
+        result = _stopped(watch, stop.nrestarts, profiler)
+        status = stop.status
+    except KeyboardInterrupt:
+        if not catch_interrupt or watch.best_x is None:
+            raise
+        warnings.warn(
+            "minimize was interrupted; returning the best point so far",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        result = _stopped(watch, 0, profiler)
+        status = INTERRUPTED
+    result.update(
+        nit=watch.improvements,
+        success=status != INTERRUPTED,
+        status=status,
+        message=MESSAGES[status],
         seed=seed,
-        rng=rng,
-        config=config,
-        profile=profile,
-        bounds=bounds,
-        warm=None,
     )
+    return result
+
+
+def _stopped(watch: Watch, nrestarts: int, profiler: Profiler) -> OptimizeResult:
+    """The result of a run that ended early: the best point ``watch`` saw."""
+    assert watch.best_x is not None  # a stop follows an improvement
+    return OptimizeResult(
+        x=watch.best_x,
+        fun=watch.best_f,
+        nfev=watch.calls,
+        nrestarts=nrestarts,
+        timings=profiler.report(),
+    )
+
+
+def _resolve_seed(
+    seed: int | np.random.SeedSequence | None,
+    rng: np.random.RandomState | np.random.Generator | None,
+) -> tuple[int | None, np.random.RandomState | None]:
+    """``(seed, rng)`` for :func:`_minimize`: an integer seed in ``[0, 2**32)`` for
+    every run that does not continue a ``RandomState``.
+
+    A ``Generator`` gives ``rng.integers(2**32)`` (one draw from it, an independent
+    stream); a ``SeedSequence`` its first 32-bit word of state; ``None`` a fresh
+    seed from the operating system's entropy, so every run can be repeated from
+    ``result.seed``.
+    """
+    if isinstance(rng, np.random.RandomState):
+        return None, rng
+    if isinstance(rng, np.random.Generator):
+        return int(rng.integers(2**32)), None
+    if isinstance(seed, np.random.SeedSequence):
+        return int(seed.generate_state(1, dtype=np.uint32)[0]), None
+    if seed is None:
+        entropy = np.random.SeedSequence().entropy
+        assert isinstance(entropy, int)
+        return entropy % 2**32, None
+    return operator.index(seed), None
 
 
 def _minimize(
@@ -237,7 +312,11 @@ def _minimize(
     width_scale: float | None = None
     explored = False
     out_of_budget = False
-    with np.errstate(invalid="ignore"), profiler.block("total"):
+    with (
+        np.errstate(invalid="ignore"),
+        profiler.block("total"),
+        restarts_on_stop(lambda: nrestarts),
+    ):
         variant = config.variant
         dim = len(x0)
         use_model = (

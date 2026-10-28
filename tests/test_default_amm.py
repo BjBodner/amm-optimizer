@@ -92,7 +92,7 @@ def test_the_engine_default_is_still_the_original_sampler():
 
 @pytest.mark.parametrize("name", ["composite", "c26"])
 def test_an_explicit_config_passes_through_unchanged(name):
-    assert name in presets.names() or name == "composite"
+    assert name in presets.names(research=True)
     config = ATMConfig.composite() if name == "composite" else presets.get(name)
     x0 = np.zeros(3)
     kwargs = {"seed": 5, "bounds": BOX, "config": config}

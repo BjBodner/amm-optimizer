@@ -29,8 +29,8 @@ def new_optimize(fun, x0, budget):
 # deliberately fixes (see docs/DEVIATIONS.md).
 FIXED_CRASHES = {"sphere_d1_crashes", "nan_far_d3_crashes"}
 # The original carried on from a NaN start value and crashed later; the new code
-# rejects a non-finite start point up front.
-REJECTED_AT_START = {"nan_d3_crashes"}
+# carries on too, with the start as a failed evaluation (decision D2 b).
+FAILED_START = {"nan_d3_crashes"}
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.name)
@@ -41,10 +41,11 @@ def test_new_matches_golden(scenario):
         assert "raises" not in got
         assert got["n_evals"] > 1
         return
-    if scenario.name in REJECTED_AT_START:
+    if scenario.name in FAILED_START:
         got = run_scenario(new_optimize, scenario)
-        assert got["raises"] == "ValueError"
-        assert got["n_evals"] == 1
+        assert "raises" not in got
+        assert got["n_evals"] > 1
+        assert np.isfinite(got["costs"]).any()
         return
     assert_matches_golden(new_optimize, scenario)
 

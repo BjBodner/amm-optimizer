@@ -47,9 +47,25 @@ def test_only_the_start_point_is_valid():
 
 
 @pytest.mark.parametrize("start_value", [np.nan, np.inf, -np.inf])
-def test_start_point_must_have_a_finite_objective_value(start_value):
-    with pytest.raises(ValueError, match="finite"):
-        atm.api.minimize(lambda x: start_value, np.zeros(2), 200, seed=0)
+@pytest.mark.parametrize("config", [None, "atm", "composite", "c23"])
+def test_a_non_finite_start_value_is_a_failed_evaluation(start_value, config):
+    """Decision D2 (b): the run carries on from a start where ``fun`` fails."""
+
+    def undefined_at_the_centre(x):
+        return start_value if np.all(x == 0.0) else float(np.sum((x - 1.0) ** 2))
+
+    result = atm.minimize(
+        undefined_at_the_centre, bounds=[(-5, 5)] * 3, budget=600, seed=0, config=config
+    )
+    assert np.isfinite(result.fun) and result.fun < 1.0
+    assert result.nfev == 600
+
+
+def test_a_run_where_every_value_fails_returns_inf_at_the_start():
+    result = atm.api.minimize(lambda x: np.nan, np.zeros(2), 200, seed=0)
+    assert result.fun == np.inf
+    np.testing.assert_array_equal(result.x, np.zeros(2))
+    assert (result.nfev, result.nit, result.status) == (200, 0, 0)
 
 
 def test_failure_handling_does_not_change_results_for_finite_objectives():

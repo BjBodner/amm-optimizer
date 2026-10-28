@@ -14,21 +14,53 @@ research = pytest.mark.skipif(
     cc.RESEARCH_DATA_MISSING is not None,
     reason=f"research data not in this checkout: {cc.RESEARCH_DATA_MISSING}",
 )
+COMPOSITES = [name for name in presets.names(research=True) if name[1:].isdigit()]
 
 
 @pytest.mark.research
 @research
-@pytest.mark.parametrize("name", presets.names())
+@pytest.mark.parametrize("name", COMPOSITES)
 def test_each_preset_is_its_recorded_composite(name):
     recorded = cc.parse(cc.composite(name))
     assert presets.get(name) == recorded
     assert presets.get(name).config_hash() == recorded.config_hash()
 
 
-def test_the_presets_are_the_composites_in_order():
-    assert presets.names() == tuple(f"c{k}" for k in range(23, 47))
+def test_the_presets_on_display_and_the_research_composites_in_order():
+    assert presets.names() == ("default", "c46", "atm", "composite")
+    assert presets.names(research=True) == (
+        "default",
+        "c46",
+        "atm",
+        "composite",
+        *(f"c{k}" for k in range(23, 46)),
+    )
+    assert sorted(COMPOSITES) == [f"c{k}" for k in range(23, 47)]
     with pytest.raises(ValueError, match="unknown preset 'c99'"):
         presets.get("c99")
+
+
+def test_every_research_preset_stays_loadable():
+    for name in presets.names(research=True):
+        assert isinstance(presets.get(name), atm.ATMConfig)
+    assert presets.get("c23").variant.es_kind == "cma"
+
+
+def test_the_aliases():
+    assert presets.get("default") == presets.get("c46")
+    assert presets.get("default").config_hash() == "2153948ebed51150"
+    assert presets.get("atm") == atm.ATMConfig()
+    assert presets.get("composite") == atm.ATMConfig.composite()
+    assert presets.with_changes("default", anytime="replay") == presets.with_changes(
+        "c46", anytime="replay"
+    )
+    assert presets.DEFAULT == atm.default.DEFAULT_PRESET == "c46"
+
+
+@pytest.mark.parametrize("name", [None, 46, "C46", ""])
+def test_get_refuses_what_is_not_a_preset_name(name):
+    with pytest.raises(ValueError, match="unknown preset"):
+        presets.get(name)
 
 
 @pytest.mark.research

@@ -11,6 +11,7 @@ and the budget), and reads the usual shapes of ``bounds``.
 from __future__ import annotations
 
 import dataclasses
+import numbers
 import operator
 import warnings
 from collections.abc import Callable
@@ -37,7 +38,7 @@ class _AmbiguousBoundsError(ValueError):
 
 
 def _pairs(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """``a`` and ``b`` as the two rows of ``[(low, high), (low, high)]``."""
+    """Read ``a`` and ``b`` as the two rows of ``[(low, high), (low, high)]``."""
     both = np.array([a, b], dtype=float)
     return both[:, 0], both[:, 1]
 
@@ -99,7 +100,7 @@ def _as_box(bounds: object) -> tuple[np.ndarray, np.ndarray]:
 def _resolve(
     x0: object, budget: object, bounds: object
 ) -> tuple[np.ndarray, int, tuple[np.ndarray, np.ndarray] | None]:
-    """The starting point, the budget and the box, with the omitted ones filled in."""
+    """Return the start point, the budget and the box, filling in omitted ones."""
     box = None if bounds is None else _as_box(bounds)
     if x0 is None:
         if box is None:
@@ -156,23 +157,29 @@ def _resolve(
     return start, count, box
 
 
-def _check_options(seed: object, rng: object, config: object) -> None:
-    """Plain errors for a ``seed``, ``rng`` or ``config`` of the wrong kind, raised
-    before the run starts (review B6)."""
-    if config is not None and not isinstance(config, ATMConfig):
-        hint = f"presets.get({config!r})" if isinstance(config, str) else "presets.get"
+def _check_options(seed: object, rng: object, config: object) -> ATMConfig | None:
+    """Check ``seed``, ``rng`` and ``config`` before the run starts (review B6).
+
+    Raises plain errors for values of the wrong kind and returns ``config`` with a
+    preset name resolved.
+    """
+    if isinstance(config, str):
+        config = presets.get(config)  # ValueError for an unknown name
+    elif config is not None and not isinstance(config, ATMConfig):
         raise TypeError(
-            f"config must be an ATMConfig, got {type(config).__name__}; for a named "
-            f"configuration use {hint}"
+            f"config must be an ATMConfig or a preset name such as 'c46', got "
+            f"{type(config).__name__}"
         )
-    if rng is not None and not isinstance(rng, np.random.RandomState):
+    if rng is not None and not isinstance(
+        rng, np.random.RandomState | np.random.Generator
+    ):
         raise TypeError(
-            f"rng must be a numpy.random.RandomState, got {type(rng).__name__}; to "
-            "seed the run pass seed=<int> instead"
+            "rng must be a numpy.random.Generator or RandomState, got "
+            f"{type(rng).__name__}; to seed the run pass seed=<int> instead"
         )
-    if seed is None:
-        return
-    allowed = "seed must be an integer in [0, 2**32)"
+    if seed is None or isinstance(seed, np.random.SeedSequence):
+        return config
+    allowed = "seed must be an integer in [0, 2**32) or a numpy.random.SeedSequence"
     if isinstance(seed, bool | np.bool_):
         raise TypeError(f"{allowed}, got the bool {seed!r}")
     try:
@@ -181,6 +188,16 @@ def _check_options(seed: object, rng: object, config: object) -> None:
         raise TypeError(f"{allowed}, got {type(seed).__name__} {seed!r}") from None
     if not 0 <= value < 2**32:
         raise ValueError(f"{allowed}, got {value}")
+    return config
+
+
+def _target(ftarget: object) -> float | None:
+    """Return ``ftarget`` as a float, or raise a plain ``TypeError``."""
+    if ftarget is None:
+        return None
+    if isinstance(ftarget, bool | np.bool_) or not isinstance(ftarget, numbers.Real):
+        raise TypeError(f"ftarget must be a real number, got {ftarget!r}")
+    return float(ftarget)
 
 
 def minimize(
@@ -189,11 +206,14 @@ def minimize(
     budget: int | None = None,
     *,
     bounds: object | None = None,
-    seed: int | None = None,
+    seed: int | np.random.SeedSequence | None = None,
     anytime: bool = False,
-    config: ATMConfig | None = None,
-    rng: np.random.RandomState | None = None,
+    config: ATMConfig | str | None = None,
+    rng: np.random.Generator | np.random.RandomState | None = None,
     profile: bool | Profiler = False,
+    callback: Callable[[OptimizeResult], object] | None = None,
+    ftarget: float | None = None,
+    catch_interrupt: bool = False,
 ) -> OptimizeResult:
     """Minimise ``fun`` over a box with at most ``budget`` evaluations.
 
@@ -214,10 +234,10 @@ def minimize(
     fun : callable
         The objective, ``fun(x) -> float`` for an array ``x`` of shape ``(D,)``. It
         must be deterministic: the probes compare function values, so noise
-        misleads them. Non-finite values count as failed evaluations and never win;
-        a non-finite value at the starting point raises ``ValueError``. ``fun`` gets
-        its own copy of ``x`` and must return a real scalar (``float``, a NumPy
-        float, ``int``); anything else raises ``TypeError``.
+        misleads them. Non-finite values (NaN, +-inf) count as failed evaluations
+        and never win, at the starting point too. ``fun`` gets its own copy of
+        ``x`` and must return a real scalar (``float``, a NumPy float, ``int``);
+        anything else raises ``TypeError``.
     x0 : array_like, optional
         The starting point, shape ``(D,)``. Default: the centre of the box. An ``x0``
         outside ``bounds`` is clipped onto the box, with a ``UserWarning``.
@@ -235,36 +255,61 @@ def minimize(
         constraint: samples are folded into it before ``fun`` is called, so ``fun``
         only sees points inside it. With ``x0`` omitted, give one ``(low, high)``
         pair per coordinate so the number of variables is known.
-    seed : int, optional
-        Seed for a reproducible run, an integer in ``[0, 2**32)``. A run is
+    seed : int or numpy.random.SeedSequence, optional
+        Seed for a reproducible run, an integer in ``[0, 2**32)`` or a
+        ``SeedSequence`` (its first 32-bit word of state is the seed). A run is
         deterministic given the seed, the platform and the BLAS thread count.
-        Default: a fresh seed.
+        Default: a fresh seed from the operating system; ``result.seed`` records
+        the seed used either way, so ``seed=result.seed`` repeats the run.
     anytime : bool, optional
         ``True`` turns on the anytime (replay) mode, for runs whose budget is not
-        known in advance or that you will cut short (for example by raising an
-        exception from ``fun`` when time runs out, keeping the best point seen).
+        known in advance or that you will cut short (with ``callback`` or
+        ``ftarget``, keeping the best point seen).
         Up to 10 000 evaluations it never learns ``budget``; see ``docs/ANYTIME.md``
         for what it costs. It trails the default by about .05 to .12 of the
         target share between 30 x D and 1000 x D evaluations when the budget is
         known, so leave it off if you know your budget. Equivalent to
         ``config=presets.with_changes("c46", anytime="replay")``.
-    config : ATMConfig, optional
-        The configuration to run. ``None`` (the default) means ``presets.get("c46")``
-        (AMM). Any other value, such as another entry of ``presets.names()`` or
-        ``ATMConfig()``, is passed to the engine unchanged. ``ATMConfig()`` runs the
-        original ATM sampler alone and does not need ``bounds``.
-    rng : numpy.random.RandomState, optional
-        An existing random state to continue instead of ``seed``.
+    config : ATMConfig or str, optional
+        The configuration to run. ``None`` (the default) means the default preset,
+        AMM (frozen as ``c46``). A string is a preset name, read by
+        ``presets.get``: ``"default"`` (the same as ``None``), ``"c46"``,
+        ``"atm"`` (``ATMConfig()``, the original ATM sampler alone, which does not
+        need ``bounds``), ``"composite"`` (``ATMConfig.composite()``), or a
+        research preset of ``presets.names(research=True)``. An ``ATMConfig`` is
+        passed to the engine unchanged.
+    rng : numpy.random.Generator or numpy.random.RandomState, optional
+        Randomness to use instead of ``seed``. A ``Generator`` gives the run one
+        draw, ``rng.integers(2**32)``, as its seed (recorded in ``result.seed``);
+        a ``RandomState`` is continued as it is (``result.seed`` is then
+        ``None``).
     profile : bool or Profiler, optional
         ``True`` times the named blocks of the algorithm and returns them as
         ``result.timings``; pass a :class:`~amm_optimizer.TimingProfiler` to
         accumulate over several runs. Profiling does not change the result.
+    callback : callable, optional
+        ``callback(intermediate_result)``, called after every evaluation that
+        improves the best value found so far, with an :class:`OptimizeResult`
+        holding the best point ``x``, its value ``fun``, ``nfev`` and ``nit``.
+        Raising ``StopIteration`` ends the run: ``minimize`` returns that best
+        point with ``status`` 2. Its return value is ignored, and it changes
+        nothing else about the run. Any other exception propagates.
+    ftarget : float, optional
+        Stop as soon as the best value is at or below ``ftarget`` (``status``
+        1). Default: run the whole budget.
+    catch_interrupt : bool, optional
+        ``True`` turns a ``KeyboardInterrupt`` (Ctrl-C) during the run into a
+        result: the best point so far, with ``status`` 3, ``success=False`` and
+        a ``RuntimeWarning``. Default ``False``: the interrupt propagates. An
+        interrupt before any finite value was found always propagates.
 
     Returns
     -------
     OptimizeResult
-        The best point ``x``, its value ``fun`` and the number of evaluations
-        ``nfev``.
+        A :class:`scipy.optimize.OptimizeResult` (fields as attributes or keys):
+        the best point ``x``, its value ``fun``, the number of evaluations
+        ``nfev``, ``nit``, ``status``, ``success``, ``message`` and the ``seed``
+        used; see :class:`~amm_optimizer.OptimizeResult`.
 
     Raises
     ------
@@ -272,14 +317,14 @@ def minimize(
         If ``config`` is not given and ``bounds`` is missing, if neither ``x0`` nor
         per-coordinate ``bounds`` say how many variables there are, if ``x0`` and
         ``bounds`` disagree on that number, if ``x0`` is not finite, if ``budget`` is
-        not a whole number or is below 1, if ``seed`` is outside ``[0, 2**32)``, or
-        if ``fun`` is not finite at the starting point. All but the last are raised
-        before ``fun`` is called.
+        not a whole number or is below 1, if ``seed`` is outside ``[0, 2**32)``,
+        or if ``config`` names no preset. All are raised before ``fun`` is called.
     TypeError
-        If ``fun`` is not callable, if ``config`` is not an ``ATMConfig`` (use
-        ``presets.get(name)`` for a named one), if ``rng`` is not a
-        ``numpy.random.RandomState``, if ``seed`` is not an integer, if ``budget`` is
-        a ``bool``, or if ``fun`` returns something other than a real scalar.
+        If ``fun`` or ``callback`` is not callable, if ``config`` is neither an
+        ``ATMConfig`` nor a preset name, if ``rng`` is not a NumPy
+        ``Generator`` or ``RandomState``, if ``seed`` is not an integer or a
+        ``SeedSequence``, if ``ftarget`` is not a number, if ``budget`` is a
+        ``bool``, or if ``fun`` returns something other than a real scalar.
 
     Notes
     -----
@@ -291,6 +336,11 @@ def minimize(
     quasi-Newton calls, where floating-point overflow and divide-by-zero warnings
     are silenced.
 
+    Version 0.6.0 made the result a :class:`scipy.optimize.OptimizeResult`,
+    added ``callback``, ``ftarget``, ``catch_interrupt``, preset names as
+    ``config``, ``Generator`` and ``SeedSequence`` seeds and ``result.seed``, and
+    made a non-finite value at the starting point a failed evaluation (it raised
+    ``ValueError`` before).
     Version 0.5.0 made ``x0`` and ``budget`` optional and added the SciPy forms of
     ``bounds`` and ``anytime``; every call that worked before runs unchanged.
     Version 0.4.0 changed the default configuration: earlier releases ran the
@@ -312,10 +362,16 @@ def minimize(
     >>> result = amm.minimize(f, np.zeros(3), 500, seed=0, bounds=(-5, 5))
     >>> result.nfev
     500
+    >>> result = amm.minimize(f, bounds=[(-5, 5)] * 3, budget=3000, ftarget=1e-8)
+    >>> result.status, result.fun <= 1e-8, result.nfev < 3000
+    (1, True, True)
     """
     if not callable(fun):
         raise TypeError(f"fun must be callable, got {type(fun).__name__}")
-    _check_options(seed, rng, config)
+    if callback is not None and not callable(callback):
+        raise TypeError(f"callback must be callable, got {type(callback).__name__}")
+    target = _target(ftarget)
+    config = _check_options(seed, rng, config)
     start, count, box = _resolve(x0, budget, bounds)
     if config is None:
         if box is None:
@@ -339,4 +395,7 @@ def minimize(
         config=config,
         profile=profile,
         bounds=engine_bounds,
+        callback=callback,
+        ftarget=target,
+        catch_interrupt=catch_interrupt,
     )

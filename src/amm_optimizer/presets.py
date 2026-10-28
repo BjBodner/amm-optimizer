@@ -1,115 +1,21 @@
-"""Named configurations: the confirmed composites of the 2026-10 research cycles.
+"""Named configurations for ``minimize(..., config=...)``.
 
-``presets.get("c26")`` returns the ``ATMConfig`` of ``c26``; ``names()`` lists the
-presets. Each one equals ``benchmarks/arms/<name>_config.txt`` as the benchmark
-harness reads it (``tests/test_presets.py`` checks the configurations and their
-``config_hash``), so results reproduce the recorded runs. Every preset needs
-``minimize(..., bounds=(lower, upper))`` and a deterministic objective.
+``presets.get(name)`` returns the :class:`~amm_optimizer.ATMConfig` of a preset, and
+``minimize`` also takes the name itself (``config="c46"``). The presets on display
+(``names()``):
 
-What runs (``api``'s module docstring has the phase order):
+* ``"default"``: AMM, the default preset (frozen as ``c46``), which
+  ``minimize`` runs without ``config``.
+* ``"c46"``: the same configuration under its research name, frozen for the paper
+  on 2026-10-22 (config hash ``2153948ebed51150``).
+* ``"atm"``: ``ATMConfig()``, the original ATM sampler alone; it needs no bounds.
+* ``"composite"``: ``ATMConfig.composite()``, ATM's sampler with five confirmed
+  options.
 
-* ``c23``: ATM's global phase with success-rate widths, a learned covariance and
-  reflection into the box, as a (1+1)-CMA-ES prefix up to
-  100 x dim (Nelder-Mead at D <= 2); above that ATM for 20% of the budget (at most
-  60 dim), the separable STEP search, and the restarted (1+1)-Cholesky-CMA-ES with
-  quadratic model steps, handing stalls (and runs past 150 dim, from D 10) to active
-  population CMA-ES with twice the default lambda.
-* ``c24``: ``c23`` with the lq2-surrogate population prefix at 100 x dim on
-  non-separable functions and a curvature probe in the hand-over's first run.
-* ``c25``: ``c24`` with the curvature-gated prefix: SLSQP where the probe reads the
-  function as smooth, lq2 populations where it reads rugged (from 30 x dim).
-* ``c26``: ``c25`` with an SLSQP stage (``cma_local_nonsep="qn3"``) before the CMA
-  finisher on smooth non-separable functions.
-* ``c27``: ``c26`` with the gated prefix also at 10 x dim from 200 evaluations
-  (``slsqplq10c``), one SLSQP descent before Nelder-Mead at D 2 up to 30 x dim
-  (``qnprefix30``) and the curvature-routed local phase ``qn7`` (confirmed on fresh
-  ids 136-145).
-* ``c28``: ``c27`` with the plateau route ``qn8`` (IPOP populations with 4x lambda on
-  plateaus such as f7; confirmed on ids 146-155).
-* ``c29``: ``c28`` with SLSQP's finite-difference step 1e-9 in the prefix
-  (``slsqplq10h``) and the local stage (``qn9``).
-* ``c30``: ``c29`` with the local phase back to ``qn8`` (``qn9`` was rejected for
-  Gallagher; the prefix's 1e-9 step stays).
-* ``c31``: ``c30`` with ``qn12`` (the 1e-9 step in the stage, SciPy's in the
-  Gallagher restarts); confirmed on fresh ids 166-175.
-* ``c32``: ``c31`` with ``qn_fallback="lbfgsb"``: an SLSQP call whose failed descents
-  outnumber its converged ones hands the rest to restarted L-BFGS-B, and a local
-  stage that ends that way gives L-BFGS-B the rest of the budget (f12, bent cigar);
-  confirmed on fresh ids 176-185 (f12 +.296; +.208 over pycma-IPOP).
-* ``c33``: ``c32`` with the local route ``qn17``: from D 20, a rugged reading with at
-  least 640 x D left runs unprotected IPOP populations from a uniform point (4x the
-  default lambda, 8x with at least 2500 x D left, doubling per restart); confirmed
-  on fresh ids 186-195 (f17-f18 at D 20-40 +.171).
-* ``c34``: ``c33`` with the local route ``qn19``: when the stage's first SLSQP descent
-  is still running at its cap, a stall monitor read once decides whether it continues
-  to SciPy's own exit, and a converged gated descent with at least 400 x D left gets
-  one more descent from a uniform point (Rosenbrock's second minimum); confirmed on
-  fresh ids 196-210 (f8 + f9 at D 20-40 +.172; every cell +.015).
-* ``c35``: ``c34`` with the local route ``qn20``: Gallagher-like readings (a smooth
-  stage with several basins) restart SLSQP from the best sample point not yet claimed
-  by an earlier start or end, and stop descents that cannot catch the incumbent;
-  confirmed on fresh ids 211-245 (f21 + f22 at D 10-40, 1000-3000 x D +.191, inside
-  the ``qn25`` composite whose other path, the f13 kink route, did not confirm).
-* ``c36``: ``c35`` with the local route ``qn29`` (``fract2``: a fractal rugged reading,
-  read by a probe moved off the bounds, leaves the rugged route for restarted SLSQP)
-  and ``lean30``'s prefix switches (a separable smooth prefix reaches SLSQP; no ATM tail
-  from above 10 x D up to 100 x D); confirmed on fresh ids 246-285 (all functions at
-  30-100 x D +.016; f23 at D 20-40 +.044).
-* ``c37``: ``c36`` with the local route ``qn38``: the f13 kink route from D 5 on a
-  scaled-FD nonsmooth BFGS (``qn_phase.run_scaled_bfgs``), one capped BFGS descent on a
-  rugged reading at D 5-9 up to 500 x D, and the rugged IPOP route from D 5 with
-  2000 x D left; confirmed on fresh ids 286-325 (f13 at D 10-40, 1000 x D +.304; f13
-  at D 5, 300 x D +.377; f15 at D 5-10, 3000 x D +.106).
-* ``c38``: ``c37`` with ``chain_route`` and ``sep_route`` (``chain_phase``): a pair
-  test at x0 from D 5 sends a linear chain (bbob f20) to the decoupled coordinate
-  search from 300 x D and a separable function to restarted STEP from 100 x D;
-  confirmed on fresh ids 326-365 (f20 at 300-3000 x D +.773; f3 at 100 x D +.711).
-* ``c39``: ``c38`` with ``basin_route`` (``basin_phase``: at D 2-3 from 100 x D a
-  Sobol design and a curvature probe send smooth multi-basin readings, Gallagher, to
-  MLSL) and ``sep_check="stall"`` from 1000 x D (a stuck STEP leaves through a pair
-  test); confirmed on fresh ids 490-529 (f21 + f22 at D 2-3 +.107; D 5, 3000 x D
-  +.040).
-* ``c40``: ``c39`` with the one-descent prefix (``es_kind="slsqplq10hd"``: one SLSQP
-  descent from the best point so far, then the (1+1)) below 31 x D and
-  ``QN_MIN_BUDGET`` (``des_max_per_dim``), and the whole budget to the prefix at 10 x D
-  (``prefix_full_min_per_dim=0``); confirmed on fresh ids 530-569 (D 5-10, 10 x D
-  +.024; D 3-5, 30 x D +.050).
-* ``c41``: ``c40`` with route ``qn44``: on a smooth reading up to 300 x D, one descent
-  of the scaled-FD BFGS with SLSQP's bound handling (``box_qp``, the BFGS engine toy's
-  f10 fix), then the usual staged route; confirmed on fresh ids 570-609 (f6 / f12 /
-  f13 / f14 at D 5-40, 300 x D +.163; all functions +.033).
-* ``c42``: ``c41`` with ``basin_descents=1`` and ``basin_keep_atm``: on
-  ``basin_route``'s smooth, not-multi-basin reading at D 2-3 up to 300 x D, one SLSQP
-  descent from the design's best point, then the usual path from that point with
-  ATM's full share;
-  confirmed on the D 2 ids 400-449 (f6 / f8 / f9 / f12 / f13 at D 2-3, 100-300 x D
-  +.103; all functions there +.016).
-* ``c43``: ``c42`` with ``small_engine="cobyqa"`` up to D 3: at budgets up to 10 x D,
-  restarted SciPy COBYQA (``cobyqa_phase``, initial trust radius 0.25 of the box)
-  spends the whole budget; confirmed on fresh ids 366-399 (D 2, 10 x D +.026; D 3
-  +.017).
-* ``c44``: ``c43`` with ``prefix_plateau_pop`` from D 5 (a plateau check in the ES
-  prefix above 30 x D hands f7-like plateaus to restarted CMA-ES populations) and
-  ``small_switch`` (at budgets up to 10 x D, D 4-20, the prefix's first SLSQP descent
-  is read after one and two line searches and hands rugged or non-quadratic runs to
-  restarted COBYQA); confirmed on fresh ids 610-649 (f7 at D 5-40, 100 x D +.079;
-  all functions at D 5-20, 10 x D +.012).
-* ``c45``: ``c44`` with five confirmed changes: ``rugged_try_rest="cutkink"`` (the
-  rugged route's capped BFGS try continues where its best point reads a kink, f13's
-  ridge), the prefix's ridge reading (``prefix_ridge_after=7`` up to 30 x D, which
-  hands a descent that overshoots a sharp ridge to restarted COBYQA, with
-  ``prefix_nan_reading="plateau"``), ``prefix_descent_retries=5`` (the one-descent
-  prefixes retry a descent that did not move), ``rugged_direct_beta=1.0`` /
-  ``rugged_direct_min_beta=0.5`` (on that band of rugged hand-over readings the
-  finisher's populations start at once), and ``box_normalize`` (any box is mapped
-  onto [-5, 5]^D; bbob unchanged); confirmed on fresh ids 650-689 (f13 at D 5,
-  300 x D +.075; f13 at D 20-40, 30 x D +.095; f12-f14 at D 20-40, 100 x D +.045;
-  f10-f12 at D 2-5, 30 x D +.047; all functions at D 5-10, 300 x D +.006).
-* ``c46``: ``c45`` with ``prefix_low_beta=0.15`` from D 10: in the ES prefix at
-  100 x D, a finite rugged curvature reading below 0.15 (Katsuura, f23) keeps the
-  (1+1)-CMA-ES instead of the lq2 populations; confirmed on fresh ids 690-729 (f23 at
-  D 10-40, 100 x D +.046); the best composite and the configuration frozen for the
-  paper (2026-10-22).
+The research composites ``c23`` to ``c45``, the steps that led to ``c46``, stay
+loadable so that earlier results reproduce; ``names(research=True)`` lists them and
+``docs/HISTORY.md`` describes each one. Every composite (``c23`` to ``c46``) needs
+``bounds`` and a deterministic objective.
 """
 
 from __future__ import annotations
@@ -248,15 +154,79 @@ def _variants() -> dict[str, dict[str, Any]]:
 _VARIANTS = _variants()
 
 
-def names() -> tuple[str, ...]:
-    """The preset names, oldest first."""
-    return tuple(_VARIANTS)
+#: The preset ``"default"`` is (the configuration ``minimize`` runs without ``config``).
+DEFAULT = "c46"
+#: The names :func:`names` lists.
+SHOWN = ("default", DEFAULT, "atm", "composite")
+
+
+def names(research: bool = False) -> tuple[str, ...]:
+    """Return the preset names.
+
+    Parameters
+    ----------
+    research : bool, optional
+        ``False`` (the default): the presets on display, ``("default", "c46",
+        "atm", "composite")``. ``True``: also the research composites ``c23`` to
+        ``c45``, oldest first.
+
+    Returns
+    -------
+    tuple of str
+        Names that :func:`get` accepts.
+
+    Examples
+    --------
+    >>> from amm_optimizer import presets
+    >>> presets.names()
+    ('default', 'c46', 'atm', 'composite')
+    >>> len(presets.names(research=True))
+    27
+    """
+    if not research:
+        return SHOWN
+    return SHOWN + tuple(name for name in _VARIANTS if name != DEFAULT)
 
 
 def get(name: str) -> ATMConfig:
-    """The ``ATMConfig`` of preset ``name`` (see the module docstring)."""
-    if name not in _VARIANTS:
-        raise ValueError(f"unknown preset {name!r}; presets: {', '.join(names())}")
+    """Return the configuration of preset ``name``.
+
+    Parameters
+    ----------
+    name : str
+        A name of ``names(research=True)``: ``"default"`` (the same as ``"c46"``),
+        ``"atm"``, ``"composite"``, or a composite ``"c23"`` to ``"c46"``.
+
+    Returns
+    -------
+    ATMConfig
+        A new configuration; changing it (``dataclasses.replace``) does not change
+        the preset.
+
+    Raises
+    ------
+    ValueError
+        If ``name`` is not a preset name.
+
+    Examples
+    --------
+    >>> from amm_optimizer import presets
+    >>> presets.get("default") == presets.get("c46")
+    True
+    >>> presets.get("c46").config_hash()
+    '2153948ebed51150'
+    """
+    if name == "default":
+        name = DEFAULT
+    if name == "atm":
+        return ATMConfig()
+    if name == "composite":
+        return ATMConfig.composite()
+    if not isinstance(name, str) or name not in _VARIANTS:
+        raise ValueError(
+            f"unknown preset {name!r}; presets: {', '.join(SHOWN)}, and the research "
+            "composites c23 to c45 (presets.names(research=True))"
+        )
     return ATMConfig(
         iterations_per_hyperparameter_set=1_000_000,
         variant=Variant(**_VARIANTS[name]),
@@ -264,6 +234,25 @@ def get(name: str) -> ATMConfig:
 
 
 def with_changes(name: str, **variant_changes: Any) -> ATMConfig:
-    """Preset ``name`` with some ``Variant`` fields changed (``replace``)."""
+    """Return preset ``name`` with some of its ``Variant`` fields changed.
+
+    Parameters
+    ----------
+    name : str
+        A preset name, as for :func:`get`.
+    **variant_changes
+        ``Variant`` fields and their new values.
+
+    Returns
+    -------
+    ATMConfig
+        ``get(name)`` with ``variant`` replaced by a copy carrying the changes.
+
+    Examples
+    --------
+    >>> from amm_optimizer import presets
+    >>> presets.with_changes("c46", anytime="replay").variant.anytime
+    'replay'
+    """
     config = get(name)
     return replace(config, variant=replace(config.variant, **variant_changes))
