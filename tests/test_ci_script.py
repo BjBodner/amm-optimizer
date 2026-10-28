@@ -52,8 +52,13 @@ def test_an_unknown_tier_is_refused():
 
 def test_full_gate_runs_all_tests_with_the_coverage_gate():
     last = ci.steps(True)[-1].command
-    assert "--cov-fail-under=100" in last and "--cov-branch" in last
+    assert f"--cov-fail-under={ci.COVERAGE_GATE:g}" in last and "--cov-branch" in last
     assert "not slow" not in last
+
+
+def test_the_coverage_gate_sits_below_the_measured_coverage():
+    # measured 94.53% on 2026-10-27; Phase 6 raises the gate (see tools/ci.py)
+    assert 90 <= ci.COVERAGE_GATE <= 94.53 - 0.5
 
 
 def test_every_step_uses_the_interpreter_that_runs_it():

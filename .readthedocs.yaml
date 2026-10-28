@@ -1,0 +1,20 @@
+# Read the Docs: builds the MkDocs site of mkdocs.yml for https://amm-optimizer.readthedocs.io
+# (the project must be imported on readthedocs.org once; then every push to main and
+# every tag builds). Warnings fail the build, as `mkdocs build --strict` does in CI.
+version: 2
+
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.12"
+
+mkdocs:
+  configuration: mkdocs.yml
+  fail_on_warning: true
+
+python:
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs

@@ -35,14 +35,18 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uv venv && uv pip install -e ".[dev]"
+      - run: uv venv && uv pip install -e ".[dev,docs]"
       - run: uv run --no-sync ruff check src tests tools benchmarks
       - run: uv run --no-sync ruff format --check src tests tools benchmarks
       - run: uv run --no-sync mypy
+      - name: Docs (mkdocs build --strict, as Read the Docs builds them)
+        env:
+          NO_MKDOCS_2_WARNING: "1" # Material's end-of-life notice, not a build warning
+        run: uv run --no-sync mkdocs build --strict --site-dir "${RUNNER_TEMP}/site"
 
   test:
     needs: lint
-    name: test (${{ matrix.os }}, py${{ matrix.python }}${{ matrix.pins && ', pinned' || '' }})
+    name: test (${{ matrix.os }}, py${{ matrix.python }}${{ matrix.label && format(', {0}', matrix.label) || '' }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     # The gating legs run the portable tests (the bit-exact snapshots skip themselves
@@ -63,15 +67,27 @@ jobs:
           - os: windows-latest
             python: "3.12"
             pins: "numpy==2.5.4 scipy==1.18.1"
+            label: pinned
             experimental: true
+          # The declared floors of pyproject.toml (numpy>=2.0, scipy>=1.18) on the oldest
+          # supported Python: the lowest versions a user can install must work. It gates;
+          # if it fails, raise the floor or fix the code, but keep the leg. (SciPy 1.18.0
+          # requires numpy>=2.0.0,<2.8; numpy 2.0.2 is the newest 2.0 with cp312 wheels.)
+          - os: ubuntu-latest
+            python: "3.12"
+            pins: "numpy~=2.0.0 scipy==1.18.0"
+            label: floor
+            experimental: false
           # Latest releases: the behaviour must hold, the bits may differ.
           - os: windows-latest
             python: "3.13"
             pins: ""
             experimental: false
+          # This leg's coverage report goes to Codecov (the coverage job below).
           - os: ubuntu-latest
             python: "3.12"
             pins: ""
+            coverage: true
             experimental: false
           - os: ubuntu-latest
             python: "3.14"
@@ -101,11 +117,50 @@ jobs:
       - name: Environment
         shell: bash
         run: uv run --no-sync python -c "import numpy, scipy, sys; print(sys.version); print('numpy', numpy.__version__, 'scipy', scipy.__version__)"
-      - name: "Tests (research tier, not slow and not merge)"
+      # The default tier of tools/ci.py ("not slow and not merge and not research") plus
+      # the research tests: the research options still ship in src until 0.7.0 removes
+      # them, and these tests are their only behavioural check on Linux and macOS (they
+      # skip themselves where benchmarks/arms or the arm snapshots are absent).
+      - name: "Tests (default tier and research tests: not slow and not merge)"
         shell: bash
         run: >
           uv run --no-sync pytest -m "not slow and not merge" -n auto --timeout=900
-          -p no:cacheprovider -ra --cov=amm_optimizer --cov-branch --cov-report=term-missing:skip-covered
+          -p no:cacheprovider -ra --cov=amm_optimizer --cov-branch
+          --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml
+      - name: Keep the coverage report for Codecov
+        if: matrix.coverage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: error
+          retention-days: 7
+
+  coverage:
+    name: coverage upload (Codecov)
+    needs: test
+    # Report-only: an upload that fails (the Codecov app not installed yet, a fork's pull
+    # request without an OIDC token, a Codecov outage) never fails CI.
+    if: ${{ !cancelled() }}
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read # the checkout, which Codecov reads to map the report's paths
+      id-token: write # OIDC instead of a stored CODECOV_TOKEN
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-xml
+      - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: coverage.xml
+          disable_search: true
+          use_oidc: true
+          fail_ci_if_error: false
 
   package:
     needs: lint
@@ -127,8 +182,8 @@ jobs:
           uvx twine check --strict dist/*
           sdist_bytes=$(stat -c%s dist/*.tar.gz)
           echo "sdist: ${sdist_bytes} bytes"
-          # PyPI rejects files above 100 MiB; a lean sdist is about 0.5 MB.
-          test "${sdist_bytes}" -lt 5000000
+          # The sdist holds the library, docs and metadata only: about 0.16 MB.
+          test "${sdist_bytes}" -lt 500000
       - name: Smoke-test the wheel in a clean environment, away from the source tree
         run: |
           uv venv --python 3.12 "${RUNNER_TEMP}/smoke"

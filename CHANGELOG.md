@@ -11,6 +11,18 @@ Public API is deprecated, with a warning, for at least one minor release before 
 
 Bug fixes. Every run that starts inside the box and gets well-behaved inputs is bit for bit as in 0.5.0 (`c46`'s config hash is still `2153948ebed51150`).
 
+### Added
+
+- A documentation site, for <https://amm-optimizer.readthedocs.io>: getting started, a user
+  guide (bounds, budgets, seeds, the anytime mode, profiling), the presets, the API reference
+  generated from the docstrings, the changelog, the deprecation policy and how to cite AMM
+  (`mkdocs.yml`, `.readthedocs.yaml`, a `docs` extra). CI builds it with `mkdocs build --strict`,
+  and the package metadata links it as `Documentation`.
+- Each release tag gets a GitHub Release once PyPI has the files: its notes are the version's
+  CHANGELOG section, and it carries the wheel, the sdist and a CycloneDX SBOM.
+- CI: a floor leg with the oldest supported NumPy and SciPy (2.0 and 1.18.0, Python 3.12), and
+  coverage reports on Codecov.
+
 ### Changed
 
 - **An `x0` outside `bounds` is clipped onto the box, with a `UserWarning`**, on every box. On the bbob box `[-5, 5]` it used to be evaluated as given; on any other box it was already clipped, silently, so those runs are unchanged. `amm_optimizer.api.minimize`, the engine, does not check `x0`.
