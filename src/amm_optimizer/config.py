@@ -142,9 +142,6 @@ RESEARCH_FIELDS: tuple[str, ...] = (
     "refine_max_dim",
     "pool_max",
     "pool_divisor",
-    "anytime_start_per_dim",
-    "anytime_factor",
-    "anytime_switch",
 )
 # Values of the shipped string fields that no shipped configuration uses.
 RESEARCH_CHOICES: dict[str, tuple[str, ...]] = {

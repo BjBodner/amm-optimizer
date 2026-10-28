@@ -1,6 +1,6 @@
 """Stop a run early: at a target value, or when a time limit runs out.
 
-python examples/early_stopping.py [budget]
+python examples/early_stopping.py [budget] [seconds]
 """
 
 import sys
@@ -11,6 +11,7 @@ import numpy as np
 import amm_optimizer as amm
 
 budget = int(sys.argv[1]) if len(sys.argv) > 1 else 20000
+seconds = float(sys.argv[2]) if len(sys.argv) > 2 else 1.0
 bounds = [(-5, 5)] * 8
 rotation = np.linalg.qr(np.random.default_rng(1).normal(size=(8, 8)))[0]
 
@@ -32,7 +33,7 @@ def slow_rastrigin(x):
     return rastrigin(x)
 
 
-def time_limit(intermediate_result, seconds=1.0):
+def time_limit(intermediate_result):
     if time.perf_counter() - start > seconds:
         raise StopIteration
 

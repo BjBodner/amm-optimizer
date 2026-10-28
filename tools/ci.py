@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PATHS = ["src", "tests", "tools", "benchmarks"]
+PATHS = ["src", "tests", "tools", "benchmarks", "examples"]
 
 
 @dataclass(frozen=True)

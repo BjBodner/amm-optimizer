@@ -82,7 +82,10 @@ again = amm.minimize(f, bounds=[(-5, 5)] * 3, budget=300, seed=42)
 print(np.array_equal(first.x, again.x))
 ```
 
-`rng=` takes an existing `numpy.random.RandomState` to continue instead of a seed.
+`seed` also accepts a `numpy.random.SeedSequence`, and `rng=` a `numpy.random.Generator` (the run
+draws its seed from it with `rng.integers(2**32)`) or an existing `numpy.random.RandomState` to
+continue. Every result records its seed in `result.seed`, so a run without `seed=` can still be
+repeated with `seed=result.seed`.
 
 The last bits of a run can differ between operating systems, NumPy or SciPy versions and BLAS
 thread counts. To compare runs bit for bit, fix all of these; set `OPENBLAS_NUM_THREADS=1`,
@@ -92,14 +95,32 @@ thread counts. To compare runs bit for bit, fix all of these; set `OPENBLAS_NUM_
 
 `fun(x)` takes an array of shape `(D,)` and returns a float. It must be deterministic: the probes
 compare function values, so noise misleads them. A NaN or infinite value counts as a failed
-evaluation and never wins, but `fun` must be finite at the starting point: a non-finite value
-there raises `ValueError`.
+evaluation and never wins, also at the starting point (a run whose every value fails returns
+`fun=inf`). The starting point itself must be finite.
 
 ## The result
 
-`minimize` returns an [`OptimizeResult`](api.md#amm_optimizer.OptimizeResult): the best point
-`x`, its value `fun`, the number of evaluations `nfev`, the number of restarts `nrestarts`, and
-`timings` when profiling was on.
+`minimize` returns an [`OptimizeResult`](api.md#amm_optimizer.OptimizeResult), a subclass of
+`scipy.optimize.OptimizeResult`, so both `result.x` and `result["x"]` work. It holds the best
+point `x`, its value `fun`, the number of evaluations `nfev`, the number of improvements `nit`,
+the number of restarts `nrestarts`, `success`, `status` and `message` (why the run ended), the
+`seed`, and `timings` when profiling was on.
+
+## Stopping early (`ftarget`, `callback`)
+
+By default a run spends its whole budget. `ftarget=` ends it as soon as a value at or below the
+target is found (`status` 1). `callback(intermediate_result)` is called after every evaluation
+that improves the best value, with an `OptimizeResult` of the best point so far; raising
+`StopIteration` in it ends the run (`status` 2). Either way `minimize` returns the best point
+found.
+
+```python
+result = amm.minimize(f, bounds=[(-5, 5)] * 3, budget=3000, seed=0, ftarget=1e-6)
+print(result.status, result.nfev < 3000)
+```
+
+Neither changes a run that does not stop: with the same seed, the evaluations up to the stop are
+the ones a full run makes. `examples/early_stopping.py` stops a run after a time limit.
 
 ## The anytime mode (`anytime`)
 

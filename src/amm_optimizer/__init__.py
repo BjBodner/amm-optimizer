@@ -12,7 +12,7 @@ from .default import minimize
 from .profiling import Profiler, TimingProfiler, Timings
 from .result import OptimizeResult
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 __all__ = [
     "ATMConfig",
     "OptimizeResult",

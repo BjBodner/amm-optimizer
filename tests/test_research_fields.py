@@ -62,8 +62,10 @@ def test_every_string_field_has_its_allowed_values_default_first():
 
 def test_the_changelog_lists_every_deprecation():
     text = (ROOT / "CHANGELOG.md").read_text(encoding="utf8")
-    unreleased = text.split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
-    deprecated = unreleased.split("### Deprecated", 1)[1].split("\n### ", 1)[0]
+    # the section that announces them: Unreleased until the release, then the version's
+    sections = [part.split("\n## [", 1)[0] for part in text.split("\n## [")[1:]]
+    section = next(s for s in sections if "### Deprecated" in s and "0.7.0" in s)
+    deprecated = section.split("### Deprecated", 1)[1].split("\n### ", 1)[0]
     entry = tool.changelog(*tool.measure())
     assert " ".join(entry.split()) in " ".join(deprecated.split())
 

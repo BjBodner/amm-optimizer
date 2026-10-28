@@ -5,11 +5,14 @@ All notable changes to amm-optimizer are documented in this file. The format fol
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version is 0.x, a minor
 release may change behaviour, with notice here; a patch release never changes results.
 Public API is deprecated, with a warning, for at least one minor release before it is removed
-(see "Deprecation policy" in [CONTRIBUTING.md](CONTRIBUTING.md)).
+(see "Deprecation policy" in
+[CONTRIBUTING.md](https://github.com/BjBodner/amm-optimizer/blob/main/CONTRIBUTING.md#deprecation-policy)).
 
 ## [Unreleased]
 
-Bug fixes and a SciPy-compatible API. Every run that starts inside the box and gets well-behaved inputs is bit for bit as in 0.5.0 (`c46`'s config hash is still `2153948ebed51150`).
+## [0.6.0] - 2026-10-28
+
+Bug fixes, a SciPy-compatible API and early stopping, with the research options deprecated. The default algorithm is unchanged: every configuration that ships runs bit for bit as in 0.5.0 on inputs that worked before, the default and `c46` reproduce the paper's benchmark runs exactly, and `c46`'s config hash is still `2153948ebed51150`.
 
 ### Added
 
@@ -18,8 +21,6 @@ Bug fixes and a SciPy-compatible API. Every run that starts inside the box and g
 - **Preset names in `config=`**: `config="default"` (AMM, the default preset, frozen as `c46`), `"c46"`, `"atm"` (`ATMConfig()`), `"composite"` (`ATMConfig.composite()`) or a research preset; `presets.get` takes the same names. Anything else that is not an `ATMConfig` is a `TypeError`.
 - `examples/` with three short scripts: `quickstart.py`, `scipy_migration.py` and `early_stopping.py`.
 - `docs/HISTORY.md`: how the research composites `c23` to `c46` came about (from the `presets` module docstring, which is now a short list).
-
-### Added
 
 - A documentation site, for <https://amm-optimizer.readthedocs.io>: getting started, a user
   guide (bounds, budgets, seeds, the anytime mode, profiling), the presets, the API reference
@@ -41,7 +42,7 @@ Bug fixes and a SciPy-compatible API. Every run that starts inside the box and g
 
 ### Deprecated
 
-- **95 research-only `Variant` fields and 29 research-only values of the other fields** emit a
+- **92 research-only `Variant` fields and 29 research-only values of the other fields** emit a
   `FutureWarning` when set and will be removed in 0.7.0 (`warnings.filterwarnings("ignore",
   "Variant", FutureWarning)` silences them meanwhile). No shipped configuration (`c23`-`c46`,
   `ATMConfig()`, `ATMConfig.composite()`, `anytime=True`) uses them, so none of those warns,
@@ -68,14 +69,13 @@ Bug fixes and a SciPy-compatible API. Every run that starts inside the box and g
   `sep_min_budget_per_dim`, `width_units`, `crossover`, `noise`, `skip_starved`, `width_mode`,
   `sr_shared_target`, `restart_mode`, `stag_tolfun`, `stag_tolx`, `ipop_factor`,
   `ipop_max_pool`, `local_method`, `simplex_max_dim`, `nm_refine_max_dim`, `refine_fraction`,
-  `refine_min_budget_per_dim`, `refine_max_dim`, `pool_max`, `pool_divisor`,
-  `anytime_start_per_dim`, `anytime_factor`, `anytime_switch`. Values: `amplitude_control`
-  `"success_rate"`; `es_kind` `"slsqplq10"`, `"slsqplq10hk"`; `cma_local_nonsep` `"ipop"`,
-  `"population"`, `"qn"`, `"qn2"`, `"qn5"`, `"qn6"`, `"qn10"`, `"qn11"`, `"qn13"`, `"qn13n"`,
-  `"qn15"`; `nm_stage` `"qnprefix"`, `"qnprefix30g"`; `cma_model` `"lq"`; `cma_restart_rule`
-  `"economy"`; `cma_local` `"population"`, `"ipop"`; `sep_check` `"pair"`; `pop_lambda`
-  `"cap4"`, `"budget"`, `"steps"`, `"ipop4"`, `"stepsgrow"`; `pop_switch_start` `"carry"`;
-  `rugged_try_rest` `"cut"`; `prefix_nan_reading` `"smooth"`.
+  `refine_min_budget_per_dim`, `refine_max_dim`, `pool_max`, `pool_divisor`. Values:
+  `amplitude_control` `"success_rate"`; `es_kind` `"slsqplq10"`, `"slsqplq10hk"`;
+  `cma_local_nonsep` `"ipop"`, `"population"`, `"qn"`, `"qn2"`, `"qn5"`, `"qn6"`, `"qn10"`,
+  `"qn11"`, `"qn13"`, `"qn13n"`, `"qn15"`; `nm_stage` `"qnprefix"`, `"qnprefix30g"`;
+  `cma_model` `"lq"`; `cma_restart_rule` `"economy"`; `cma_local` `"population"`, `"ipop"`;
+  `sep_check` `"pair"`; `pop_lambda` `"cap4"`, `"budget"`, `"steps"`, `"ipop4"`, `"stepsgrow"`;
+  `pop_switch_start` `"carry"`; `rugged_try_rest` `"cut"`; `prefix_nan_reading` `"smooth"`.
 
 ### Fixed
 
@@ -84,7 +84,6 @@ Bug fixes and a SciPy-compatible API. Every run that starts inside the box and g
 - **The value at the starting point is a `float`** like every other value; a `fun` returning `Fraction` no longer crashes.
 - **Warnings raised by `fun` reach the caller** on the COBYQA and basin routes, which used to ignore every warning. SciPy's own overflow warnings from finite differences over a failed evaluation are no longer shown.
 - **The diagnostic logs stay bounded.** `anytime.LAST_STAGES` (alias `STAGE_LOG`) holds the stages of the most recent anytime run only; `cma_phase.PROBE_LOG` records only while `cma_phase.RECORD_PROBES` is true.
-- The `minimize` docstring has a thread-safety note.
 - **Runs in separate threads no longer share the step unit** of `Variant.box_steps`. It was the module global `qn_phase.X_UNIT`, which every call wrote, so two threads on different boxes used whichever unit was written last; it is now a context variable (`qn_phase.set_x_unit` / `qn_phase.x_unit()`), one per thread. Every run is bit for bit as before.
 
 ## [0.5.0] - 2026-10-25
@@ -197,7 +196,8 @@ benchmark runs bit for bit).
   `2153948ebed51150`), plus the `amm` alias package, `CITATION.cff`, and an AMM README. No
   algorithmic change. Yanked from PyPI: use 0.3.0 or later.
 
-[Unreleased]: https://github.com/BjBodner/amm-optimizer/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/BjBodner/amm-optimizer/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/BjBodner/amm-optimizer/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/BjBodner/amm-optimizer/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/BjBodner/amm-optimizer/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/BjBodner/amm-optimizer/releases/tag/v0.3.0
