@@ -137,7 +137,6 @@ def test_without_restarts_it_returns_at_the_first_stagnation():
     assert result.used == objective.calls < 5000
 
 
-# research-only options (deprecated in 0.6.0)
 def test_quadratic_step_finds_the_minimum_of_a_quadratic():
     from amm_optimizer.cma_phase import quadratic_step
 

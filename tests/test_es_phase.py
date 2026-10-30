@@ -211,7 +211,6 @@ def test_the_es_is_skipped_above_the_budget_limit():
     )
 
 
-# research-only options (deprecated in 0.6.0)
 def test_the_design_follows_the_factor_and_has_at_least_four_points(monkeypatch):
     import amm_optimizer as atm
     import amm_optimizer.api

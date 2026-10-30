@@ -87,8 +87,6 @@ def test_a_positive_coordinate_opens_both_gates():
     assert ledger_a == ledger_b
 
 
-# research-only options (deprecated in 0.6.0)
-# research-only options (deprecated in 0.6.0)
 def test_loguniform_targeted_step_is_a_bounded_multiple_of_the_move():
     change = np.array([1.0, -2.0, 0.5])
     low, high = TARGETED_MULTIPLIER_RANGE
@@ -104,6 +102,3 @@ def test_loguniform_targeted_step_is_a_bounded_multiple_of_the_move():
     assert rng.ledger == [("rand", (500, 1))]  # one draw, like the original
     original = targeted_search(change, 500, params(), 5.0, 5.0, 50.0, rng)
     assert np.abs(original).max() > 10 * np.abs(change).max()  # unbounded by comparison
-
-
-# research-only options (deprecated in 0.6.0)

@@ -328,8 +328,8 @@ def minimize(
 
     Notes
     -----
-    Thread safety: runs in separate threads are independent; the run's step
-    unit is a per-thread context variable, not a module global. Warnings that
+    Thread safety: runs in separate threads are independent; a run keeps its
+    state in its own call, not in module globals. Warnings that
     ``fun`` raises reach the caller, except inside SciPy's quasi-Newton calls,
     where floating-point overflow and divide-by-zero warnings are silenced.
 

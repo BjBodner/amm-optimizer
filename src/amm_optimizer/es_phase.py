@@ -89,40 +89,40 @@ def run_es_phase(
     ``kind="lq2"`` IPOP population runs ranked by ``surrogate``;
     ``kind="slsqp"`` (internal: where a probe read smooth): restarted SLSQP
     (``qn_phase``); ``"slsqpnm"``: one SLSQP descent, then the Nelder-Mead
-    restarts of ``"nm"`` (cycle 17, D <= 2);
+    restarts of ``"nm"`` (D <= 2);
     ``"slsqplq"``: restarted SLSQP
     where ``qn_phase.curvature_beta`` reads the function as smooth, else
-    ``rugged_kind`` (cycle 12, ``c25``); ``"slsqplqc"``: ``"slsqplq"`` with the
-    two-direction probe (cycle 17).
-    ``fd_step``: SLSQP's forward-difference step (cycle 20; SciPy's default if None).
-    ``qn_fallback``: SLSQP hands a failing call to L-BFGS-B (cycle 28,
-    ``run_slsqp_restarts``'s ``fallback``).
-    ``"slsqpdes"`` (cycle 33, ``q7ed``): one SLSQP descent from the design's best, then
+    ``rugged_kind``; ``"slsqplqc"``: ``"slsqplq"`` with the
+    two-direction probe.
+    ``fd_step``: SLSQP's forward-difference step (SciPy's default if None).
+    ``qn_fallback``: SLSQP hands a failing call to L-BFGS-B
+    (``run_slsqp_restarts``'s ``fallback``).
+    ``"slsqpdes"``: one SLSQP descent from the design's best, then
     the (1+1) on the rest.
     ``lq_nonsep_only``: the (1+1) instead of ``lq2`` or ``slsqplq`` when the
-    separable search ran and its separability check passed (``sep_smooth_probe``,
-    cycle 38: for ``"slsqplq"`` and ``"slsqplqc"`` the curvature probe decides there
+    separable search ran and its separability check passed (``sep_smooth_probe``:
+    for ``"slsqplq"`` and ``"slsqplqc"`` the curvature probe decides there
     too, SLSQP where smooth and the (1+1) where rugged; f2 at D 5, 30 x D trailed
     restarted SLSQP by .65).
-    ``small_switch`` (a ``qn_phase.SmallSwitch``; the small10 toy): the first SLSQP
+    ``small_switch`` (a ``qn_phase.SmallSwitch``): the first SLSQP
     descent of ``"slsqpdes"`` and ``"slsqp"`` is read online and may hand the rest to
     restarted COBYQA (``cobyqa_phase.run_cobyqa_restarts``); with its ``rest``, COBYQA
     also replaces the (1+1) after ``"slsqpdes"``'s descent and after a rugged probe.
-    ``nan_reading`` (cycle 64, the SLSQP-cells toy): where an undefined probe slope
+    ``nan_reading``: where an undefined probe slope
     of ``"slsqplq"`` / ``"slsqplqc"`` goes (``curvature_beta``'s NaN: fewer than two
     positive mirrored losses, mostly probe pairs clipped at a box face): ``"rugged"``
-    (as before), ``"smooth"``, or ``"plateau"`` (smooth unless one ``plateau_check``
+    (as before) or ``"plateau"`` (smooth unless one ``plateau_check``
     then reads a plateau, which keeps f7's plateaus on the rugged kind).
-    ``ridge_after`` (the f13 toy): where the probe sends the prefix to SLSQP, its
+    ``ridge_after``: where the probe sends the prefix to SLSQP, its
     first descent is read once after that many iterations (``qn_phase.ridge_reading``);
     a ridge hands the rest to restarted COBYQA (``cobyqa_phase``, initial trust
     radius ``ridge_radius`` x box width). With ``small_switch`` too, the switch's
     checkpoints (after the first two line searches) come first; the ridge is read
     only on a descent the switch kept.
 
-    Research options from a second screen of parked ideas, each off by default:
+    Further options, each off by default:
 
-    * ``low_beta`` (the gaps4 toy): a finite rugged reading below it takes the
+    * ``low_beta``: a finite rugged reading below it takes the
       (1+1)-CMA-ES instead of the ``"lq2"`` populations (f23 at 100 x dim).
     * ``design`` (the anytime hand-over): these points (the best evaluated so far)
       instead of ``init_points`` uniform draws.
@@ -173,7 +173,7 @@ def run_es_phase(
     if kind == "slsqp":
         return _slsqp_prefix(ctx, x, cost, used, ridge_after)
     if kind in ("slsqpdes", "slsqpnm") and descent_retries and small_switch is None:
-        # ``descent_retries`` (parked2): the guarded descent, then the (1+1) / simplex
+        # ``descent_retries``: the guarded descent, then the (1+1) / simplex
         x, cost, spent = _guarded_descents(
             objective,
             rng,
@@ -334,7 +334,7 @@ def _read_curvature(
     used += spent
     kind = "slsqp" if beta >= BETA_THRESHOLD else rugged_kind
     if low_beta and kind == "lq2" and beta < low_beta:
-        # ``low_beta`` (gaps4): very rough readings (Katsuura reads -0.3 to 0.3 at
+        # ``low_beta``: very rough readings (Katsuura reads -0.3 to 0.3 at
         # 100 x dim) keep the elitist (1+1), which beats the populations there
         kind = "cma"
     if nan_reading != "rugged" and np.isnan(beta):
@@ -401,7 +401,7 @@ def _slsqp_prefix(
 ) -> EsResult:
     """Restarted SLSQP for the rest of the prefix (a smooth reading).
 
-    ``ridge_after`` (the f13 toy) and ``small_switch`` read the same first descent;
+    ``ridge_after`` and ``small_switch`` read the same first descent;
     the switch's checkpoints come before the ridge's iterations.
     """
     from .qn_phase import run_slsqp_restarts
@@ -453,7 +453,7 @@ def _one_descent(
     (the kind returned) the (1+1) or the simplex on the rest, or COBYQA's result."""
     from .qn_phase import run_slsqp_restarts
 
-    if kind == "slsqpdes":  # ``q7ed``: then the (1+1) (cycle 33; 10 x dim at D 5-19)
+    if kind == "slsqpdes":  # then the (1+1)
         reader = _switch_reader(ctx, len(x)) if ctx.small_switch is not None else None
         first = run_slsqp_restarts(
             ctx.objective,
@@ -561,8 +561,7 @@ def _guarded_descents(
     from its start (SciPy's false status 0 at the start, or a failure), a uniform
     restart, at most ``retries`` times, unless the first descent's first gradient was
     exactly zero (``FlatGradientReader``: a plateau, f7, keeps its budget for the
-    finisher). The SLSQP-cells toy's ``retry5`` checked with ``plateau_check`` (4
-    evaluations) instead; that code went with ``lean_gd`` (dead code 6).
+    finisher).
     """
     from .qn_phase import Descent, FlatGradientReader, run_slsqp_restarts
 

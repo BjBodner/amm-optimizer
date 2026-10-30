@@ -1,8 +1,8 @@
-"""Restarted SLSQP, a quasi-Newton local search (cycle 11).
+"""Restarted SLSQP, a quasi-Newton local search.
 
-On fresh bbob instances, SciPy's SLSQP restarted from uniform points beat the hybrid
-`c23` at 10-300 x D on the smooth functions (f6, f8-f14) and on Gallagher's f21-f22
-(RESULTS, pip-installable comparison). Its BFGS update learns a full Hessian from
+On fresh bbob instances, SciPy's SLSQP restarted from uniform points beat the first
+hybrid composite at 10-300 x D on the smooth functions (f6, f8-f14) and on
+Gallagher's f21-f22. Its BFGS update learns a full Hessian from
 finite-difference gradients (dim + 1 evaluations each), so it converges
 superlinearly where the function is smooth. Here it runs from the best point inside
 the box; after each run it restarts from a uniform point, until the evaluations are
@@ -23,71 +23,70 @@ from .es_phase import EsResult
 from .objective import CountedObjective
 
 FTOL = 1e-14
-# The curvature probe (cycle 12): scales as shares of the box width, directions, the
-# beta threshold (cycle 12 calibration ``prefix_beta.py``: beta over absolute scales
-# 0.3-3 is 1.5-2.4 on f1, f2, f6, f8-f14 and f20-f22, and -0.1 to 1.4 on f7, f15-f19,
-# f23 and f24, at D 5-40).
+# The curvature probe: scales as shares of the box width, directions, the beta
+# threshold (calibration: beta over absolute scales 0.3-3 is 1.5-2.4 on f1, f2, f6,
+# f8-f14 and f20-f22, and -0.1 to 1.4 on f7, f15-f19, f23 and f24, at D 5-40).
 BETA_SCALES = (0.03, 0.1, 0.3)
 BETA_DIRECTIONS = 4
 BETA_THRESHOLD = 1.45
 # ``es_kind="slsqplq"``: below this many times dim evaluations the prefix stays the
-# (1+1) (Batch 32: the 24-evaluation probe cost up to .05 at 10 x D).
+# (1+1) (the 24-evaluation probe cost up to .05 at 10 x D).
 QN_MIN_BUDGET_PER_DIM = 30.0
-# ``cma_local_nonsep="qn2"`` (cycle 13): plateau check at this share of the box width
-# (Batch 34 diagnosis: mirrored probes at absolute h = .003 repeat f(x) exactly in
-# every probe on f7 and in none on the other 23 bbob functions, D 5-40), and the
-# share of the local budget SLSQP may use before the CMA finisher takes over.
+# The SLSQP routes' plateau check at this share of the box width (mirrored probes
+# at absolute h = .003 repeat f(x) exactly in every probe on f7 and in none on the
+# other 23 bbob functions, D 5-40), and the share of the local budget SLSQP may use
+# before the CMA finisher takes over.
 TIE_SCALE = 3e-4
 TIE_DIRECTIONS = 2
 QN_LOCAL_SHARE = 1.0 / 3.0
-# ``"qn3"`` (Batch 36): the SLSQP stage is also capped at this many times dim, and
-# the finisher keeps the warm-start shape (Batch 35 lost f10, f11 and f14 at
-# 1000 x D when SLSQP took a third of the budget and the shape was dropped).
+# ``"qn3"``: the SLSQP stage is also capped at this many times dim, and the finisher
+# keeps the warm-start shape (without both, f10, f11 and f14 lost at 1000 x D when
+# SLSQP took a third of the budget and the shape was dropped).
 QN_LOCAL_CAP_PER_DIM = 100.0
 # ``multi_basin``: ends within ``SEED_GAP`` x width x sqrt(dim)
 # of a basin already descended.
 SEED_GAP = 0.02
-# ``"qn6"`` (cycle 16): a capped stage whose first descent is still running when the
-# cap is reached (f8, f9, f13 at D 20-40) continues for this share of what is left
-# before the CMA finisher; the hill-valley test (Maree et al. 2018) checks these
-# fractions of the segment between two descent ends, for up to this many pairs.
+# A capped stage whose first descent is still running when the cap is reached (f8,
+# f9, f13 at D 20-40) continues for this share of what is left before the CMA
+# finisher; the hill-valley test (Maree et al. 2018) checks these fractions of the
+# segment between two descent ends, for up to this many pairs.
 QN_EXTEND_SHARE = 2.0 / 3.0
-# ``es_kind="slsqplq10"`` (cycle 17): the curvature-gated prefix also below
+# ``es_kind="slsqplq10c"`` and its successors: the curvature-gated prefix also below
 # ``QN_MIN_BUDGET_PER_DIM`` x dim once the budget reaches this many evaluations, where
-# the 24-evaluation probe is at most an eighth of it (Batch 32 at 10 x D: D 20 +.026,
-# D 40 +.031; D 5 -.052 and D 10 -.006, where the probe costs a quarter or more).
+# the 24-evaluation probe is at most an eighth of it (at 10 x D: D 20 +.026, D 40
+# +.031; D 5 -.052 and D 10 -.006, where the probe costs a quarter or more).
 QN_MIN_BUDGET = 200
-# ``"slsqplq10c"`` (cycle 17, after Batch 43): below 30 x dim the probe uses this many
-# directions (12 evaluations). On calibration instances 1-3 and 8-10 at D 20 / 40, two
-# directions route 125 / 126 of 144 (function, instance) pairs as the calibration table,
-# four directions 125 / 124.
+# ``"slsqplq10c"``: below 30 x dim the probe uses this many directions (12
+# evaluations). On calibration instances 1-3 and 8-10 at D 20 / 40, two directions
+# route 125 / 126 of 144 (function, instance) pairs as the calibration table, four
+# directions 125 / 124.
 CHEAP_BETA_DIRECTIONS = 2
-# ``cma_local_nonsep="qn9"`` and ``es_kind="slsqplq10h"`` (cycle 20, detector report):
+# ``cma_local_nonsep="qn9"`` and ``es_kind="slsqplq10h"``:
 # SLSQP's forward-difference step. SciPy's default 1.49e-8 leaves a truncation-bias
 # floor of (h^2 / 8) d^T H^-1 d, about 1e-5 on the discus f11; on calibration ids 1-3
 # (D 5-20) a step of 1e-9 lifted restarted SLSQP by +.19 / +.22 / +.13-.22 / +.07-.10
 # on f10 / f11 / f12 / f13-f14 at 100-1000 x D.
 QN_FD_STEP = 1e-9
-# The status-4 fallback (``Variant.qn_fallback="lbfgsb"``, cycle 28): once at least
+# The status-4 fallback (``Variant.qn_fallback="lbfgsb"``): once at least
 # ``FALLBACK_MIN_DESCENTS`` SLSQP descents have completed and more of them failed
 # (SciPy status != 0) than converged, the call's remaining evaluations go to
 # restarted L-BFGS-B with ``LBFGSB_MAXCOR`` correction pairs and no tolerance stop
-# (ftol = gtol = 0). In c31's own runs only f12 (bent cigar) shows the majority
-# (cycle 27 status trace), where bounded SLSQP never converges at D 20-40.
+# (ftol = gtol = 0). On bbob only f12 (bent cigar) shows the majority, where bounded
+# SLSQP never converges at D 20-40.
 FALLBACK_MIN_DESCENTS = 2
 LBFGSB_MAXCOR = 10
-# ``QnRoute.rugged_ipop`` (cycle 29): the budget left (x dim) from which a rugged
+# ``QnRoute.rugged_ipop``: the budget left (x dim) from which a rugged
 # reading runs IPOP from a uniform point (Hansen & Kern 2004's global structure
-# needs wide, large populations; c31's plateau route for f7 is the template), and
+# needs wide, large populations; the plateau route for f7 is the template), and
 # where it starts at 8x instead of 4x (one 8x run gave .97 / .88 on f17 / f18 at
-# D 40, 3000 x D, against .78 / .58 for plain IPOP; COCO leaders report).
+# D 40, 3000 x D, against .78 / .58 for plain IPOP).
 RUGGED_IPOP_MIN_LEFT_PER_DIM = 640
-# ``rugged_ipop_low_dim`` (cycle 46): the low rugged route opens with this many x dim
-# left (Batch 63's 2000, 3000 x D budgets)
+# ``rugged_ipop_low_dim``: the low rugged route opens with this many x dim left
+# (for the 2000 and 3000 x D budgets)
 RUGGED_IPOP_LOW_LEFT_PER_DIM = 2000.0
 RUGGED_IPOP8_MIN_DIM = 20
 RUGGED_IPOP8_MIN_LEFT_PER_DIM = 2500
-# ``run_sampled_restarts`` (cycle 35, ``gal3c``; the multi-basin route's restarts):
+# ``run_sampled_restarts`` (the multi-basin route's restarts):
 # before each descent ``SAMPLE_PER_DIM`` x dim uniform points join a sample, and the
 # descent starts from the best sample point farther than ``SAMPLE_GAP_SHARE`` x box
 # width x sqrt(dim) from every earlier start and end; a descent above the incumbent
@@ -97,26 +96,28 @@ RUGGED_IPOP8_MIN_LEFT_PER_DIM = 2500
 SAMPLE_PER_DIM = 10
 SAMPLE_GAP_SHARE = 0.1
 GAP_STOP_SHARE = 0.01
-# ``micro_slopes`` (cycle 35, ``fract``): along ``MICRO_DIRECTIONS`` directions fixed
+# ``micro_slopes``: along ``MICRO_DIRECTIONS`` directions fixed
 # per dimension, the absolute mirrored second difference at the scales ``MICRO_SCALES``
 # x box width; its log10 slope between neighbouring scales is 2 where the function is
 # smooth at those scales and about 1 on Katsuura's fractal (f23). A rugged reading is
 # fractal when the median over directions of both of the two smallest slopes is below
 # ``MICRO_FRACTAL_SLOPE``, unless at least ``MICRO_KINK_DIRECTIONS`` directions read a
 # smallest slope within ``MICRO_KINK_SPREAD`` of exactly 1 (a kink in the probe line:
-# f16-f18) or the smallest scale reads no difference at all (a plateau: f7). In c34's
-# own rugged readings at D 20-40 (ids 1-3, 12 seeds) that flags 56 of 67 f23, 0 of 71
-# f16 and 0 of 313 others; no f23 reading had two directions within .02 of 1.
+# f16-f18) or the smallest scale reads no difference at all (a plateau: f7). In the
+# composite's own rugged readings at D 20-40 (ids 1-3, 12 seeds) that flags 56 of 67
+# f23, 0 of 71 f16 and 0 of 313 others; no f23 reading had two directions within .02
+# of 1.
 MICRO_SCALES = (1e-7, 1e-6, 1e-5, 1e-4)
 MICRO_DIRECTIONS = 4
 MICRO_FRACTAL_SLOPE = 1.5
 MICRO_KINK_SPREAD = 0.02
 MICRO_KINK_DIRECTIONS = 2
 MICRO_SEED = 4_243
-# ``kink_check`` (cycle 30, Batch 56; reused in cycle 36): mirrored second
+# ``kink_check``: mirrored second
 # differences at ``KINK_H_SHARE`` of the box width along ``KINK_DIRECTIONS`` directions
 # fixed per dimension (no draws from the run's stream). On a kink the difference grows
-# like 1 / h; on a smooth function it is the curvature. At c31's hand-over points
+# like 1 / h; on a smooth function it is the curvature. At the composite's hand-over
+# points
 # (calibration ids 1-3, D 5-40, 300-1000 x D) f13 (sharp ridge) read 9.3e7-3.4e8 and
 # every other bbob function at most 2e6 (one f16 run 2.1e7). ``KINK_D2`` is an
 # absolute threshold tied to bbob's scaling.
@@ -139,7 +140,7 @@ class Descent:
     status: int
 
 
-# ``cma_local_nonsep="qn10"`` (cycle 21, detector report's ``qnstall``): past the stage
+# The stall monitor (``QnRoute.extend_in_descent``): past the stage
 # cap, the first SLSQP descent continues (no restart, so its quasi-Newton matrix is
 # kept) while the last ``STALL_WINDOW`` iterations look healthy: median ratio of
 # actual to predicted decrease at the first line-search trial at least ``STALL_RHO``
@@ -220,7 +221,7 @@ class StallMonitor:
 
 @dataclass(frozen=True)
 class SmallSwitch:
-    """``small_switch`` (research option, from a study of budgets up to 10 x D).
+    """``small_switch`` (from a study of budgets up to 10 x D).
 
     The prefix's first SLSQP descent is read at two checkpoints, the first probe of
     the gradient after its first and after its second line search (no extra
@@ -327,7 +328,7 @@ class SwitchReader:
 class FlatGradientReader:
     """Reads whether a descent's first finite-difference gradient was exactly zero.
 
-    Research (``prefix_descent_retries``, the parked2 toy): SLSQP's first ``dim + 1``
+    For ``prefix_descent_retries``: SLSQP's first ``dim + 1``
     evaluations are its start and the forward-difference probes of its first gradient;
     when all of them repeat one value the start sits on a plateau (bbob f7), a reading
     the descent already paid for. Same interface as :class:`SwitchReader`; it never
@@ -356,7 +357,7 @@ class FlatGradientReader:
         return len(v) == self.dim + 1 and all(x == v[0] for x in v)
 
 
-# ``ridge_reading`` (the f13 toy, ``Variant.prefix_ridge_after``): on f13's sharp
+# ``ridge_reading`` (``Variant.prefix_ridge_after``): on f13's sharp
 # ridge every full SLSQP step overshoots across the ridge by a similar factor (the
 # median ratio of actual to predicted decrease at the first trial is -1.7 to -3.0 at
 # D 20 / 40, 30 x D, calibration ids 1-3) and about one backtrack recovers it (2.3-2.8
@@ -487,7 +488,7 @@ def run_slsqp_restarts(
             best_x, best_cost, best_start = point.copy(), float(value), start
         if value < run_best[0]:
             run_best[0], run_best[1] = float(value), point.copy()
-        # The c45 candidate's composition order of the first descent's readers (each
+        # The composition order of the first descent's readers (each
         # only when on, so any one alone runs exactly as on its own branch):
         # ``reader`` (small_switch) before the evaluation, the ``StallMonitor`` after
         # it, then the ridge reading (``ridge_after``, once; a ridge stops the call)
@@ -598,10 +599,10 @@ def micro_slopes(
     the step). Spends 2 x scales x directions evaluations. None if the objective ran
     out.
 
-    ``centered`` (cycle 37): a point within the largest scale of
+    ``centered``: a point within the largest scale of
     a bound is first moved inward by at most that scale (one more evaluation), so no
     probe point is clipped. A clipped probe is one-sided, and its second difference
-    grows linearly in the step: Batch 59's f16 false exemptions sat on the bound.
+    grows linearly in the step: f16's false exemptions without it sat on the bound.
     """
     dim = len(x)
     width = float(np.mean(box.upper - box.lower))
@@ -650,11 +651,11 @@ class _AbortDescentError(Exception):
     pass
 
 
-# ``run_scaled_bfgs`` (cycle 44, idea #58 from the local-engine toy): a Lewis-Overton
+# ``run_scaled_bfgs``: a Lewis-Overton
 # nonsmooth BFGS on forward differences taken along the eigenvectors of its inverse
 # Hessian, each with step 2 sqrt(eps |f| mu_i) clipped to ``SCALED_STEP_RANGE``: long
 # along a smooth valley, tiny across a ridge (f13), where no fixed step suits both.
-# Calibration-id toy (cold start, D 5-20, 300-1000 x D): f13 1.00 in every cell
+# On calibration ids (cold start, D 5-20, 300-1000 x D): f13 1.00 in every cell
 # against .55-.66 for SLSQP at a 1e-9 step; f12 +.53, f11 1.00; behind SLSQP at 30-100
 # x D (f8, f10).
 SCALED_STEP_RANGE = (1e-12, 1e-6)
@@ -701,11 +702,11 @@ def _scaled_grad(
 def _box_qp(g: np.ndarray, b: np.ndarray, lo: np.ndarray, hi: np.ndarray) -> np.ndarray:
     """argmin_d g.d + d.B.d / 2 over lo <= d <= hi (lo <= 0 <= hi), B SPD.
 
-    A primal active-set method from d = 0 (the BFGS engine toy, 2026-10-21): solve on
+    A primal active-set method from d = 0: solve on
     the free set with the bound coordinates fixed, step to the first blocking bound and
     add it; once the free solve is feasible, release the bound with the most negative
-    multiplier or stop. On 300 random box QPs (D 2-40, condition up to 1e6) the toy's
-    copy was always feasible and never worse than L-BFGS-B's solution by more than
+    multiplier or stop. On 300 random box QPs (D 2-40, condition up to 1e6) it was
+    always feasible and never worse than L-BFGS-B's solution by more than
     3.2e-12 relative.
     """
     n = len(g)
@@ -783,11 +784,11 @@ def run_scaled_bfgs(
     slope is one forward difference along the direction), the BFGS update when
     s.y > 0, and no small-step stop: a descent ends only when the line search finds
     no Armijo point or the projected direction is not a descent direction. Later
-    descents start from uniform points. ``box_qp`` (cycle 59): where -H g leaves the
+    descents start from uniform points. ``box_qp``: where -H g leaves the
     box, the direction is the quadratic model's minimiser over the box (``_box_qp``),
     as in SLSQP. Returns the best point, its value, a sigma from the first descent's
     travel (as ``run_slsqp_restarts``) and the evaluations used.
-    ``extend_to`` (the f13 toy, ``Variant.rugged_try_rest``): a descent still running
+    ``extend_to`` (``Variant.rugged_try_rest``): a descent still running
     when ``evaluations`` are used goes on, the same descent, up to ``extend_to``
     evaluations, if ``extend_gate(best_x, best_cost)`` (read once; None: always).
     """
@@ -833,7 +834,7 @@ def run_scaled_bfgs(
                 if not box_qp:
                     d = _free_dir(z, d, box)
                 elif np.any((z + d < box.lower) | (z + d > box.upper)):
-                    # ``box_qp`` (cycle 59, the engine toy): SLSQP's bound handling.
+                    # ``box_qp``: SLSQP's bound handling.
                     # The model's minimiser over the box replaces zeroing the components
                     # that point out of a face, so t <= 1 stays inside the box and no H
                     # reset is needed at a face (f10: 4-20 resets per run, all at a
@@ -1285,28 +1286,27 @@ class QnRoute:
       for ``QN_EXTEND_SHARE`` of what is left, for at most another capped stage
       (``"capped"``, ``"qn7"``), or not (``"none"``).
     * ``basins``: converged descents in separate basins (``multi_basin``) keep
-      restarting SLSQP to the end (from ``"qn6"``).
+      restarting SLSQP to the end.
     * ``rugged_steps``: a rugged or plateau reading gives the finisher ``steps``
-      populations (from ``"qn6"``).
+      populations.
     * ``plateau_ipop4``: a plateau runs IPOP populations with 4x the default lambda
       from a uniform point to the end (from ``"qn8"``).
     * ``fd_step``: the stage and its extension use SLSQP with the finite-difference
-      step ``QN_FD_STEP`` instead of SciPy's (from ``"qn9"``, cycle 20).
+      step ``QN_FD_STEP`` instead of SciPy's (from ``"qn9"``).
     * ``extend_in_descent``: the stage's first descent goes on past the cap while a
       ``StallMonitor`` reads it as progressing, keeping a reserve for the finisher,
-      instead of the separate extension (cycle 21).
+      instead of the separate extension.
     * ``basins_scipy_step``: the multi-basin SLSQP restarts use SciPy's step, for
-      more and cheaper descents (from ``"qn12"``, cycle 24).
+      more and cheaper descents (from ``"qn12"``).
     * ``rugged_ipop``: a rugged reading with at least ``RUGGED_IPOP_MIN_LEFT_PER_DIM``
       x dim left runs the plateau route's schedule instead of the finisher: IPOP
       populations from a uniform point at sigma0 = box / 5, 4x the default lambda
       doubling per restart (8x from ``RUGGED_IPOP8_MIN_DIM`` with at least
       ``RUGGED_IPOP8_MIN_LEFT_PER_DIM`` x dim left), no protection, to the end
-      (cycle 29; COCO leaders report rank 2). ``rugged_ipop_min_dim``:
-      only from that dimension (``"qn17"``: D >= 20, cycle 31; Batch 55 lost f15-f16
-      at D 5 and f18 at D 10, where c31's (1+1)-first path is strong, and no in-state
-      probe separates the fractal f23 from Schaffer's f17-f18).
-    * ``cap_gate`` (with ``extend_in_descent``; cycle 33): the stage's
+      ``rugged_ipop_min_dim``: only from that dimension (``"qn17"``: D >= 20; lower
+      it lost f15-f16 at D 5 and f18 at D 10, where the (1+1)-first path is strong,
+      and no in-state probe separates the fractal f23 from Schaffer's f17-f18).
+    * ``cap_gate`` (with ``extend_in_descent``): the stage's
       first descent, still running at the cap, goes on to SciPy's own exit (or the
       budget minus the reserve) when the ``StallMonitor`` reads its last iterations
       as progressing at the cap, read once (``run_slsqp_restarts``'s ``gate_once``);
@@ -1315,13 +1315,13 @@ class QnRoute:
     * ``second_descent_min_left_per_dim`` (``"qn19"``): after a gated descent that
       converged with at least this many x dim evaluations left, one more SLSQP
       descent from a uniform point before the finisher (Rosenbrock's second minimum).
-    * ``basins_sampled`` (``"qn20"``, cycle 35, ``gal3c``): the multi-basin restarts
+    * ``basins_sampled`` (``"qn20"``): the multi-basin restarts
       are ``run_sampled_restarts`` (sampled starts and the gap-scaled stop).
-    * ``fractal_exempt`` (``"qn29"``, cycles 35 and 37, ``fract2``): before the rugged
+    * ``fractal_exempt`` (``"qn29"``): before the rugged
       route's populations, ``micro_slopes`` tests the reading (centred: the probe
       moved off the bounds first); a fractal one (f23-like) runs restarted SLSQP
       (SciPy's step) for the rest instead.
-    * ``kink_small_step`` (``"qn38"``, cycles 36, 44 and 47, f13): where the cap gate
+    * ``kink_small_step`` (``"qn38"``, f13): where the cap gate
       read the stage's first descent as not progressing, from ``kink_min_dim``,
       ``kink_check`` tests the hand-over point; a kink with at least
       ``KINK_MIN_LEFT_PER_DIM`` x dim left runs the scaled-FD BFGS for the rest
@@ -1356,7 +1356,7 @@ class QnRoute:
             raise ValueError(f"extend must be none or capped, got {self.extend!r}")
 
 
-# ``Variant.cma_local_nonsep``'s SLSQP routes (cycles 13-25). A new route that
+# ``Variant.cma_local_nonsep``'s SLSQP routes. A new route that
 # recombines these steps is one row here (and its name in ``config.py``'s choices).
 _QN8 = QnRoute(extend="capped", basins=True, rugged_steps=True, plateau_ipop4=True)
 _QN12 = replace(_QN8, fd_step=True, basins_scipy_step=True)
@@ -1373,12 +1373,11 @@ QN_ROUTES: dict[str, QnRoute] = {
     "qn17": _QN17,
     "qn19": _QN19,
     "qn20": replace(_QN19, basins_sampled=True),
-    # cycle 39's promoted route: ``gal3c``'s sampled restarts plus ``fract2`` (the
-    # centred fractal probe) on ``qn19``; cycle 36's f13 kink route (``qn24``, SLSQP
-    # at a smaller step) did not confirm twice and left with dead code 7
+    # the sampled restarts plus the centred fractal probe on ``"qn19"``
     "qn29": _QN29,
-    # cycle 48 (Batch 65): ``kinklow`` + ``tryd5`` + ``lowipop`` on one route. The
-    # try (D <= 9, up to 500 x D) and the low rugged IPOP (2000 x D left) never meet
+    # the f13 kink route, the capped rugged try and the low rugged IPOP on one
+    # route. The try (D <= 9, up to 500 x D) and the low rugged IPOP (2000 x D left)
+    # never meet
     "qn38": replace(
         _QN29,
         kink_small_step=True,
@@ -1388,10 +1387,10 @@ QN_ROUTES: dict[str, QnRoute] = {
         rugged_try_max_budget_per_dim=500.0,
         rugged_ipop_low_dim=5,
     ),
-    # cycle 59: on a smooth reading up to 300 x D, one descent of the scaled-FD BFGS
-    # with SLSQP's bound handling (``box_qp``; the engine toy's f10 fix), then the usual
-    # staged route from its best point (the parked study's ``pk40d1``: the descent's
-    # own end decides, so Gallagher keeps its basin restarts)
+    # on a smooth reading up to 300 x D, one descent of the scaled-FD BFGS with
+    # SLSQP's bound handling (``box_qp``, which fixed f10), then the usual staged route
+    # from its best point (the descent's own end decides, so Gallagher keeps its basin
+    # restarts)
     "qn44": replace(
         _QN29,
         kink_small_step=True,

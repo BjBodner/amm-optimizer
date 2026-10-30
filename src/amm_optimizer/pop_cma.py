@@ -75,14 +75,14 @@ def run_population_restarts(
         if lambda_rule == "fixed2":
             lam = 2 * default_population(dim)
         elif lambda_rule == "steps":
-            # Cycle 14 (literature report, rank 2; sweep at D 5, 20, 40): the
-            # multiple of the default lambda that wins with R x dim evaluations left.
+            # The multiple of the default lambda that wins with R x dim evaluations
+            # left (a sweep at D 5, 20, 40).
             left_per_dim = (evaluations - used) / dim
             multiple = 4 if left_per_dim >= 640 else 2 if left_per_dim >= 150 else 1
             lam = multiple * default_population(dim)
-        elif lambda_rule == "ipop4":  # cycle 18's plateau route: 4x, doubling
+        elif lambda_rule == "ipop4":  # the plateau route: 4x, doubling
             lam = 4 * default_population(dim) * 2**restarts
-        elif lambda_rule == "ipop8":  # cycle 29's rugged route at D >= 20: 8x, doubling
+        elif lambda_rule == "ipop8":  # the rugged route at D >= 20: 8x, doubling
             lam = 8 * default_population(dim) * 2**restarts
         else:
             lam = default_population(dim) * (2**restarts if doubling else 1)

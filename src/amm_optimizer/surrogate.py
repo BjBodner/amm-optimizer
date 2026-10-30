@@ -56,7 +56,7 @@ def _solve_pos(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """``scipy.linalg.solve(a, b, assume_a="pos")``: the same bits, less overhead.
 
     The solution is LAPACK ``dposv`` on the upper triangle, as in scipy's solve
-    (bit-equal with SciPy 1.18 on every fit of c43 runs; ``lower=True`` and
+    (bit-equal with SciPy 1.18 on every fit of the recorded runs; ``lower=True`` and
     ``cho_factor`` are not), without scipy's fixed cost of about 0.14 ms a call
     (and without its condition estimate, so no ``LinAlgWarning``). A 1 x 1 system
     (scipy divides), non-finite input (scipy's ``check_finite``), a failed

@@ -1,4 +1,4 @@
-"""A separable coordinate search (variant ``sep_probe``, audit cycle 4).
+"""A separable coordinate search (variant ``sep_probe``).
 
 Round-robin STEP as in BSrr (Pošík and Baudiš 2015): every coordinate keeps the
 points sampled along its axis through the current best point ``x*`` and, at each
@@ -16,7 +16,7 @@ about ``3 dim`` evaluations (HCMA's non-separability test, Loshchilov et al. 201
 
 That check only sees an interaction if ``x*`` has moved along another axis since the
 re-evaluated point was sampled. On a rugged rotated function STEP soon sticks in a
-local minimum, ``x*`` stops moving and the check passes for ever (cycle 23: on
+local minimum, ``x*`` stops moving and the check passes for ever (on
 rotated Rastrigin / Schaffer at D 5 the phase took 40% of a 3000 x D budget).
 ``pair_check`` moves two axes at once to stored points and tests additivity,
 ``f(x*; x_i = a, x_j = b) = f* + h_i(a) + h_j(b)``, which holds exactly under
@@ -56,19 +56,19 @@ def run_step_phase(
     Returns the best point and value, the evaluations used and, as ``stalled``,
     whether the phase stopped because the separability check failed.
 
-    ``parabolic`` (cycle 14, after Brent-STEP): every other turn of an axis probes the
+    ``parabolic`` (after Brent-STEP): every other turn of an axis probes the
     vertex of the parabola through its best stored point and the two neighbours
     when that parabola is convex and the vertex lies strictly inside their bracket,
     away from both, instead of STEP's least-difficult midpoint. On a separable
     quadratic (bbob f2) one such step lands on an axis's minimum.
-    ``pair_when_stuck`` (cycle 29): the check uses ``pair_check``'s two-axis
+    ``pair_when_stuck``: the check uses ``pair_check``'s two-axis
     additivity test only when the best value has not improved over the last two
     sweeps. Re-evaluating a stored point of one axis at an unchanged best returns the
     stored value, so the one-axis check cannot fail once STEP is stuck in a local
     minimum (f15-f18 at D 5 spent 600-1800 x dim there).
-    ``check_tol`` replaces ``CHECK_TOL`` (``sep_route``, cycle 50: inf turns the
+    ``check_tol`` replaces ``CHECK_TOL`` (``sep_route``: inf turns the
     check off once a pair test has read the function separable).
-    Each axis keeps its samples in arrays (cycle 50; they were lists converted at
+    Each axis keeps its samples in arrays (they were lists converted at
     every turn, O(samples) Python work per evaluation: 4 ms per evaluation at D 40,
     3000 x D). The points evaluated are the same. Since 2026-10-23 (post-freeze)
     the arrays are buffers that also hold every interval's difficulty, updated
