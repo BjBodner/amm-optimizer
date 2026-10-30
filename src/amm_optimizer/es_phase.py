@@ -131,43 +131,24 @@ def run_es_phase(
       many times, after a descent that did not move, unless its first gradient was
       exactly zero (a plateau; ``qn_phase.FlatGradientReader``).
     """
-    dim = len(x0)
-    width = float(np.mean(box.upper - box.lower))
-    # passed only when on, so the other prefixes' calls stay exactly as recorded
-    qn_on: dict[str, Any] = {"fallback": True} if qn_fallback else {}
-    x = np.array(x0, dtype=float)
-    cost = objective.evaluate_point(x)
-    assert cost is not None  # the first evaluation of a run always fits
-    used = 1
-    if design is None:
-        design = box.lower + (box.upper - box.lower) * rng.rand(
-            min(init_points, evaluations - used), dim
-        )
-    else:  # the anytime hand-over: the best points earlier stages evaluated
-        design = design[: min(init_points, evaluations - used)]
-    for candidate in design:
-        value = objective.evaluate_point(candidate)
-        used += 1
-        if value is not None and value < cost:
-            x, cost = candidate, value
-    separable = False
+    ctx = _Prefix(
+        objective,
+        rng,
+        box,
+        evaluations,
+        float(np.mean(box.upper - box.lower)),
+        sigma_scale,
+        fd_step,
+        # passed only when on, so the other prefixes' calls stay exactly as recorded
+        {"fallback": True} if qn_fallback else {},
+        small_switch,
+        ridge_radius,
+    )
+    x, cost, used = _design(ctx, x0, init_points, design)
     if step_share > 0:  # ``sep_probe``: the separable coordinate search
-        from .step_phase import run_step_phase
-
-        # passed only when on, so the other calls stay exactly as recorded
-        step_on: dict[str, Any] = {}
-        if step_pair_when_stuck:
-            step_on["pair_when_stuck"] = True
-        probe = run_step_phase(
-            objective,
-            x,
-            cost,
-            box,
-            int(step_share * (evaluations - used)),
-            **step_on,
+        x, cost, used, separable = _separable_search(
+            ctx, x, cost, used, step_share, step_pair_when_stuck
         )
-        x, cost, used = probe.x, probe.cost, used + probe.used
-        separable = not probe.stalled
         if (
             lq_nonsep_only
             and kind in ("lq2", "slsqplq")
@@ -177,169 +158,20 @@ def run_es_phase(
             kind = "cma"  # the separability check passed: keep the (1+1)
         if sep_smooth_probe and lq_nonsep_only and separable:
             rugged_kind = "cma"  # separable but rugged (f3, f4): the (1+1) as before
-
-    def plateau_populations(
-        x: np.ndarray, cost: float, used: int
-    ) -> tuple[bool, EsResult]:
-        """``plateau_pop``: (handled, result) after ``plateau_check`` at ``x``."""
-        from .pop_cma import run_population_restarts
-        from .qn_phase import plateau_check
-
-        flat = plateau_check(
-            objective, np.random.RandomState(PLATEAU_SEED + dim), x, cost, box
-        )
-        if flat is None:
-            return True, EsResult(
-                x, cost, INITIAL_SIGMA_SHARE * width * sigma_scale, used
-            )
-        used += flat[1]
-        if not flat[0]:
-            return False, EsResult(x, cost, 0.0, used)
-        pop = run_population_restarts(
-            objective,
-            rng,
-            x,
-            cost,
-            INITIAL_SIGMA_SHARE * width * sigma_scale,
-            box,
-            evaluations - used,
-            True,
-            active=True,
-        )
-        if pop.cost <= cost:
-            x, cost = pop.x, pop.cost
-        return True, EsResult(x, cost, pop.sigma, used + pop.used)
-
     if plateau_pop and kind in ("nm", "slsqpnm", "slsqplq", "slsqplqc"):
-        handled, checked = plateau_populations(x, cost, used)
+        handled, checked = _plateau_populations(ctx, x, cost, used, len(x0))
         if handled:
             return checked
         used = checked.used
     if kind in ("slsqplq", "slsqplqc"):  # SLSQP where the probe reads smooth
-        from .qn_phase import (
-            BETA_DIRECTIONS,
-            BETA_THRESHOLD,
-            CHEAP_BETA_DIRECTIONS,
-            curvature_beta,
+        read = _read_curvature(
+            ctx, kind, x, cost, used, rugged_kind, low_beta, nan_reading
         )
-
-        # The c45 candidate's prefix reading composes in this order (each step only
-        # when on): a NaN slope is read by ``nan_reading`` (then the plateau check);
-        # on SLSQP,
-        # ``small_switch``'s checkpoints come first and the ridge reading
-        # (``ridge_after``) after them. ``descent_retries`` acts only on the
-        # one-descent kinds (``"slsqpdes"``, ``"slsqpnm"``) further down.
-        probe_dirs = CHEAP_BETA_DIRECTIONS if kind == "slsqplqc" else BETA_DIRECTIONS
-        probed = curvature_beta(
-            objective,
-            rng,
-            x,
-            cost,
-            box,
-            probe_dirs,
-        )
-        if probed is None:
-            return EsResult(x, cost, INITIAL_SIGMA_SHARE * width * sigma_scale, used)
-        beta, x, cost, spent = probed
-        used += spent
-        kind = "slsqp" if beta >= BETA_THRESHOLD else rugged_kind
-        if low_beta and kind == "lq2" and beta < low_beta:
-            # ``low_beta`` (gaps4): very rough readings (Katsuura reads -0.3 to 0.3
-            # at 100 x dim) keep the elitist (1+1), which beats the populations there
-            kind = "cma"
-        if nan_reading != "rugged" and np.isnan(beta):
-            flat_nan = False
-            if nan_reading == "plateau":
-                from .qn_phase import plateau_check
-
-                flat = plateau_check(objective, rng, x, cost, box)
-                if flat is None:
-                    return EsResult(
-                        x, cost, INITIAL_SIGMA_SHARE * width * sigma_scale, used
-                    )
-                used += flat[1]
-                flat_nan = flat[0]
-            if not flat_nan:
-                kind = "slsqp"
-
-    def switch_reader() -> Any:
-        from .qn_phase import SCIPY_FD_STEP, SwitchReader
-
-        step = fd_step if fd_step is not None else SCIPY_FD_STEP
-        return SwitchReader(step, dim, small_switch)
-
-    def cobyqa_rest(x: np.ndarray, cost: float, used: int, sigma: float) -> EsResult:
-        from .cobyqa_phase import run_cobyqa_restarts
-
-        rest = run_cobyqa_restarts(
-            objective,
-            rng,
-            x,
-            box,
-            evaluations - used,
-            small_switch.radius,
-            cost=cost,
-            sigma=sigma,
-        )
-        return EsResult(rest.x, rest.cost, sigma, used + rest.used)
-
-    def ridge_rest(first: EsResult, x: np.ndarray, cost: float, used: int) -> EsResult:
-        """``ridge_after`` read a ridge: restarted COBYQA from the descent's best."""
-        from .cobyqa_phase import run_cobyqa_restarts
-
-        used += first.used
-        if first.cost <= cost:
-            x, cost = first.x, first.cost
-        rest = run_cobyqa_restarts(
-            objective, rng, x, box, evaluations - used, ridge_radius
-        )
-        if rest.cost <= cost:
-            x, cost = rest.x, rest.cost
-        return EsResult(x, cost, first.sigma, first.used + rest.used)
-
+        if isinstance(read, EsResult):
+            return read
+        kind, x, cost, used = read
     if kind == "slsqp":
-        from .qn_phase import run_slsqp_restarts
-
-        if small_switch is None and ridge_after <= 0:
-            return run_slsqp_restarts(
-                objective,
-                rng,
-                x,
-                cost,
-                box,
-                evaluations - used,
-                fd_step=fd_step,
-                **qn_on,
-            )
-        # ``ridge_after`` (the f13 toy) and ``small_switch`` read the same first
-        # descent; the switch's checkpoints come before the ridge's 7 iterations
-        reader = switch_reader() if small_switch is not None else None
-        ridge: list[bool] = []
-        read_on: dict[str, Any] = {"reader": reader} if reader is not None else {}
-        if ridge_after > 0:
-            read_on |= {"ridge_after": ridge_after, "ridge_out": ridge}
-        out = run_slsqp_restarts(
-            objective,
-            rng,
-            x,
-            cost,
-            box,
-            evaluations - used,
-            fd_step=fd_step,
-            **read_on,
-            **qn_on,
-        )
-        if ridge and ridge[0]:
-            return ridge_rest(out, x, cost, used)
-        if (
-            reader is None
-            or not reader.stopped_at
-            or evaluations - used - out.used <= 0
-        ):
-            return out
-        if out.cost <= cost:
-            x, cost = out.x, out.cost
-        return cobyqa_rest(x, cost, used + out.used, out.sigma)
+        return _slsqp_prefix(ctx, x, cost, used, ridge_after)
     if kind in ("slsqpdes", "slsqpnm") and descent_retries and small_switch is None:
         # ``descent_retries`` (parked2): the guarded descent, then the (1+1) / simplex
         x, cost, spent = _guarded_descents(
@@ -350,26 +182,289 @@ def run_es_phase(
             box,
             evaluations - used,
             fd_step if kind == "slsqpdes" else None,
-            qn_on,
+            ctx.qn_on,
             descent_retries,
         )
         used += spent
         kind = "cma" if kind == "slsqpdes" else "nm"
-    if kind == "slsqpdes":  # ``q7ed``: one SLSQP descent from the design's best,
-        # then the (1+1) on the rest (cycle 33; 10 x dim at D 5-19)
-        from .qn_phase import run_slsqp_restarts
+    if kind in ("slsqpdes", "slsqpnm"):
+        descended = _one_descent(ctx, kind, x, cost, used)
+        if isinstance(descended, EsResult):
+            return descended
+        kind, x, cost, used = descended
+    return _local_search(ctx, kind, x, cost, used, model, cma_options)
 
-        reader = switch_reader() if small_switch is not None else None
-        first = run_slsqp_restarts(
-            objective,
-            rng,
+
+@dataclass(frozen=True)
+class _Prefix:
+    """What the steps of :func:`run_es_phase` share (its arguments, mostly)."""
+
+    objective: CountedObjective
+    rng: np.random.RandomState
+    box: Box
+    evaluations: int
+    width: float
+    sigma_scale: float
+    fd_step: float | None
+    qn_on: dict[str, Any]
+    small_switch: Any
+    ridge_radius: float
+
+    @property
+    def sigma0(self) -> float:
+        """The local searches' start sigma."""
+        return INITIAL_SIGMA_SHARE * self.width * self.sigma_scale
+
+    def stopped(self, x: np.ndarray, cost: float, used: int) -> EsResult:
+        """The prefix's result where the objective ran out during a probe."""
+        return EsResult(x, cost, self.sigma0, used)
+
+
+def _design(
+    ctx: _Prefix, x0: np.ndarray, init_points: int, design: Any
+) -> tuple[np.ndarray, float, int]:
+    """``x0`` and the uniform design (or the anytime hand-over's points): the best
+    point, its value and the evaluations used."""
+    objective, box = ctx.objective, ctx.box
+    x = np.array(x0, dtype=float)
+    cost = objective.evaluate_point(x)
+    assert cost is not None  # the first evaluation of a run always fits
+    used = 1
+    if design is None:
+        design = box.lower + (box.upper - box.lower) * ctx.rng.rand(
+            min(init_points, ctx.evaluations - used), len(x)
+        )
+    else:  # the anytime hand-over: the best points earlier stages evaluated
+        design = design[: min(init_points, ctx.evaluations - used)]
+    for candidate in design:
+        value = objective.evaluate_point(candidate)
+        used += 1
+        if value is not None and value < cost:
+            x, cost = candidate, value
+    return x, cost, used
+
+
+def _separable_search(
+    ctx: _Prefix,
+    x: np.ndarray,
+    cost: float,
+    used: int,
+    step_share: float,
+    pair_when_stuck: bool,
+) -> tuple[np.ndarray, float, int, bool]:
+    """``sep_probe``: STEP on ``step_share`` of what is left; (x, cost, used, whether
+    the separability check passed)."""
+    from .step_phase import run_step_phase
+
+    # passed only when on, so the other calls stay exactly as recorded
+    step_on: dict[str, Any] = {}
+    if pair_when_stuck:
+        step_on["pair_when_stuck"] = True
+    probe = run_step_phase(
+        ctx.objective,
+        x,
+        cost,
+        ctx.box,
+        int(step_share * (ctx.evaluations - used)),
+        **step_on,
+    )
+    return probe.x, probe.cost, used + probe.used, not probe.stalled
+
+
+def _plateau_populations(
+    ctx: _Prefix, x: np.ndarray, cost: float, used: int, dim: int
+) -> tuple[bool, EsResult]:
+    """``plateau_pop``: (handled, result) after ``plateau_check`` at ``x``."""
+    from .pop_cma import run_population_restarts
+    from .qn_phase import plateau_check
+
+    flat = plateau_check(
+        ctx.objective, np.random.RandomState(PLATEAU_SEED + dim), x, cost, ctx.box
+    )
+    if flat is None:
+        return True, ctx.stopped(x, cost, used)
+    used += flat[1]
+    if not flat[0]:
+        return False, EsResult(x, cost, 0.0, used)
+    pop = run_population_restarts(
+        ctx.objective,
+        ctx.rng,
+        x,
+        cost,
+        ctx.sigma0,
+        ctx.box,
+        ctx.evaluations - used,
+        True,
+        active=True,
+    )
+    if pop.cost <= cost:
+        x, cost = pop.x, pop.cost
+    return True, EsResult(x, cost, pop.sigma, used + pop.used)
+
+
+def _read_curvature(
+    ctx: _Prefix,
+    kind: str,
+    x: np.ndarray,
+    cost: float,
+    used: int,
+    rugged_kind: str,
+    low_beta: float,
+    nan_reading: str,
+) -> tuple[str, np.ndarray, float, int] | EsResult:
+    """The curvature probe of ``"slsqplq"`` / ``"slsqplqc"``: (the kind it routes
+    to, x, cost, used), or the result if the objective ran out.
+
+    A NaN slope is read by ``nan_reading`` (with ``"plateau"``, after a plateau
+    check); on SLSQP, ``small_switch``'s checkpoints come first and the ridge reading
+    (``ridge_after``) after them (:func:`_slsqp_prefix`).
+    """
+    from .qn_phase import (
+        BETA_DIRECTIONS,
+        BETA_THRESHOLD,
+        CHEAP_BETA_DIRECTIONS,
+        curvature_beta,
+    )
+
+    probe_dirs = CHEAP_BETA_DIRECTIONS if kind == "slsqplqc" else BETA_DIRECTIONS
+    probed = curvature_beta(ctx.objective, ctx.rng, x, cost, ctx.box, probe_dirs)
+    if probed is None:
+        return ctx.stopped(x, cost, used)
+    beta, x, cost, spent = probed
+    used += spent
+    kind = "slsqp" if beta >= BETA_THRESHOLD else rugged_kind
+    if low_beta and kind == "lq2" and beta < low_beta:
+        # ``low_beta`` (gaps4): very rough readings (Katsuura reads -0.3 to 0.3 at
+        # 100 x dim) keep the elitist (1+1), which beats the populations there
+        kind = "cma"
+    if nan_reading != "rugged" and np.isnan(beta):
+        flat_nan = False
+        if nan_reading == "plateau":
+            from .qn_phase import plateau_check
+
+            flat = plateau_check(ctx.objective, ctx.rng, x, cost, ctx.box)
+            if flat is None:
+                return ctx.stopped(x, cost, used)
+            used += flat[1]
+            flat_nan = flat[0]
+        if not flat_nan:
+            kind = "slsqp"
+    return kind, x, cost, used
+
+
+def _switch_reader(ctx: _Prefix, dim: int) -> Any:
+    """``small_switch``'s reader of the first SLSQP descent."""
+    from .qn_phase import SCIPY_FD_STEP, SwitchReader
+
+    step = ctx.fd_step if ctx.fd_step is not None else SCIPY_FD_STEP
+    return SwitchReader(step, dim, ctx.small_switch)
+
+
+def _cobyqa_rest(
+    ctx: _Prefix, x: np.ndarray, cost: float, used: int, sigma: float
+) -> EsResult:
+    """``small_switch``: restarted COBYQA on the rest, from ``x`` (value known)."""
+    from .cobyqa_phase import run_cobyqa_restarts
+
+    rest = run_cobyqa_restarts(
+        ctx.objective,
+        ctx.rng,
+        x,
+        ctx.box,
+        ctx.evaluations - used,
+        ctx.small_switch.radius,
+        cost=cost,
+        sigma=sigma,
+    )
+    return EsResult(rest.x, rest.cost, sigma, used + rest.used)
+
+
+def _ridge_rest(
+    ctx: _Prefix, first: EsResult, x: np.ndarray, cost: float, used: int
+) -> EsResult:
+    """``ridge_after`` read a ridge: restarted COBYQA from the descent's best."""
+    from .cobyqa_phase import run_cobyqa_restarts
+
+    used += first.used
+    if first.cost <= cost:
+        x, cost = first.x, first.cost
+    rest = run_cobyqa_restarts(
+        ctx.objective, ctx.rng, x, ctx.box, ctx.evaluations - used, ctx.ridge_radius
+    )
+    if rest.cost <= cost:
+        x, cost = rest.x, rest.cost
+    return EsResult(x, cost, first.sigma, first.used + rest.used)
+
+
+def _slsqp_prefix(
+    ctx: _Prefix, x: np.ndarray, cost: float, used: int, ridge_after: int
+) -> EsResult:
+    """Restarted SLSQP for the rest of the prefix (a smooth reading).
+
+    ``ridge_after`` (the f13 toy) and ``small_switch`` read the same first descent;
+    the switch's checkpoints come before the ridge's iterations.
+    """
+    from .qn_phase import run_slsqp_restarts
+
+    if ctx.small_switch is None and ridge_after <= 0:
+        return run_slsqp_restarts(
+            ctx.objective,
+            ctx.rng,
             x,
             cost,
-            box,
-            evaluations - used,
+            ctx.box,
+            ctx.evaluations - used,
+            fd_step=ctx.fd_step,
+            **ctx.qn_on,
+        )
+    reader = _switch_reader(ctx, len(x)) if ctx.small_switch is not None else None
+    ridge: list[bool] = []
+    read_on: dict[str, Any] = {"reader": reader} if reader is not None else {}
+    if ridge_after > 0:
+        read_on |= {"ridge_after": ridge_after, "ridge_out": ridge}
+    out = run_slsqp_restarts(
+        ctx.objective,
+        ctx.rng,
+        x,
+        cost,
+        ctx.box,
+        ctx.evaluations - used,
+        fd_step=ctx.fd_step,
+        **read_on,
+        **ctx.qn_on,
+    )
+    if ridge and ridge[0]:
+        return _ridge_rest(ctx, out, x, cost, used)
+    if (
+        reader is None
+        or not reader.stopped_at
+        or ctx.evaluations - used - out.used <= 0
+    ):
+        return out
+    if out.cost <= cost:
+        x, cost = out.x, out.cost
+    return _cobyqa_rest(ctx, x, cost, used + out.used, out.sigma)
+
+
+def _one_descent(
+    ctx: _Prefix, kind: str, x: np.ndarray, cost: float, used: int
+) -> tuple[str, np.ndarray, float, int] | EsResult:
+    """``"slsqpdes"`` / ``"slsqpnm"``: one SLSQP descent from the design's best, then
+    (the kind returned) the (1+1) or the simplex on the rest, or COBYQA's result."""
+    from .qn_phase import run_slsqp_restarts
+
+    if kind == "slsqpdes":  # ``q7ed``: then the (1+1) (cycle 33; 10 x dim at D 5-19)
+        reader = _switch_reader(ctx, len(x)) if ctx.small_switch is not None else None
+        first = run_slsqp_restarts(
+            ctx.objective,
+            ctx.rng,
+            x,
+            cost,
+            ctx.box,
+            ctx.evaluations - used,
             max_descents=1,
-            fd_step=fd_step,
-            **qn_on,
+            fd_step=ctx.fd_step,
+            **ctx.qn_on,
             **({"reader": reader} if reader is not None else {}),
         )
         used += first.used
@@ -377,40 +472,44 @@ def run_es_phase(
             x, cost = first.x, first.cost
         if (
             reader is not None
-            and evaluations - used > 0
-            and (reader.stopped_at or small_switch.rest)
+            and ctx.evaluations - used > 0
+            and (reader.stopped_at or ctx.small_switch.rest)
         ):
-            return cobyqa_rest(x, cost, used, first.sigma)
-        kind = "cma"
-    if kind == "slsqpnm":  # one SLSQP descent, then the simplex from its best
-        from .qn_phase import run_slsqp_restarts
+            return _cobyqa_rest(ctx, x, cost, used, first.sigma)
+        return "cma", x, cost, used
+    # ``"slsqpnm"``: then the simplex from its best
+    first = run_slsqp_restarts(
+        ctx.objective,
+        ctx.rng,
+        x,
+        cost,
+        ctx.box,
+        ctx.evaluations - used,
+        max_descents=1,
+        **ctx.qn_on,
+    )
+    used += first.used
+    if first.cost <= cost:
+        x, cost = first.x, first.cost
+    return "nm", x, cost, used
 
-        first = run_slsqp_restarts(
-            objective,
-            rng,
-            x,
-            cost,
-            box,
-            evaluations - used,
-            max_descents=1,
-            **qn_on,
-        )
-        used += first.used
-        if first.cost <= cost:
-            x, cost = first.x, first.cost
-        kind = "nm"
+
+def _local_search(
+    ctx: _Prefix,
+    kind: str,
+    x: np.ndarray,
+    cost: float,
+    used: int,
+    model: bool,
+    cma_options: dict[str, object] | None,
+) -> EsResult:
+    """The prefix's local search on the rest: Nelder-Mead, the lq2 populations, the
+    (1+1)-CMA-ES (or ``small_switch``'s COBYQA) or the (1+1)-ES."""
+    objective, rng, box, left = ctx.objective, ctx.rng, ctx.box, ctx.evaluations - used
     if kind == "nm":
         from .nm_phase import run_nm_restarts
 
-        return run_nm_restarts(
-            objective,
-            rng,
-            x,
-            cost,
-            box,
-            evaluations - used,
-            INITIAL_SIGMA_SHARE * width * sigma_scale,
-        )
+        return run_nm_restarts(objective, rng, x, cost, box, left, ctx.sigma0)
     if kind == "lq2":
         from .pop_cma import run_population_restarts
 
@@ -419,9 +518,9 @@ def run_es_phase(
             rng,
             x,
             cost,
-            INITIAL_SIGMA_SHARE * width * sigma_scale,
+            ctx.sigma0,
             box,
-            evaluations - used,
+            left,
             True,
             active=True,
             surrogate=kind,
@@ -429,22 +528,20 @@ def run_es_phase(
     if kind == "cma":
         from .cma_phase import run_cma
 
-        if small_switch is not None and small_switch.rest and evaluations - used > 0:
-            return cobyqa_rest(x, cost, used, INITIAL_SIGMA_SHARE * width * sigma_scale)
+        if ctx.small_switch is not None and ctx.small_switch.rest and left > 0:
+            return _cobyqa_rest(ctx, x, cost, used, ctx.sigma0)
         return run_cma(
             objective,
             rng,
             x,
             cost,
-            INITIAL_SIGMA_SHARE * width * sigma_scale,
+            ctx.sigma0,
             box,
-            evaluations - used,
+            left,
             model=model,
             **(cma_options or {}),  # type: ignore[arg-type]
         )
-    return run_es(
-        objective, rng, x, cost, INITIAL_SIGMA_SHARE * width, box, evaluations - used
-    )
+    return run_es(objective, rng, x, cost, INITIAL_SIGMA_SHARE * ctx.width, box, left)
 
 
 def _guarded_descents(
@@ -498,7 +595,7 @@ def _guarded_descents(
             break
         if reader is not None and reader.flat:  # a plateau: the finisher, no retries
             break
-        start = box.lower + (box.upper - box.lower) * rng.rand(dim)
+        start = box.uniform(rng)
         value = objective.evaluate_point(start)
         if value is None:
             break

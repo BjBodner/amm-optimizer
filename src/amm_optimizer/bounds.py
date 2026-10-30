@@ -44,6 +44,12 @@ class Box:
             raise ValueError("every lower bound must be below its upper bound")
         return cls(lower, upper)
 
+    def uniform(self, rng: np.random.RandomState) -> np.ndarray:
+        """A uniform point of the box: one ``rng.rand(dim)`` draw."""
+        return np.asarray(
+            self.lower + (self.upper - self.lower) * rng.rand(len(self.lower))
+        )
+
 
 def reflect(x: np.ndarray, box: Box) -> np.ndarray:
     """Fold ``x`` into the box by repeated reflection at the walls."""

@@ -57,7 +57,7 @@ def pair_test(
     dim = len(x)
     fun = BudgetedObjective(objective, 3 * dim + 1)
     x = np.array(x, dtype=float)
-    t = box.lower + (box.upper - box.lower) * rng.rand(dim)
+    t = box.uniform(rng)
     try:
         f0 = fun(x)
         fi = []
@@ -168,7 +168,7 @@ def band_consistency(
     """
     dim = len(x)
     fun = BudgetedObjective(objective, 6 * dim)
-    x2 = box.lower + (box.upper - box.lower) * rng.rand(dim)
+    x2 = box.uniform(rng)
     try:
         a = _band_factors(fun, x, box, h)
         b = _band_factors(fun, x2, box, h)
@@ -553,7 +553,7 @@ def run_coord_hess(
     try:
         while True:
             engine.solve(fun, start)
-            start = box.lower + (box.upper - box.lower) * rng.rand(len(x))
+            start = box.uniform(rng)
     except SpentError:
         pass
     best = fun.best_x if fun.best_x is not None else np.array(x, dtype=float)

@@ -311,18 +311,13 @@ def run_cma(
     (``quadratic_step``) once there are enough of them; a model candidate that
     improves is accepted but does not adapt sigma or the covariance.
 
-    Options of the audit's Batch 5 (all off by default):
-
-    * ``restart_rule`` is ``"legacy"`` (a 100 + 50 dim stall window) or ``"short"``
-      (10 + 30 dim).
-    * ``active`` adds the negative covariance update of Arnold and Hansen (2010).
-    * ``a0`` is the Cholesky factor the first run starts with (restarts reset it).
-
-    Options of the audit's Batch 12 (all off by default; ``Variant`` explains them):
-    ``model_kind="diagonal"`` is the gated, rank-weighted diagonal model
-    (``model_step``), and ``stop_when_left > 0`` returns at a
-    stagnation (``stalled``) instead of restarting if at least that many
-    evaluations are left.
+    ``model_kind="diagonal"``: the gated, rank-weighted diagonal model
+    (``model_step``) instead. ``restart_rule``: a stall window of 100 + 50 dim
+    (``"legacy"``) or 10 + 30 dim (``"short"``). ``active``: the negative covariance
+    update of Arnold and Hansen (2010). ``a0``: the first run's Cholesky factor.
+    ``stop_when_left > 0`` returns at a stagnation (``stalled``) instead of
+    restarting if at least that many evaluations are left; ``run_cap`` and
+    ``probe_at`` / ``probe_beta`` hand over earlier (``Variant`` explains them).
     """
     kind = model_kind if model_kind is not None else ("quadratic" if model else None)
     dim = len(x)
@@ -342,71 +337,24 @@ def run_cma(
     parents = [cost]
     p_c, p_succ = np.zeros(dim), p_target
     history: list[float] = []
-    n_model = (dim + 1) * (dim + 2) // 2
-    model_turn = False
     used = 0
-    diagonal = kind == "diagonal"
-    if diagonal:
-        n_diag = 2 * dim + 1
-        need, keep_fit = (
-            int(np.ceil(LQ_POINTS_PER_PARAMETER * n_diag)),
-            DIAGONAL_WINDOW * n_diag,
-        )
-    else:
-        need, keep_fit = n_model + dim, 2 * n_model
-    # The run's start and candidates, for the models: up to the largest window one
-    # reads (``keep_fit``, or ``2 n_model`` for ``quadratic_step``).
-    recent = _Recent(dim, max(keep_fit, 2 * n_model))
-    recent.reset(x, cost)
-    radius_fit = np.sqrt(dim) + GATED_RADIUS_ADD
-    period, countdown, low_streak = GATE_PERIOD[0], GATE_PERIOD[0], 0
+    models = _Models(kind, dim)
+    models.recent.reset(x, cost)
     probed = False
     ties: list[bool] = []
 
     while used < evaluations:
-        candidate = None
-        predicted = 0.0
-        if diagonal:
-            countdown -= 1
-            if countdown <= 0:
-                countdown = period
-                if recent.count >= need:
-                    found_step = model_step(
-                        *recent.latest(keep_fit),
-                        x,
-                        sigma,
-                        a,
-                        a_inv,
-                        "diagonal",
-                        True,
-                        radius_fit,
-                        box,
-                    )
-                    if found_step is not None:
-                        candidate, predicted = found_step
-        elif kind == "quadratic" and model_turn and recent.count >= n_model + dim:
-            proposal = quadratic_step(*recent.latest(2 * n_model), x, sigma, a, a_inv)
-            if proposal is not None:
-                candidate = clip(proposal, box.lower, box.upper)
-        model_turn = not model_turn
+        candidate, predicted = models.candidate(x, sigma, a, a_inv, box)
         if candidate is not None:
             value = objective.evaluate_point(candidate)
             if value is None:
                 break
             used += 1
-            recent.append(candidate, value)
-            if diagonal:
-                ratio = (cost - value) / predicted if predicted > 0 else -np.inf
-                if ratio < RATIO_LOW:
-                    low_streak += 1
-                    if low_streak >= 2:
-                        period, low_streak = min(GATE_PERIOD[1], 2 * period), 0
-                        countdown = period
-                elif ratio > RATIO_HIGH:
-                    period, low_streak = max(GATE_PERIOD[0], period // 2), 0
-                    countdown = period
-                else:
-                    low_streak = 0
+            models.recent.append(candidate, value)
+            if models.diagonal:
+                models.gate.read(
+                    (cost - value) / predicted if predicted > 0 else -np.inf
+                )
             if value <= cost:
                 x, cost = candidate, value
                 parents.append(cost)
@@ -414,120 +362,51 @@ def run_cma(
                     best_x, best_cost = x.copy(), cost
             history.append(cost)
             continue
-        z_draw = rng.randn(dim)
-        step = sigma * (a @ z_draw)
-        inward = ((x <= box.lower) & (step > 0)) | ((x >= box.upper) & (step < 0))
-        if inward.any():
-            step = np.where(inward & (rng.rand(dim) < PIN_STICK), -step, step)
-        candidate = clip(x + step, box.lower, box.upper)
+        candidate = _random_candidate(rng, x, sigma, a, box)
         value = objective.evaluate_point(candidate)
         if value is None:
             break
         used += 1
         if kind is not None:
-            recent.append(candidate, value)
+            models.recent.append(candidate, value)
         success = value <= cost
         ties.append(value == cost)
         p_succ = (1 - c_p) * p_succ + c_p * success
         if success:
             taken = (candidate - x) / sigma
             x, cost = candidate, value
-            if p_succ < p_thresh:
-                p_c = (1 - c_c) * p_c + np.sqrt(c_c * (2 - c_c)) * taken
-                alpha = 1 - c_cov
-            else:
-                p_c = (1 - c_c) * p_c
-                alpha = 1 - c_cov + c_cov * c_c * (2 - c_c)
-            a, a_inv = cholesky_update(a, a_inv, p_c, alpha, c_cov)
+            p_c, a, a_inv = _success_update(
+                p_c, a, a_inv, taken, p_succ < p_thresh, c_c, c_cov
+            )
             parents.append(cost)
             if cost < best_cost:
                 best_x, best_cost = x.copy(), cost
         elif active and len(parents) >= ACTIVE_LAG and value > parents[-ACTIVE_LAG]:
-            taken = (candidate - x) / sigma
-            z = a_inv @ taken
-            norm2 = float(z @ z)
-            rate = c_minus
-            if 2 * norm2 - 1 > 0:
-                rate = min(rate, 1 / (2 * norm2 - 1))
-            a, a_inv = cholesky_update(a, a_inv, taken, 1 + rate, -rate)
+            a, a_inv = _active_update(a, a_inv, (candidate - x) / sigma, c_minus)
         sigma *= float(np.exp((p_succ - p_target) / (d * (1 - p_target))))
         history.append(cost)
         span = short_window if restart_rule == "short" else window
         stalled = len(history) > span and history[-span - 1] - cost <= TOLFUN
+        left = evaluations - used
         if probe_at and not probed and len(history) >= probe_at:
-            # ``probe_at``: the curvature probe (cycle 9). Mirrored pairs along
-            # PROBE_DIRECTIONS directions of the learned metric at PROBE_SCALES times
-            # the step; beta is the slope of log(mean loss) against log(scale): 2 on
-            # any quadratic, lower on rugged landscapes.
             probed = True
-            losses: list[list[float]] = [[] for _ in PROBE_SCALES]
-            dirs = [a @ rng.randn(dim) for _ in range(PROBE_DIRECTIONS)]
-            spent = False
-            for j, scale in enumerate(PROBE_SCALES):
-                for d_k in dirs:
-                    pair = []
-                    for sign in (1.0, -1.0):
-                        point = clip(
-                            x + sign * scale * sigma * d_k, box.lower, box.upper
-                        )
-                        value = objective.evaluate_point(point)
-                        if value is None:
-                            spent = True
-                            break
-                        used += 1
-                        pair.append(float(value))
-                        if value < best_cost:
-                            best_x, best_cost = point.copy(), float(value)
-                    if spent:
-                        break
-                    losses[j].append(0.5 * (pair[0] + pair[1]) - cost)
-                if spent:
-                    break
-            if spent:
+            beta, spent, best_x, best_cost = _probe_beta(
+                objective, rng, x, cost, sigma, a, box, best_x, best_cost
+            )
+            used, left = used + spent, left - spent
+            if beta is None:
                 break
-            mean_loss = [float(np.mean(v)) for v in losses]
-            ok = [j for j, v in enumerate(mean_loss) if v > 0]
-            beta = (
-                float(
-                    np.polyfit(
-                        np.log10([PROBE_SCALES[j] for j in ok]),
-                        np.log10([mean_loss[j] for j in ok]),
-                        1,
-                    )[0]
-                )
-                if len(ok) >= 2
-                else float("nan")
-            )
-            if RECORD_PROBES:
-                PROBE_LOG.append(beta)
-            if (
-                probe_beta > 0
-                and beta < probe_beta
-                and evaluations - used >= stop_when_left
-                and used < evaluations
-            ):
+            if probe_beta > 0 and beta < probe_beta and left >= max(stop_when_left, 1):
                 return EsResult(best_x, float(best_cost), sigma, used, True)
-        if (
-            (run_cap and len(history) >= run_cap)
-            and evaluations - used >= stop_when_left
-            and used < evaluations
-        ):
-            # ``run_cap``: hand over after this many evaluations of the run even
-            # without a stall, returning the width scale (sigma det(A)^(1/dim)).
-            sign, log_det = np.linalg.slogdet(a)
-            scale = sigma * float(np.exp(log_det / dim)) if sign != 0 else sigma
-            shape = a @ a.T
-            shape = shape / np.exp(np.linalg.slogdet(shape)[1] / dim)
-            tied = float(np.mean(ties[-10 * dim :])) if ties else 0.0
-            return EsResult(
-                best_x, float(best_cost), scale, used, True, True, shape, tied
-            )
+        # ``run_cap``: hand over after this many evaluations of the run, stall or not
+        if run_cap and len(history) >= run_cap and left >= max(stop_when_left, 1):
+            return _capped(best_x, best_cost, sigma, a, used, ties)
         if (sigma < SIGMA_FLOOR_SHARE * width or stalled) and used < evaluations:
             if not restarts or (
                 stop_when_left and evaluations - used >= stop_when_left
             ):
                 return EsResult(best_x, float(best_cost), sigma, used, True)
-            x = box.lower + (box.upper - box.lower) * rng.rand(dim)
+            x = box.uniform(rng)
             value = objective.evaluate_point(x)
             if value is None:
                 break
@@ -540,9 +419,228 @@ def run_cma(
             p_c, p_succ = np.zeros(dim), p_target
             history = []
             parents = [cost]
-            recent.reset(x, cost)
+            models.restart(x, cost)
             ties = []
-            period, countdown, low_streak = GATE_PERIOD[0], GATE_PERIOD[0], 0
     sign, log_det = np.linalg.slogdet(a)
     scale = sigma * float(np.exp(log_det / dim)) if sign != 0 else sigma
     return EsResult(best_x, float(best_cost), scale, used)
+
+
+def _random_candidate(
+    rng: np.random.RandomState, x: np.ndarray, sigma: float, a: np.ndarray, box: Box
+) -> np.ndarray:
+    """The (1+1)'s random candidate ``x + sigma A z``, clipped onto the box; a step
+    that would pull a coordinate on a wall inside is mirrored outward with
+    probability ``PIN_STICK``."""
+    dim = len(x)
+    z_draw = rng.randn(dim)
+    step = sigma * (a @ z_draw)
+    inward = ((x <= box.lower) & (step > 0)) | ((x >= box.upper) & (step < 0))
+    if inward.any():
+        step = np.where(inward & (rng.rand(dim) < PIN_STICK), -step, step)
+    return np.asarray(clip(x + step, box.lower, box.upper))
+
+
+def _success_update(
+    p_c: np.ndarray,
+    a: np.ndarray,
+    a_inv: np.ndarray,
+    taken: np.ndarray,
+    below_threshold: bool,
+    c_c: float,
+    c_cov: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """After a success: the evolution path and the Cholesky factor's rank-one update
+    (the path learns from the step only while the success rate is below the
+    threshold)."""
+    if below_threshold:
+        p_c = (1 - c_c) * p_c + np.sqrt(c_c * (2 - c_c)) * taken
+        alpha = 1 - c_cov
+    else:
+        p_c = (1 - c_c) * p_c
+        alpha = 1 - c_cov + c_cov * c_c * (2 - c_c)
+    a, a_inv = cholesky_update(a, a_inv, p_c, alpha, c_cov)
+    return p_c, a, a_inv
+
+
+class _Gate:
+    """The diagonal model's period: lengthened by two low ratios of actual to
+    predicted decrease in a row (below ``RATIO_LOW``), shortened by one high one
+    (above ``RATIO_HIGH``)."""
+
+    def __init__(self) -> None:
+        self.period, self.countdown, self.low_streak = (
+            GATE_PERIOD[0],
+            GATE_PERIOD[0],
+            0,
+        )
+
+    def due(self) -> bool:
+        """Count one candidate; whether a model step is due."""
+        self.countdown -= 1
+        if self.countdown <= 0:
+            self.countdown = self.period
+            return True
+        return False
+
+    def read(self, ratio: float) -> None:
+        if ratio < RATIO_LOW:
+            self.low_streak += 1
+            if self.low_streak >= 2:
+                self.period, self.low_streak = min(GATE_PERIOD[1], 2 * self.period), 0
+                self.countdown = self.period
+        elif ratio > RATIO_HIGH:
+            self.period, self.low_streak = max(GATE_PERIOD[0], self.period // 2), 0
+            self.countdown = self.period
+        else:
+            self.low_streak = 0
+
+
+class _Models:
+    """The model candidates of a CMA run (``kind``: ``"quadratic"``, ``"diagonal"``
+    or None) and the recent points they are fitted to."""
+
+    def __init__(self, kind: str | None, dim: int) -> None:
+        self.kind, self.dim = kind, dim
+        self.diagonal = kind == "diagonal"
+        self.n_model = (dim + 1) * (dim + 2) // 2
+        if self.diagonal:
+            n_diag = 2 * dim + 1
+            self.need = int(np.ceil(LQ_POINTS_PER_PARAMETER * n_diag))
+            self.keep_fit = DIAGONAL_WINDOW * n_diag
+        else:
+            self.need, self.keep_fit = self.n_model + dim, 2 * self.n_model
+        # The run's start and candidates: up to the largest window a model reads
+        # (``keep_fit``, or ``2 n_model`` for ``quadratic_step``).
+        self.recent = _Recent(dim, max(self.keep_fit, 2 * self.n_model))
+        self.radius_fit = np.sqrt(dim) + GATED_RADIUS_ADD
+        self.gate = _Gate()
+        self.turn = False
+
+    def restart(self, x: np.ndarray, cost: float) -> None:
+        self.recent.reset(x, cost)
+        self.gate = _Gate()
+
+    def candidate(
+        self,
+        x: np.ndarray,
+        sigma: float,
+        a: np.ndarray,
+        a_inv: np.ndarray,
+        box: Box,
+    ) -> tuple[np.ndarray | None, float]:
+        """This turn's model candidate and its predicted decrease (None: a random
+        step); the quadratic model takes every other turn."""
+        candidate, predicted = None, 0.0
+        recent = self.recent
+        if self.diagonal:
+            if self.gate.due() and recent.count >= self.need:
+                found_step = model_step(
+                    *recent.latest(self.keep_fit),
+                    x,
+                    sigma,
+                    a,
+                    a_inv,
+                    "diagonal",
+                    True,
+                    self.radius_fit,
+                    box,
+                )
+                if found_step is not None:
+                    candidate, predicted = found_step
+        elif (
+            self.kind == "quadratic"
+            and self.turn
+            and recent.count >= self.n_model + self.dim
+        ):
+            proposal = quadratic_step(
+                *recent.latest(2 * self.n_model), x, sigma, a, a_inv
+            )
+            if proposal is not None:
+                candidate = clip(proposal, box.lower, box.upper)
+        self.turn = not self.turn
+        return candidate, predicted
+
+
+def _active_update(
+    a: np.ndarray, a_inv: np.ndarray, taken: np.ndarray, c_minus: float
+) -> tuple[np.ndarray, np.ndarray]:
+    """The active (negative) update of the Cholesky factor along ``taken``."""
+    z = a_inv @ taken
+    norm2 = float(z @ z)
+    rate = c_minus
+    if 2 * norm2 - 1 > 0:
+        rate = min(rate, 1 / (2 * norm2 - 1))
+    return cholesky_update(a, a_inv, taken, 1 + rate, -rate)
+
+
+def _probe_beta(
+    objective: CountedObjective,
+    rng: np.random.RandomState,
+    x: np.ndarray,
+    cost: float,
+    sigma: float,
+    a: np.ndarray,
+    box: Box,
+    best_x: np.ndarray,
+    best_cost: float,
+) -> tuple[float | None, int, np.ndarray, float]:
+    """``probe_at``: the curvature probe (cycle 9); (beta, evaluations used, best
+    point, its value), beta None when the objective ran out.
+
+    Mirrored pairs along ``PROBE_DIRECTIONS`` directions of the learned metric at
+    ``PROBE_SCALES`` times the step; beta is the slope of log(mean loss) against
+    log(scale): 2 on any quadratic, lower on rugged landscapes.
+    """
+    dim = len(x)
+    used = 0
+    losses: list[list[float]] = [[] for _ in PROBE_SCALES]
+    dirs = [a @ rng.randn(dim) for _ in range(PROBE_DIRECTIONS)]
+    for j, scale in enumerate(PROBE_SCALES):
+        for d_k in dirs:
+            pair = []
+            for sign in (1.0, -1.0):
+                point = clip(x + sign * scale * sigma * d_k, box.lower, box.upper)
+                value = objective.evaluate_point(point)
+                if value is None:
+                    return None, used, best_x, best_cost
+                used += 1
+                pair.append(float(value))
+                if value < best_cost:
+                    best_x, best_cost = point.copy(), float(value)
+            losses[j].append(0.5 * (pair[0] + pair[1]) - cost)
+    mean_loss = [float(np.mean(v)) for v in losses]
+    ok = [j for j, v in enumerate(mean_loss) if v > 0]
+    beta = (
+        float(
+            np.polyfit(
+                np.log10([PROBE_SCALES[j] for j in ok]),
+                np.log10([mean_loss[j] for j in ok]),
+                1,
+            )[0]
+        )
+        if len(ok) >= 2
+        else float("nan")
+    )
+    if RECORD_PROBES:
+        PROBE_LOG.append(beta)
+    return beta, used, best_x, best_cost
+
+
+def _capped(
+    best_x: np.ndarray,
+    best_cost: float,
+    sigma: float,
+    a: np.ndarray,
+    used: int,
+    ties: list[bool],
+) -> EsResult:
+    """``run_cap``'s hand-over: the width scale (sigma det(A)^(1/dim)), the shape
+    A A^T at unit determinant and the share of the last 10 dim samples that tied."""
+    dim = len(best_x)
+    sign, log_det = np.linalg.slogdet(a)
+    scale = sigma * float(np.exp(log_det / dim)) if sign != 0 else sigma
+    shape = a @ a.T
+    shape = shape / np.exp(np.linalg.slogdet(shape)[1] / dim)
+    tied = float(np.mean(ties[-10 * dim :])) if ties else 0.0
+    return EsResult(best_x, float(best_cost), scale, used, True, True, shape, tied)

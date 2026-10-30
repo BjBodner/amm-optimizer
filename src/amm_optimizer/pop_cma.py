@@ -11,6 +11,8 @@ One call is one run; it ends at stagnation or when its evaluations are spent.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from .bounds import Box, clip
@@ -109,7 +111,7 @@ def run_population_restarts(
         if run.used == 0 or not run.stalled:
             break
         restarts += 1
-        start = box.lower + (box.upper - box.lower) * rng.rand(dim)
+        start = box.uniform(rng)
         start_sigma = INITIAL_SIGMA_SHARE * width
     return EsResult(best_x, best_cost, start_sigma, used)
 
@@ -124,6 +126,51 @@ def reflect_into(x: np.ndarray, box: Box) -> np.ndarray:
 def default_population(dim: int) -> int:
     """``4 + floor(3 ln dim)``, the CMA-ES default lambda."""
     return 4 + int(3 * np.log(dim))
+
+
+def _evaluate(
+    objective: CountedObjective,
+    shown: np.ndarray,
+    model: Any,
+    mean: np.ndarray,
+    sigma: float,
+    left: int,
+) -> tuple[np.ndarray, np.ndarray, int, bool]:
+    """One generation's (ranking values, true values, evaluations used, whether it
+    was complete): every point evaluated, failures as inf, or (``model``, the lq2
+    surrogate) ranked by ``surrogate.evaluate_generation``."""
+    if model is not None:
+        from .surrogate import evaluate_generation
+
+        got = evaluate_generation(
+            objective.evaluate_point, shown, model, mean, sigma, left
+        )
+        if got is None:
+            return np.empty(0), np.empty(0), 0, False
+        values, true, spent = got
+        return values, np.where(np.isnan(true), np.inf, true), spent, True
+    values = np.empty(len(shown))
+    for k in range(len(shown)):
+        value = objective.evaluate_point(shown[k])
+        if value is None:
+            return values, values, k, False
+        values[k] = value if np.isfinite(value) else np.inf
+    return values, values, len(shown), True
+
+
+def _negative_weights(
+    lam: int, mu: int, mu_eff: float, c_1: float, c_mu: float, dim: int
+) -> np.ndarray:
+    """``active``: the negative weights of the worst ``lam - mu`` steps (Hansen's
+    tutorial, eq. 50-53)."""
+    raw = np.log(mu + 0.5) - np.log(np.arange(mu + 1, lam + 1))
+    mu_eff_neg = float(raw.sum() ** 2 / np.sum(raw**2))
+    alpha = min(
+        1 + c_1 / c_mu,
+        1 + 2 * mu_eff_neg / (mu_eff + 2),
+        (1 - c_1 - c_mu) / (dim * c_mu),
+    )
+    return np.asarray(alpha * raw / np.abs(raw).sum())
 
 
 def run_population_cma(
@@ -167,14 +214,7 @@ def run_population_cma(
     chi_n = np.sqrt(dim) * (1 - 1 / (4 * dim) + 1 / (21 * dim**2))
     negative = np.zeros(lam - mu)
     if active and lam > mu:
-        raw = np.log(mu + 0.5) - np.log(np.arange(mu + 1, lam + 1))
-        mu_eff_neg = float(raw.sum() ** 2 / np.sum(raw**2))
-        alpha = min(
-            1 + c_1 / c_mu,
-            1 + 2 * mu_eff_neg / (mu_eff + 2),
-            (1 - c_1 - c_mu) / (dim * c_mu),
-        )
-        negative = alpha * raw / np.abs(raw).sum()
+        negative = _negative_weights(lam, mu, mu_eff, c_1, c_mu, dim)
     mean = np.clip(np.array(mean, dtype=float), box.lower, box.upper)
     p_sigma, p_c = np.zeros(dim), np.zeros(dim)
     cov = np.eye(dim) if cov0 is None else np.array(cov0, dtype=float)
@@ -190,7 +230,7 @@ def run_population_cma(
     stalled = False
     model = None
     if surrogate == "lq2":
-        from .surrogate import QuadraticSurrogate, evaluate_generation
+        from .surrogate import QuadraticSurrogate
 
         model = QuadraticSurrogate(dim)
     # lq2: every step used in the update is capped at this Mahalanobis length
@@ -209,24 +249,12 @@ def run_population_cma(
         else:
             x = clip(mean + sigma * y, box.lower, box.upper)
             shown = x
-        if model is not None:
-            got = evaluate_generation(
-                objective.evaluate_point, shown, model, mean, sigma, evaluations - used
-            )
-            if got is None:
-                return EsResult(best_x, float(best_cost), sigma, used, False)
-            values, true, spent = got
-            used += spent
-            truth = np.where(np.isnan(true), np.inf, true)
-        else:
-            values = np.empty(lam)
-            for k in range(lam):
-                value = objective.evaluate_point(shown[k])
-                if value is None:
-                    return EsResult(best_x, float(best_cost), sigma, used, False)
-                values[k] = value if np.isfinite(value) else np.inf
-                used += 1
-            truth = values
+        values, truth, spent, complete = _evaluate(
+            objective, shown, model, mean, sigma, evaluations - used
+        )
+        if not complete:
+            return EsResult(best_x, float(best_cost), sigma, used + spent, False)
+        used += spent
         order = np.argsort(values, kind="stable")
         top = int(np.argmin(truth))
         if truth[top] < best_cost:
