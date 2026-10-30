@@ -13,15 +13,12 @@ import warnings
 
 import numpy as np
 
+from ._budget import BudgetedObjective, SpentError
 from .bounds import Box
 from .es_phase import EsResult
 from .objective import CountedObjective
 
 FINAL_RADIUS = 1e-10
-
-
-class _SpentError(Exception):
-    pass
 
 
 def run_cobyqa_restarts(
@@ -31,13 +28,21 @@ def run_cobyqa_restarts(
     box: Box,
     evaluations: int,
     radius_share: float = 0.25,
+    cost: float | None = None,
+    sigma: float = 0.0,
 ) -> EsResult:
     """COBYQA from ``x`` with an initial trust radius of ``radius_share`` x the box's
     mean width (final radius ``FINAL_RADIUS``), restarted from uniform points whenever
     it stops early, until ``evaluations`` are spent or the objective runs out.
 
-    Returns the best point, its value, sigma 0 (no step-size state to hand over) and
-    the evaluations used.
+    Returns the best point, its value, ``sigma`` (COBYQA has no step-size state to
+    hand over) and the evaluations used.
+
+    With ``cost``, the value of ``x`` is known (``small_switch``): the best point
+    starts as (``x``, ``cost``), and COBYQA's first point, when it is ``x`` itself, is
+    not evaluated again (COBYQA moves a start that lies within one radius of a bound),
+    so the first run may make one call more. Without it, the first run starts from
+    ``x`` clipped onto the box.
     """
     from scipy.optimize import OptimizeWarning  # type: ignore[import-untyped]
     from scipy.optimize import minimize as scipy_minimize
@@ -45,25 +50,23 @@ def run_cobyqa_restarts(
     dim = len(x)
     radius = radius_share * float(np.mean(box.upper - box.lower))
     bounds = list(zip(box.lower, box.upper, strict=True))
-    used = 0
-    best_x, best_cost = np.array(x, dtype=float), np.inf
-
-    def fun(point: np.ndarray) -> float:
-        nonlocal used, best_x, best_cost
-        if used >= evaluations:
-            raise _SpentError
-        clipped = np.clip(np.asarray(point, dtype=float), box.lower, box.upper)
-        value = objective.evaluate_point(clipped)
-        if value is None:
-            raise _SpentError
-        used += 1
-        if value < best_cost:
-            best_x, best_cost = clipped, float(value)
-        return float(value) if np.isfinite(value) else 1e300
-
-    start = np.clip(np.array(x, dtype=float), box.lower, box.upper)
-    while used < evaluations:
-        before, left = used, evaluations - used
+    known = cost is not None
+    fun = BudgetedObjective(
+        objective,
+        evaluations,
+        box=box,
+        best_x=np.array(x, dtype=float),
+        best_cost=np.inf if cost is None else float(cost),
+        known=None if cost is None else (np.array(x, dtype=float), float(cost)),
+    )
+    start = (
+        np.array(x, dtype=float)
+        if known
+        else np.clip(np.array(x, dtype=float), box.lower, box.upper)
+    )
+    while fun.used < evaluations:
+        # with a known first point, one more than is left: that point is free
+        before, left = fun.used, evaluations - fun.used + (1 if known else 0)
         try:
             with warnings.catch_warnings():
                 # SciPy's notices only: the objective's warnings get through (B5)
@@ -80,81 +83,11 @@ def run_cobyqa_restarts(
                         "final_tr_radius": FINAL_RADIUS,
                     },
                 )
-        except _SpentError:
+        except SpentError:
             break
-        if used == before:  # nothing evaluated: never loop without progress
-            break
-        start = box.lower + (box.upper - box.lower) * rng.rand(dim)
-    return EsResult(best_x, best_cost, 0.0, used)
-
-
-def run_cobyqa_from(
-    objective: CountedObjective,
-    rng: np.random.RandomState,
-    x: np.ndarray,
-    cost: float,
-    box: Box,
-    evaluations: int,
-    radius_share: float = 0.25,
-    sigma: float = 0.0,
-) -> EsResult:
-    """:func:`run_cobyqa_restarts` from a point whose value ``cost`` is known
-    (``small_switch``, the small10 toy): COBYQA's first point, when it is ``x``
-    itself, is not evaluated again (COBYQA moves a start that lies within one radius
-    of a bound). The best point starts as (``x``, ``cost``).
-    """
-    from scipy.optimize import OptimizeWarning
-    from scipy.optimize import minimize as scipy_minimize
-
-    dim = len(x)
-    radius = radius_share * float(np.mean(box.upper - box.lower))
-    bounds = list(zip(box.lower, box.upper, strict=True))
-    used = 0
-    best_x, best_cost = np.array(x, dtype=float), float(cost)
-    known_x = np.array(x, dtype=float)
-    first = [True]
-
-    def fun(point: np.ndarray) -> float:
-        nonlocal used, best_x, best_cost
-        clipped = np.clip(np.asarray(point, dtype=float), box.lower, box.upper)
-        if first[0]:
-            first[0] = False
-            if np.array_equal(clipped, known_x):
-                return float(cost)
-        if used >= evaluations:
-            raise _SpentError
-        value = objective.evaluate_point(clipped)
-        if value is None:
-            raise _SpentError
-        used += 1
-        if value < best_cost:
-            best_x, best_cost = clipped, float(value)
-        return float(value) if np.isfinite(value) else 1e300
-
-    start = np.array(x, dtype=float)
-    while used < evaluations:
-        # one more than is left: the known first point is free
-        before, left = used, evaluations - used + 1
-        try:
-            with warnings.catch_warnings():
-                # SciPy's notices only: the objective's warnings get through (B5)
-                warnings.filterwarnings("ignore", category=OptimizeWarning)
-                scipy_minimize(
-                    fun,
-                    start,
-                    method="COBYQA",
-                    bounds=bounds,
-                    options={
-                        "maxfev": left,
-                        "maxiter": 10 * left,
-                        "initial_tr_radius": radius,
-                        "final_tr_radius": FINAL_RADIUS,
-                    },
-                )
-        except _SpentError:
-            break
-        first[0] = False
-        if used == before:  # nothing evaluated: never loop without progress
+        fun.known = None
+        if fun.used == before:  # nothing evaluated: never loop without progress
             break
         start = box.lower + (box.upper - box.lower) * rng.rand(dim)
-    return EsResult(best_x, best_cost, sigma, used)
+    assert fun.best_x is not None
+    return EsResult(fun.best_x, fun.best_cost, sigma, fun.used)

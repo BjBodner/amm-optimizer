@@ -106,7 +106,7 @@ def run_es_phase(
     restarted SLSQP by .65).
     ``small_switch`` (a ``qn_phase.SmallSwitch``; the small10 toy): the first SLSQP
     descent of ``"slsqpdes"`` and ``"slsqp"`` is read online and may hand the rest to
-    restarted COBYQA (``cobyqa_phase.run_cobyqa_from``); with its ``rest``, COBYQA
+    restarted COBYQA (``cobyqa_phase.run_cobyqa_restarts``); with its ``rest``, COBYQA
     also replaces the (1+1) after ``"slsqpdes"``'s descent and after a rugged probe.
     ``nan_reading`` (cycle 64, the SLSQP-cells toy): where an undefined probe slope
     of ``"slsqplq"`` / ``"slsqplqc"`` goes (``curvature_beta``'s NaN: fewer than two
@@ -269,10 +269,17 @@ def run_es_phase(
         return SwitchReader(step, dim, small_switch)
 
     def cobyqa_rest(x: np.ndarray, cost: float, used: int, sigma: float) -> EsResult:
-        from .cobyqa_phase import run_cobyqa_from
+        from .cobyqa_phase import run_cobyqa_restarts
 
-        rest = run_cobyqa_from(
-            objective, rng, x, cost, box, evaluations - used, small_switch.radius, sigma
+        rest = run_cobyqa_restarts(
+            objective,
+            rng,
+            x,
+            box,
+            evaluations - used,
+            small_switch.radius,
+            cost=cost,
+            sigma=sigma,
         )
         return EsResult(rest.x, rest.cost, sigma, used + rest.used)
 
