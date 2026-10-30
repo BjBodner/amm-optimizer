@@ -46,12 +46,10 @@ MARKERS = {
     "default": "not slow and not merge",
     "merge": "not slow",
 }
-# Branch coverage the full tier must reach, in percent. Measured on 2026-10-27
-# (chore/ci-docs, the "not slow" tests, a subset of the full tier): 94.53%. The gate is
-# floor(measured) - 0.5, below the measurement so a harmless change does not trip it.
-# The research code that 0.7.0 removes (Phase 6) holds most of the uncovered lines;
-# raise the gate after that.
-COVERAGE_GATE = 93.5
+# Branch coverage the full tier must reach, in percent. Measured on 2026-10-29
+# (release/0.7.0, the full tier): 95.74%. The gate is floor(measured) - 0.5, below the
+# measurement so a harmless change does not trip it.
+COVERAGE_GATE = 94.5
 
 
 def steps(tier: str | bool = "default") -> list[Step]:

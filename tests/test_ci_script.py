@@ -52,8 +52,8 @@ def test_full_gate_runs_all_tests_with_the_coverage_gate():
 
 
 def test_the_coverage_gate_sits_below_the_measured_coverage():
-    # measured 94.53% on 2026-10-27; Phase 6 raises the gate (see tools/ci.py)
-    assert 90 <= ci.COVERAGE_GATE <= 94.53 - 0.5
+    # measured 95.74% on 2026-10-29 with the full tier (see tools/ci.py)
+    assert 90 <= ci.COVERAGE_GATE <= 95.74 - 0.5
 
 
 def test_every_step_uses_the_interpreter_that_runs_it():
