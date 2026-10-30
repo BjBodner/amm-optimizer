@@ -148,7 +148,6 @@ class CountedObjective:
         allowed: int,
         strict: bool = True,
         profiler: Profiler = NULL_PROFILER,
-        memo: bool = False,
     ) -> None:
         self._fun = copying(fun)
         self._profiler = profiler
@@ -156,34 +155,6 @@ class CountedObjective:
         self._limit = allowed if strict else allowed + 1
         self.calls = 0
         self._charged = 0
-        self._held = 0
-        # ``Variant.eval_memo`` (the novel-ideas toy): exactly repeated points return
-        # their stored value, uncharged and uncalled (``memo_hits`` counts them)
-        self._memo: dict[bytes, float] | None = {} if memo else None
-        self.memo_hits = 0
-
-    def _recall(self, x: np.ndarray) -> tuple[bytes, float | None]:
-        """(key, stored value or None) of ``x`` in the memo (which must be on)."""
-        assert self._memo is not None
-        key = np.asarray(x, dtype=float).tobytes()
-        value = self._memo.get(key)
-        if value is not None:
-            self.memo_hits += 1
-        return key, value
-
-    def _evaluate_memo(self, x: np.ndarray) -> float | None:
-        """:meth:`evaluate_point` with the memo on."""
-        assert self._memo is not None
-        key, value = self._recall(x)
-        if value is not None:
-            return value
-        if self._charged >= self._limit:
-            return None
-        self._charged += 1
-        self.calls += 1
-        value = float(self._fun(x))
-        self._memo[key] = value
-        return value
 
     def set_limit(self, calls: int) -> None:
         """Make ``calls`` charged calls the end of the budget (a phase's share).
@@ -195,16 +166,6 @@ class CountedObjective:
 
     def evaluate_start(self, x: np.ndarray) -> float:
         """Evaluate the point a search starts from."""
-        if self._memo is not None:
-            key, known = self._recall(x)
-            if known is not None:
-                return known
-            self.calls += 1
-            if self._strict:
-                self._charged += 1
-            value = float(self._fun(x))
-            self._memo[key] = value
-            return value
         self.calls += 1
         if self._strict:
             self._charged += 1
@@ -220,20 +181,8 @@ class CountedObjective:
         """Evaluations that can still be charged."""
         return max(self._limit - self._charged, 0)
 
-    def hold_back(self, n: int) -> None:
-        """Make the last ``n`` evaluations unavailable until :meth:`release`."""
-        self._held = n
-        self._limit -= n
-
-    def release(self) -> None:
-        """Make the evaluations kept back by :meth:`hold_back` available again."""
-        self._limit += self._held
-        self._held = 0
-
     def evaluate_point(self, x: np.ndarray) -> float | None:
         """Charge and evaluate one point; ``None`` when the budget is spent."""
-        if self._memo is not None:
-            return self._evaluate_memo(x)
         if self._charged >= self._limit:
             return None
         self._charged += 1
@@ -258,17 +207,6 @@ class CountedObjective:
         indices to costs that are already known: those columns are neither
         evaluated nor charged.
         """
-        if self._memo is not None:
-            cost = np.zeros(samples.shape[1])
-            for j, column in enumerate(samples.T):
-                if known and j in known:
-                    cost[j] = known[j]
-                    continue
-                value = self._evaluate_memo(column)
-                if value is None:
-                    return cost[:j], False
-                cost[j] = value
-            return cost, True
         if known:
             return self._evaluate_columns_known(samples, known)
         if self._profiler.enabled:

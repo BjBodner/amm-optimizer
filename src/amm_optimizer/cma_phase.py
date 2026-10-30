@@ -12,7 +12,6 @@ uniform point of the box and keeps the best point found.
 from __future__ import annotations
 
 from functools import cache
-from math import gamma, pi
 
 import numpy as np
 
@@ -27,18 +26,13 @@ TOLFUN = 1e-11
 # Quadratic model steps (``model=True``): a trust radius of MODEL_RADIUS sqrt(dim)
 # in CMA coordinates, fitted to the last 2 (dim + 1)(dim + 2) / 2 points.
 MODEL_RADIUS = 3.0
-# ``restart_rule``: the stall window of a run that does not hold the best point
-# ("short" and "economy"), and the sigma drop that ends such a run ("economy").
+# ``restart_rule="short"``: the stall window.
 SHORT_WINDOW = (10, 30)  # 10 + 30 dim evaluations
-ECONOMY_SIGMA_DROP = 1e-3
-HOLDING_TOLERANCE = 1e-8
-# ``model_kind="lq"``: rung choice, best share, rank weights and the gate.
+# The weighted model fit (``_lq_fit``, after lq-CMA-ES): the points per parameter
+# a model needs, the best share it fits and the rank weights.
 LQ_POINTS_PER_PARAMETER = 1.47
 LQ_BEST_SHARE = 0.75
 LQ_WEIGHTS = (20.0, 1.0)
-LQ_GATE_POINTS = 15
-LQ_GATE_TAU = 0.85
-LQ_SIGMA_BOUNDS = (1 / 3, 3.0)
 # ``active=True``: the negative update of Arnold and Hansen (2010) after a
 # candidate worse than the fifth-last accepted point.
 ACTIVE_LAG = 5
@@ -59,53 +53,6 @@ PROBE_DIRECTIONS = 4
 # (the log is process-global; off, it stays empty and no run grows it).
 RECORD_PROBES = False
 PROBE_LOG: list[float] = []
-# ``placement="mlsl"``: GLOBAL's single-linkage critical distance at level alpha,
-# scanning the best ELITE_SHARE (at most ELITE_MAX) of the archive.
-MLSL_ALPHA = 0.01
-ELITE_SHARE = 0.05
-ELITE_MAX = 500
-
-
-def critical_distance(n_points: int, box: Box) -> float:
-    """GLOBAL's critical distance for ``n_points`` uniform-like points in the box.
-
-    ``pi^-1/2 (Gamma(1 + d/2) vol(box) (1 - alpha^(1/(n-1))))^(1/d)``.
-    """
-    dim = len(box.lower)
-    if n_points < 2:
-        return float(np.inf)
-    volume = float(np.prod(box.upper - box.lower))
-    share = 1 - MLSL_ALPHA ** (1 / (n_points - 1))
-    return float(pi**-0.5 * (gamma(1 + dim / 2) * volume * share) ** (1 / dim))
-
-
-def mlsl_start(
-    points: np.ndarray, values: np.ndarray, endpoints: list[np.ndarray], radius: float
-) -> tuple[np.ndarray, float, float] | None:
-    """The best archive point with no better point and no endpoint within ``radius``.
-
-    Returns the point, its value and a start sigma of half the smaller of
-    ``radius`` and the distance to its nearest better point; ``None`` if no point
-    of the elite qualifies (variant ``cma_placement``).
-    """
-    finite = np.isfinite(values)
-    points, values = points[finite], values[finite]
-    if not len(values):
-        return None
-    order = np.argsort(values, kind="stable")
-    elite = min(ELITE_MAX, max(1, int(np.ceil(ELITE_SHARE * len(values)))))
-    ends = np.array(endpoints) if endpoints else None
-    for rank in range(elite):
-        p = points[order[rank]]
-        if ends is not None and np.min(np.linalg.norm(ends - p, axis=1)) <= radius:
-            continue
-        nearest = np.inf
-        if rank:
-            nearest = float(np.min(np.linalg.norm(points[order[:rank]] - p, axis=1)))
-            if nearest <= radius:
-                continue
-        return p.copy(), float(values[order[rank]]), 0.5 * min(radius, nearest)
-    return None
 
 
 class _Recent:
@@ -223,14 +170,6 @@ def quadratic_step(
     return np.asarray(x + sigma * (a @ step))
 
 
-def kendall_tau(a: np.ndarray, b: np.ndarray) -> float:
-    """Kendall's tau (ties count as neither concordant nor discordant)."""
-    da = np.sign(a[:, None] - a[None, :])
-    db = np.sign(b[:, None] - b[None, :])
-    n = len(a)
-    return float(np.sum(np.triu(da * db, 1))) / (n * (n - 1) / 2)
-
-
 def _lq_features(z: np.ndarray, rung: str) -> np.ndarray:
     ones = np.ones((len(z), 1))
     if rung == "linear":
@@ -238,15 +177,6 @@ def _lq_features(z: np.ndarray, rung: str) -> np.ndarray:
     if rung == "diagonal":
         return np.hstack([ones, z, z * z])
     return np.hstack([ones, z, _pairs(z)])
-
-
-def _lq_rung(n_points: int, dim: int, full: bool) -> str | None:
-    """The largest model the archive supports (``LQ_POINTS_PER_PARAMETER``)."""
-    sizes = [("linear", dim + 1), ("diagonal", 2 * dim + 1)]
-    if full:
-        sizes.append(("full", (dim + 1) * (dim + 2) // 2))
-    fitting = [r for r, k in sizes if LQ_POINTS_PER_PARAMETER * k <= n_points]
-    return fitting[-1] if fitting else None
 
 
 def _lq_fit(z: np.ndarray, values: np.ndarray, rung: str) -> np.ndarray:
@@ -263,63 +193,6 @@ def _lq_fit(z: np.ndarray, values: np.ndarray, rung: str) -> np.ndarray:
         features * weights[:, None], target * weights, rcond=None
     )[0]
     return np.asarray(solution)
-
-
-def lq_step(
-    points: np.ndarray,
-    values: np.ndarray,
-    x: np.ndarray,
-    sigma: float,
-    a: np.ndarray,
-    a_inv: np.ndarray,
-    full: bool,
-) -> tuple[np.ndarray, float] | None:
-    """An lq-CMA-ES style model step: the candidate and its length in sigma units.
-
-    The rung (linear, diagonal, full) follows the archive size; the fit uses the
-    best three quarters with linear rank weights; the step is taken only if the
-    model fitted without the ``LQ_GATE_POINTS`` most recent points ranks them with
-    Kendall's tau of at least ``LQ_GATE_TAU``, and only for a quadratic rung with a
-    positive definite Hessian. ``None`` otherwise.
-    """
-    dim = len(x)
-    if not np.isfinite(values).all() or len(values) <= LQ_GATE_POINTS:
-        return None
-    if not values.max() > values.min():
-        return None
-    z = ((points - x) / sigma) @ a_inv.T
-    rung = _lq_rung(len(values) - LQ_GATE_POINTS, dim, full)
-    if rung is None or rung == "linear":
-        return None
-    head, tail = slice(None, -LQ_GATE_POINTS), slice(-LQ_GATE_POINTS, None)
-    probe = _lq_fit(z[head], values[head], rung)
-    predicted = _lq_features(z[tail], rung) @ probe
-    if kendall_tau(predicted, values[tail]) < LQ_GATE_TAU:
-        return None
-    coef = _lq_fit(z, values, rung)
-    g = coef[1 : dim + 1]
-    if rung == "diagonal":
-        curvature = 2 * coef[dim + 1 :]
-        if not (curvature > 1e-12 * np.abs(curvature).max()).all():
-            return None
-        step = -g / curvature
-    else:
-        upper = _upper(dim)
-        h = np.zeros((dim, dim))
-        h[upper] = coef[dim + 1 :]
-        h = h + h.T
-        eig = np.linalg.eigvalsh(h)
-        if not np.isfinite(eig).all() or eig.min() <= 1e-12 * np.abs(eig).max():
-            return None
-        step = -np.linalg.solve(h, g)
-    radius = MODEL_RADIUS * np.sqrt(dim)
-    norm = float(np.linalg.norm(step))
-    if not np.isfinite(norm) or norm == 0:
-        return None
-    if norm > radius:
-        step *= radius / norm
-        norm = radius
-    return np.asarray(x + sigma * (a @ step)), norm
 
 
 def model_step(
@@ -420,13 +293,9 @@ def run_cma(
     model: bool = False,
     *,
     model_kind: str | None = None,
-    model_full: bool = True,
-    model_sigma: bool = False,
     restart_rule: str = "legacy",
     active: bool = False,
     a0: np.ndarray | None = None,
-    placement: str = "uniform",
-    archive: tuple[list[np.ndarray], list[float]] | None = None,
     stop_when_left: int = 0,
     run_cap: int = 0,
     probe_at: int = 0,
@@ -444,18 +313,10 @@ def run_cma(
 
     Options of the audit's Batch 5 (all off by default):
 
-    * ``model_kind="lq"`` uses ``lq_step`` instead (``model_full`` allows its full
-      rung) and ``model_sigma`` rescales sigma after an accepted model step.
-    * ``restart_rule`` is ``"legacy"`` (a 100 + 50 dim stall window), ``"short"``
-      (10 + 30 dim) or ``"economy"``. In ``"economy"`` a run whose best is worse
-      than the best point found by more than ``HOLDING_TOLERANCE`` uses the short
-      window and also stops once sigma fell below ``ECONOMY_SIGMA_DROP`` of its
-      start; the run holding the best keeps the legacy window.
+    * ``restart_rule`` is ``"legacy"`` (a 100 + 50 dim stall window) or ``"short"``
+      (10 + 30 dim).
     * ``active`` adds the negative covariance update of Arnold and Hansen (2010).
     * ``a0`` is the Cholesky factor the first run starts with (restarts reset it).
-    * ``placement="mlsl"`` restarts from ``mlsl_start`` on ``archive`` (lists of
-      points and values, extended with every evaluation here) away from the
-      endpoints of earlier runs, falling back to a uniform point.
 
     Options of the audit's Batch 12 (all off by default; ``Variant`` explains them):
     ``model_kind="diagonal"`` is the gated, rank-weighted diagonal model
@@ -478,13 +339,11 @@ def run_cma(
         a, a_inv = np.array(a0, dtype=float), np.linalg.inv(a0)
     else:
         a, a_inv = np.eye(dim), np.eye(dim)
-    run_sigma0 = sigma
     parents = [cost]
     p_c, p_succ = np.zeros(dim), p_target
     history: list[float] = []
     n_model = (dim + 1) * (dim + 2) // 2
     model_turn = False
-    endpoints: list[np.ndarray] = []
     used = 0
     diagonal = kind == "diagonal"
     if diagonal:
@@ -496,7 +355,7 @@ def run_cma(
     else:
         need, keep_fit = n_model + dim, 2 * n_model
     # The run's start and candidates, for the models: up to the largest window one
-    # reads (``keep_fit``, or ``2 n_model`` for ``quadratic_step`` and ``lq_step``).
+    # reads (``keep_fit``, or ``2 n_model`` for ``quadratic_step``).
     recent = _Recent(dim, max(keep_fit, 2 * n_model))
     recent.reset(x, cost)
     radius_fit = np.sqrt(dim) + GATED_RADIUS_ADD
@@ -504,14 +363,8 @@ def run_cma(
     probed = False
     ties: list[bool] = []
 
-    def remember(point: np.ndarray, value: float) -> None:
-        if archive is not None:
-            archive[0].append(np.array(point, dtype=float))
-            archive[1].append(float(value))
-
     while used < evaluations:
         candidate = None
-        model_length = 0.0
         predicted = 0.0
         if diagonal:
             countdown -= 1
@@ -535,26 +388,12 @@ def run_cma(
             proposal = quadratic_step(*recent.latest(2 * n_model), x, sigma, a, a_inv)
             if proposal is not None:
                 candidate = clip(proposal, box.lower, box.upper)
-        elif kind == "lq" and model_turn:
-            keep = 2 * (n_model if model_full else 2 * dim + 1)
-            found = lq_step(
-                *recent.latest(keep),
-                x,
-                sigma,
-                a,
-                a_inv,
-                model_full,
-            )
-            if found is not None:
-                candidate = clip(found[0], box.lower, box.upper)
-                model_length = found[1]
         model_turn = not model_turn
         if candidate is not None:
             value = objective.evaluate_point(candidate)
             if value is None:
                 break
             used += 1
-            remember(candidate, value)
             recent.append(candidate, value)
             if diagonal:
                 ratio = (cost - value) / predicted if predicted > 0 else -np.inf
@@ -571,10 +410,6 @@ def run_cma(
             if value <= cost:
                 x, cost = candidate, value
                 parents.append(cost)
-                if model_sigma and model_length > 0:
-                    low, high = LQ_SIGMA_BOUNDS
-                    factor = np.sqrt(model_length / np.sqrt(dim))
-                    sigma *= float(np.clip(factor, low, high))
                 if cost < best_cost:
                     best_x, best_cost = x.copy(), cost
             history.append(cost)
@@ -589,7 +424,6 @@ def run_cma(
         if value is None:
             break
         used += 1
-        remember(candidate, value)
         if kind is not None:
             recent.append(candidate, value)
         success = value <= cost
@@ -618,17 +452,7 @@ def run_cma(
             a, a_inv = cholesky_update(a, a_inv, taken, 1 + rate, -rate)
         sigma *= float(np.exp((p_succ - p_target) / (d * (1 - p_target))))
         history.append(cost)
-        span = window
-        early = False
-        if restart_rule != "legacy":
-            holding = cost <= best_cost + HOLDING_TOLERANCE
-            if restart_rule == "short" or not holding:
-                span = short_window
-            early = (
-                restart_rule == "economy"
-                and not holding
-                and sigma < ECONOMY_SIGMA_DROP * run_sigma0
-            )
+        span = short_window if restart_rule == "short" else window
         stalled = len(history) > span and history[-span - 1] - cost <= TOLFUN
         if probe_at and not probed and len(history) >= probe_at:
             # ``probe_at``: the curvature probe (cycle 9). Mirrored pairs along
@@ -651,7 +475,6 @@ def run_cma(
                             spent = True
                             break
                         used += 1
-                        remember(point, value)
                         pair.append(float(value))
                         if value < best_cost:
                             best_x, best_cost = point.copy(), float(value)
@@ -699,34 +522,20 @@ def run_cma(
             return EsResult(
                 best_x, float(best_cost), scale, used, True, True, shape, tied
             )
-        if (
-            sigma < SIGMA_FLOOR_SHARE * width or stalled or early
-        ) and used < evaluations:
+        if (sigma < SIGMA_FLOOR_SHARE * width or stalled) and used < evaluations:
             if not restarts or (
                 stop_when_left and evaluations - used >= stop_when_left
             ):
                 return EsResult(best_x, float(best_cost), sigma, used, True)
-            placed = None
-            if placement == "mlsl" and archive is not None:
-                endpoints.append(x.copy())
-                radius = critical_distance(len(archive[1]), box)
-                placed = mlsl_start(
-                    np.array(archive[0]), np.array(archive[1]), endpoints, radius
-                )
-            if placed is not None:
-                x, cost, sigma = placed
-            else:
-                x = box.lower + (box.upper - box.lower) * rng.rand(dim)
-                value = objective.evaluate_point(x)
-                if value is None:
-                    break
-                used += 1
-                remember(x, value)
-                cost = value
-                sigma = INITIAL_SIGMA_SHARE * width
+            x = box.lower + (box.upper - box.lower) * rng.rand(dim)
+            value = objective.evaluate_point(x)
+            if value is None:
+                break
+            used += 1
+            cost = value
+            sigma = INITIAL_SIGMA_SHARE * width
             if cost < best_cost:
                 best_x, best_cost = x.copy(), cost
-            run_sigma0 = sigma
             a, a_inv = np.eye(dim), np.eye(dim)
             p_c, p_succ = np.zeros(dim), p_target
             history = []

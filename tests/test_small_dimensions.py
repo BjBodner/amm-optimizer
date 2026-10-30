@@ -12,8 +12,6 @@ import numpy as np
 import pytest
 
 import amm_optimizer as atm
-from amm_optimizer.config import Variant
-from preset_cases import LOCAL_STAGES
 
 BOX = (-5.0, 5.0)
 DIMS = (1, 2, 3)
@@ -22,10 +20,6 @@ BUDGETS = (1, 10, 40, 150, 300)
 CONFIGS = {
     "default": lambda: (atm.ATMConfig(), None),
     "composite": lambda: (atm.ATMConfig.composite(), BOX),
-    "local_stages": lambda: (
-        atm.ATMConfig(variant=Variant(**LOCAL_STAGES)),
-        BOX,
-    ),
     "c46": lambda: (atm.presets.get("c46"), BOX),
 }
 
@@ -38,16 +32,7 @@ def _rastrigin(x: np.ndarray) -> float:
 @pytest.mark.parametrize("dim", DIMS)
 @pytest.mark.parametrize(
     "name",
-    [
-        # local_stages sets research-only options (deprecated in 0.6.0)
-        pytest.param(
-            name,
-            marks=pytest.mark.filterwarnings("ignore:Variant:FutureWarning"),
-        )
-        if name == "local_stages"
-        else name
-        for name in CONFIGS
-    ],
+    list(CONFIGS),
 )
 def test_a_shipped_config_runs_in_small_dimensions(name: str, dim: int, budget: int):
     config, bounds = CONFIGS[name]()

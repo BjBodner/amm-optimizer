@@ -38,14 +38,6 @@ WAVE5 = {
     "cov_rate": 3.0,
     "cov_select": 0.5,
 }
-# ... plus the simplex stages in small dimensions (smoke tests).
-LOCAL_STAGES = {
-    **WAVE5,
-    "local_method": "nelder_mead",
-    "refine_fraction": 0.5,
-    "es_small_dim": 5,
-    "refine_max_dim": 10,
-}
 PRESETS = {"default": {}, "composite": COMPOSITE}
 
 

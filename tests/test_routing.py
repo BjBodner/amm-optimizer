@@ -21,12 +21,10 @@ ES_KINDS = (
     "cma",
     "lq2",
     "slsqplq",
-    "slsqplq10",
     "slsqplq10c",
     "slsqplq10h",
-    "slsqplq10hk",
 )
-NM_STAGES = ("both", "prefix", "qnprefix", "qnprefix30", "qnprefix30g")
+NM_STAGES = ("both", "prefix", "qnprefix30")
 
 
 def legacy_prefix_kind(variant, dim, budget):
@@ -78,8 +76,6 @@ def budgets(dim):
     return sorted({int(m * dim) for m in per_dim} | set(absolute))
 
 
-# research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 @pytest.mark.parametrize(
     ("es_kind", "nm_stage"), list(itertools.product(ES_KINDS, NM_STAGES))
 )
@@ -116,20 +112,16 @@ def test_the_c27_prefix_routes_by_dimension_and_budget(dim, budget, expected):
     assert api._prefix_kind(variant, dim, budget) == expected
 
 
-# research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_prefix_runs_only_up_to_its_budget_limit():
     variant = Variant(
-        amplitude_control="success_rate",
+        amplitude_control="success_rate_targeted",
         es_phase="prefix",
         es_max_budget_per_dim=100.0,
-        es_small_dim=2,
-        es_small_max_budget_per_dim=30.0,
     )
     assert api._prefix_runs(variant, 5, 500)
     assert not api._prefix_runs(variant, 5, 501)
-    assert api._prefix_runs(variant, 2, 60)
-    assert not api._prefix_runs(variant, 2, 61)
+    assert api._prefix_runs(variant, 2, 200)
+    assert not api._prefix_runs(variant, 2, 201)
     assert not api._prefix_runs(Variant(), 5, 10)
 
 
@@ -142,69 +134,38 @@ def test_the_route_table_covers_exactly_the_configured_qn_routes():
 
 # The routes' switches as their cycles documented them (config.py, RESULTS).
 FIELDS = (
-    "plateau_check",
-    "staged",
-    "capped",
-    "seeded",
-    "keep_warm_shape",
     "extend",
     "basins",
     "rugged_steps",
     "plateau_ipop4",
     "fd_step",
     "extend_in_descent",
-    "rugged_grow",
     "basins_scipy_step",
-    "failures_to_population",
-    "failures_surrogate",
 )
 _ = False
 DOCUMENTED = {
-    "qn": (_, _, _, _, True, "none", _, _, _, _, _, _, _, _, "none"),
-    "qn2": (True, True, _, _, _, "none", _, _, _, _, _, _, _, _, "none"),
-    "qn3": (True, True, True, _, True, "none", _, _, _, _, _, _, _, _, "none"),
-    "qn5": (True, True, True, True, True, "none", _, _, _, _, _, _, _, _, "none"),
-    "qn6": (True, True, True, _, True, "share", True, True, _, _, _, _, _, _, "none"),
-    "qn7": (True, True, True, _, True, "capped", True, True, _, _, _, _, _, _, "none"),
-    "qn8": (True, True, True, _, True, "capped", True, True, True)
-    + (_, _, _, _, _, "none"),
-    "qn9": (True, True, True, _, True, "capped", True, True, True)
-    + (True, _, _, _, _, "none"),
-    "qn10": (True, True, True, _, True, "none", True, True, True)
-    + (True, True, _, _, _, "none"),
-    "qn11": (True, True, True, _, True, "capped", True, True, True)
-    + (True, _, True, _, _, "none"),
-    "qn12": (True, True, True, _, True, "capped", True, True, True)
-    + (True, _, _, True, _, "none"),
-    "qn13": (True, True, True, _, True, "capped", True, True, True)
-    + (True, _, _, True, True, "lq2"),
-    "qn13n": (True, True, True, _, True, "capped", True, True, True)
-    + (True, _, _, True, True, "none"),
-    "qn15": (True, True, True, _, True, "capped", True, True, True)
-    + (True, _, _, True, _, "none"),
-    "qn17": (True, True, True, _, True, "capped", True, True, True)
-    + (True, _, _, True, _, "none"),
-    "qn19": (True, True, True, _, True, "capped", True, True, True)
-    + (True, True, _, True, _, "none"),
-    "qn20": (True, True, True, _, True, "capped", True, True, True)
-    + (True, True, _, True, _, "none"),
-    "qn29": (True, True, True, _, True, "capped", True, True, True)
-    + (True, True, _, True, _, "none"),
-    "qn38": (True, True, True, _, True, "capped", True, True, True)
-    + (True, True, _, True, _, "none"),
-    "qn44": (True, True, True, _, True, "capped", True, True, True)
-    + (True, True, _, True, _, "none"),
+    "qn3": ("none", _, _, _, _, _, _),
+    "qn7": ("capped", True, True, _, _, _, _),
+    "qn8": ("capped", True, True, True, _, _, _),
+    "qn9": ("capped", True, True, True, True, _, _),
+    "qn12": ("capped", True, True, True, True, _, True),
+    "qn17": ("capped", True, True, True, True, _, True),
+    "qn19": ("capped", True, True, True, True, True, True),
+    "qn20": ("capped", True, True, True, True, True, True),
+    "qn29": ("capped", True, True, True, True, True, True),
+    "qn38": ("capped", True, True, True, True, True, True),
+    "qn44": ("capped", True, True, True, True, True, True),
 }
 
 
-def test_only_qn15_and_qn17_run_populations_on_rugged_readings():
+def test_only_qn17_and_later_run_populations_on_rugged_readings():
     routes = qn_phase.QN_ROUTES
     rugged = {n for n, r in routes.items() if r.rugged_ipop}
     late = {"qn20", "qn29"}
     late |= {"qn38"}
     late |= {"qn44"}
-    assert rugged == {"qn15", "qn17", "qn19"} | late
-    assert all(routes[n].rugged_ipop_min_dim == 20 for n in rugged - {"qn15"})
+    assert rugged == {"qn17", "qn19"} | late
+    assert all(routes[n].rugged_ipop_min_dim == 20 for n in rugged)
 
 
 def test_only_qn18_and_qn19_gate_the_stage_once_at_the_cap():
@@ -267,18 +228,12 @@ def test_a_route_rejects_an_unknown_extension():
         qn_phase.QnRoute(extend="forever")
 
 
-# research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_cma_options_follow_the_variant():
     variant = Variant(
-        cma_model="lq",
         cma_restart_rule="short",
         cma_active=True,
     )
     assert api._cma_options(variant, 5) == {
-        "model_kind": "lq",
-        "model_full": True,
-        "model_sigma": False,
         "restart_rule": "short",
         "active": True,
     }

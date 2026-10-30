@@ -83,9 +83,7 @@ markers = [
 ]
 filterwarnings = [
   "error::DeprecationWarning",
-  # the research-only Variant options (config.RESEARCH_FIELDS) warn when set: a test
-  # that sets one says so with its own filter, so a shipped configuration never warns
-  'error:Variant\.:FutureWarning',
+  "error::FutureWarning",
 ]
 
 [tool.ruff]

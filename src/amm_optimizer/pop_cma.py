@@ -1,4 +1,4 @@
-"""A (mu/mu_w, lambda)-CMA-ES run inside the box (variant ``cma_regimes``).
+"""A (mu/mu_w, lambda)-CMA-ES run inside the box (the population runs).
 
 The standard non-elitist CMA-ES of Hansen's tutorial (arXiv 1604.00772):
 weighted recombination of the best half, cumulative step-size adaptation, rank-one
@@ -23,12 +23,6 @@ from .objective import CountedObjective
 TOLHISTFUN = 1e-11
 TOLX_SHARE = 1e-12
 MAX_CONDITION = 1e14
-# ``lambda_rule="budget"``: a run is planned to last about this many times dim
-# generations' worth of evaluations per lambda (research notes, cycle 3).
-BUDGET_RUN_LENGTH = 35
-
-
-GROW_FROM_PER_DIM = 2000.0
 
 
 def run_population_restarts(
@@ -56,17 +50,12 @@ def run_population_restarts(
     ``doubling`` (IPOP). Returns the best point and value (``cost`` is the known
     value of ``x``) and the evaluations used.
 
-    Batch 12 options: ``lambda_rule`` ``"cap4"`` cycles the population through 1, 2
-    and 4 times the default, ``"fixed2"`` keeps it at twice the default;
-    ``active`` adds the negative covariance update; ``min_left > 0`` launches a
-    run only while at least that many evaluations are left (the rest is
-    returned unused). ``lambda_rule="budget"`` sizes each run's population as
-    max(default, left / (BUDGET_RUN_LENGTH dim)); ``"steps"`` uses 1, 2 or 4 times
-    the default for fewer than 150, 150-640 and at least 640 dim evaluations left;
-    ``"ipop4"``: 4 times the default, doubled at every restart (``"ipop8"``: from 8
-    times); ``"stepsgrow"``:
-    ``"steps"``, doubling from 4x per restart while at least ``GROW_FROM_PER_DIM``
-    dim evaluations are left.
+    ``lambda_rule``: ``"fixed2"`` keeps the population at twice the default;
+    ``"steps"`` uses 1, 2 or 4 times the default for fewer than 150, 150-640 and at
+    least 640 dim evaluations left; ``"ipop4"``: 4 times the default, doubled at
+    every restart (``"ipop8"``: from 8 times). ``active`` adds the negative
+    covariance update; ``min_left > 0`` launches a run only while at least that
+    many evaluations are left (the rest is returned unused).
     ``bounds_mode`` is passed to ``run_population_cma``. ``must_beat``
     (protection): stop after the first run that ends without a value below both it
     and every earlier run's best.
@@ -81,15 +70,8 @@ def run_population_restarts(
     while used < evaluations:
         if min_left and evaluations - used < min_left:
             break
-        if lambda_rule == "cap4":
-            lam = default_population(dim) * 2 ** (restarts % 3)
-        elif lambda_rule == "fixed2":
+        if lambda_rule == "fixed2":
             lam = 2 * default_population(dim)
-        elif lambda_rule == "budget":
-            lam = max(
-                default_population(dim),
-                int((evaluations - used) / (BUDGET_RUN_LENGTH * dim)),
-            )
         elif lambda_rule == "steps":
             # Cycle 14 (literature report, rank 2; sweep at D 5, 20, 40): the
             # multiple of the default lambda that wins with R x dim evaluations left.
@@ -100,16 +82,6 @@ def run_population_restarts(
             lam = 4 * default_population(dim) * 2**restarts
         elif lambda_rule == "ipop8":  # cycle 29's rugged route at D >= 20: 8x, doubling
             lam = 8 * default_population(dim) * 2**restarts
-        elif lambda_rule == "stepsgrow":
-            # Cycle 22: ``"steps"``, but with at least GROW_FROM_PER_DIM x dim
-            # evaluations left the population doubles from 4x at every restart
-            # (a 2500 x D sweep: f15 at D 5 needs 8-16x, f16-f18 stay solved).
-            left_per_dim = (evaluations - used) / dim
-            if left_per_dim >= GROW_FROM_PER_DIM:
-                multiple = 4 * 2**restarts
-            else:
-                multiple = 4 if left_per_dim >= 640 else 2 if left_per_dim >= 150 else 1
-            lam = multiple * default_population(dim)
         else:
             lam = default_population(dim) * (2**restarts if doubling else 1)
         lam = min(lam, evaluations - used)

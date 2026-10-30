@@ -48,14 +48,14 @@ def test_repeated_selection_of_correlated_steps_learns_the_direction():
     assert values[-1] / values[0] > 10
 
 
-# research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
-def test_the_eigenvalue_ratio_is_capped():
+def test_the_eigenvalue_ratio_is_capped(monkeypatch):
+    import amm_optimizer.control as control
+
+    monkeypatch.setattr(control, "COV_CAP", 50.0)
     capped = Variant(
-        amplitude_control="success_rate",
+        amplitude_control="success_rate_targeted",
         covariance="rank_mu",
         cov_rate=100.0,
-        cov_cap=50.0,
     )
     steps = np.array([[100.0, 0.0], [90.0, 0.1], [80.0, 0.0], [95.0, 0.2]])
     cov = np.eye(2)
@@ -65,12 +65,12 @@ def test_the_eigenvalue_ratio_is_capped():
     assert values[-1] / values[0] <= 50.0 * (1 + 1e-9)
 
 
-# research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_a_single_selected_step_barely_moves_the_covariance():
     cov, _ = shape_of(
         Variant(
-            amplitude_control="success_rate", covariance="rank_mu", cov_select=0.01
+            amplitude_control="success_rate_targeted",
+            covariance="rank_mu",
+            cov_select=0.01,
         ),
         np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]),
         np.array([0.0, 1.0, 2.0]),
@@ -79,7 +79,7 @@ def test_a_single_selected_step_barely_moves_the_covariance():
 
 
 def test_samples_follow_the_covariance_factor_and_the_width():
-    options = SampleOptions(scalar_width=True, no_targeted=True, use_covariance=True)
+    options = SampleOptions(scalar_width=True, use_covariance=True)
     factor = np.array([[2.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 0.0, 0.1]])
     (samples, _, _), _ = draw(
         [0, 0, 0], options, n=20000, random_growth=np.log(0.6), noise_factor=factor
@@ -94,15 +94,12 @@ def test_the_variant_asks_for_covariance_noise():
 
 
 def test_covariance_parameters_are_validated():
-    base = {"amplitude_control": "success_rate"}
+    base = {"amplitude_control": "success_rate_targeted"}
     for kwargs, match in [
         ({"covariance": "diag"}, "covariance"),
         ({"covariance": "rank_mu", "cov_rate": 0.0}, "cov_rate"),
         ({"covariance": "rank_mu", "cov_select": 0.0}, "cov_select"),
         ({"covariance": "rank_mu", "cov_select": 1.5}, "cov_select"),
-        ({"covariance": "rank_mu", "cov_cap": 0.5}, "cov_cap"),
-        ({"covariance": "rank_mu", "cov_max_dim": 0}, "cov_max_dim"),
-        ({"covariance": "rank_mu", "scale_learning": "diagonal"}, "scale_learning"),
     ]:
         with pytest.raises(ValueError, match=match):
             Variant(**base, **kwargs)
@@ -138,8 +135,6 @@ def test_a_run_learns_an_elongated_shape_on_a_rotated_ellipsoid(monkeypatch):
     assert values[-1] / values[0] > 30  # far from the unit sphere it started as
 
 
-# research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_covariance_is_not_learned_above_the_dimension_limit(monkeypatch):
     calls = []
     original = section.update_covariance
@@ -148,7 +143,10 @@ def test_the_covariance_is_not_learned_above_the_dimension_limit(monkeypatch):
         "update_covariance",
         lambda *args: calls.append(1) or original(*args),
     )
-    limited = Variant(**{**COV.to_dict(), "cov_max_dim": 3})
+    import amm_optimizer.search as search
+
+    monkeypatch.setattr(search, "COV_MAX_DIM", 3)
+    limited = COV
     objective = lambda x: float(np.sum(np.asarray(x) ** 2))  # noqa: E731
     atm.api.minimize(
         objective,

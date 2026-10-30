@@ -68,7 +68,6 @@ def pair_test(
     rng: np.random.RandomState,
     x: np.ndarray,
     box: Box,
-    strict: bool = False,
 ) -> tuple[str, np.ndarray, float] | None:
     """Two-axis additivity at ``x``: (reading, best point, its value), 3 D evaluations.
 
@@ -78,8 +77,6 @@ def pair_test(
     additive pair. A far residual of at least ``SEP_TOL`` reads "nonsep"; otherwise
     an adjacent one reads "chain"; otherwise "separable". Pairs whose single moves
     leave f unchanged are skipped. None when the objective runs out.
-    ``strict`` (research, gaps3): when every pair was skipped (a plateau, f7 at D 2,
-    where the only pair is often flat), the reading is "flat", not "separable".
     """
     dim = len(x)
     fun = _Counted(objective, 3 * dim + 1)
@@ -118,8 +115,6 @@ def pair_test(
     reading = (
         "nonsep" if r_far >= SEP_TOL else "chain" if r_adj >= SEP_TOL else "separable"
     )
-    if strict and all(r is None for r in adjacent + far):
-        reading = "flat"
     assert fun.best_x is not None
     return reading, fun.best_x, fun.best_cost
 

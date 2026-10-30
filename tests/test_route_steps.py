@@ -36,11 +36,8 @@ def handover():
         cma_options={},
         pop_options=dict(POP),
         nonseparable=True,
-        mlsl=False,
         recorded_x=[],
         recorded_f=[],
-        search=None,  # type: ignore[arg-type]
-        allocation=np.zeros(4),
         best_x=np.zeros(2),
         best_cost=1.0,
         a0=np.eye(2),
@@ -63,8 +60,8 @@ def spies(monkeypatch):
         log["slsqp"].append((evaluations, args, kw))
         if kw.get("gate_out") is not None and "gate" in reading:
             kw["gate_out"].append(reading["gate"])
-        if len(args) >= 2 and args[1] is not None:  # the stage's ``ends_out``
-            args[1].extend(reading["ends"])
+        if args and args[0] is not None:  # the stage's ``ends_out``
+            args[0].extend(reading["ends"])
         return EsResult(x, cost, 0.25, evaluations)
 
     def multi_basin(objective, ends, box):
@@ -127,9 +124,8 @@ FAILED = [
     Descent(np.full(2, 2.0), 0.0, 0),
 ]
 PLATEAU_IPOP = {
-    *("qn8", "qn9", "qn10", "qn11", "qn12", "qn13", "qn13n"),
+    *("qn8", "qn9", "qn12"),
     *(
-        "qn15",
         "qn17",
         "qn19",
         "qn20",
@@ -143,7 +139,7 @@ GATED = {"qn19", "qn20"} | {
     "qn38",
     "qn44",
 }
-CYCLE16 = {"qn6", "qn7"} | PLATEAU_IPOP
+CYCLE16 = {"qn7"} | PLATEAU_IPOP
 
 
 @pytest.mark.parametrize("name", sorted(QN_ROUTES))
@@ -153,8 +149,7 @@ def test_a_rugged_reading(spies, name):
     h = handover()
     options = api._qn_local_phase(QN_ROUTES[name], h, Calls())
     if name in CYCLE16:
-        rule = "stepsgrow" if name == "qn11" else "steps"
-        assert options == {**POP, "lambda_rule": rule}
+        assert options == {**POP, "lambda_rule": "steps"}
     else:
         assert options is h.pop_options
     assert not log["slsqp"] and not log["pop"]
@@ -165,9 +160,7 @@ def test_a_plateau_reading(spies, name):
     log, reading = spies
     reading["plateau"] = True
     options = api._qn_local_phase(QN_ROUTES[name], handover(), Calls())
-    if name == "qn":  # no plateau check: the curvature decides (smooth here)
-        assert options is None and len(log["slsqp"]) == 1
-    elif name in PLATEAU_IPOP:
+    if name in PLATEAU_IPOP:
         assert options is None
         assert log["pop"] == [{"lambda_rule": "ipop4", "active": True}]
     elif name in CYCLE16:
@@ -183,15 +176,11 @@ def test_a_smooth_reading_runs_the_stage(spies, name):
     h = handover()
     options = api._qn_local_phase(QN_ROUTES[name], h, Calls())
     budget, calls, dim = 1_000, 100, 2
-    if name == "qn":  # SLSQP for the whole local phase
-        assert options is None
-        assert log["slsqp"] == [(budget - calls, (), {})]
-        return
     evaluations, args, kw = log["slsqp"][0]
     share = (budget - calls) / 3
-    assert evaluations == int(share if name == "qn2" else min(share, 100 * dim))
+    assert evaluations == int(min(share, 100 * dim))
     assert kw["fd_step"] == (QN_FD_STEP if name in PLATEAU_IPOP - {"qn8"} else None)
-    if name in {"qn10"} | GATED:
+    if name in GATED:
         reserve = max(0.1 * (budget - calls), 20 * dim)
         assert kw["extend_to"] == int(budget - calls - reserve)
     else:
@@ -200,10 +189,10 @@ def test_a_smooth_reading_runs_the_stage(spies, name):
     assert log["basins"] == ([2] if name in CYCLE16 else [])
     assert options is h.pop_options
     assert h.sigma_override == [0.25]
-    assert (h.a0 is None) == (name == "qn2")
+    assert h.a0 is not None
 
 
-@pytest.mark.parametrize("name", sorted(CYCLE16 - {"qn10"}))
+@pytest.mark.parametrize("name", sorted(CYCLE16))
 def test_a_stage_cut_at_the_cap_is_extended(spies, name):
     log, reading = spies
     reading["ends"] = []  # the first descent was still running
@@ -212,28 +201,15 @@ def test_a_stage_cut_at_the_cap_is_extended(spies, name):
     evaluations, args, kw = log["slsqp"][1]
     left = 1_000 - 100
     more = 2 / 3 * left
-    assert evaluations == int(more if name == "qn6" else min(more, 200))
-    assert kw == {"fd_step": QN_FD_STEP if name not in ("qn6", "qn7", "qn8") else None}
+    assert evaluations == int(min(more, 200))
+    assert kw == {"fd_step": QN_FD_STEP if name not in ("qn7", "qn8") else None}
 
 
-def test_qn10_extends_inside_the_descent_instead(spies):
-    log, reading = spies
-    reading["ends"] = []
-    api._qn_local_phase(QN_ROUTES["qn10"], handover(), Calls())
-    assert len(log["slsqp"]) == 1 and log["basins"] == [0]
-
-
-@pytest.mark.parametrize("name", ["qn12", "qn13", "qn13n"])
-def test_mostly_failed_descents(spies, name):
+def test_mostly_failed_descents_still_take_the_hill_valley_test(spies):
     log, reading = spies
     reading["ends"] = FAILED
-    options = api._qn_local_phase(QN_ROUTES[name], handover(), Calls())
-    if name == "qn12":  # the hill-valley test as before
-        assert log["basins"] == [3] and not log["pop"] and options is not None
-    else:
-        assert options is None and not log["basins"]
-        surrogate = "lq2" if name == "qn13" else "none"
-        assert log["pop"] == [{"active": True, "surrogate": surrogate}]
+    options = api._qn_local_phase(QN_ROUTES["qn12"], handover(), Calls())
+    assert log["basins"] == [3] and not log["pop"] and options is not None
 
 
 @pytest.mark.parametrize(
@@ -247,11 +223,7 @@ def test_separate_basins_keep_restarting_slsqp(spies, name):
     assert api._qn_local_phase(QN_ROUTES[name], handover(), Calls()) is None
     evaluations, args, kw = log["slsqp"][-1]
     assert evaluations == 1_000 - 100
-    scipy_step = name in ("qn12", "qn13", "qn13n", "qn15", "qn17", *GATED) or name in (
-        "qn6",
-        "qn7",
-        "qn8",
-    )
+    scipy_step = name in ("qn12", "qn17", *GATED) or name in ("qn7", "qn8")
     assert kw == {"fd_step": None if scipy_step else QN_FD_STEP}
 
 
@@ -265,34 +237,34 @@ def wide_handover(dim, budget):
 
 @pytest.mark.parametrize(
     ("dim", "left_per_dim", "rule"),
-    [(2, 640, "ipop4"), (5, 3000, "ipop4"), (20, 2499, "ipop4"), (20, 2500, "ipop8")],
+    [(20, 640, "ipop4"), (20, 2499, "ipop4"), (20, 2500, "ipop8")],
 )
-def test_qn15_sends_a_rugged_reading_with_budget_left_to_ipop(
+def test_qn17_sends_a_rugged_reading_with_budget_left_to_ipop(
     spies, dim, left_per_dim, rule
 ):
     log, reading = spies
     reading["beta"] = 1.0
     h = wide_handover(dim, Calls.calls + left_per_dim * dim)
-    assert api._qn_local_phase(QN_ROUTES["qn15"], h, Calls()) is None
+    assert api._qn_local_phase(QN_ROUTES["qn17"], h, Calls()) is None
     assert log["pop"] == [{"lambda_rule": rule, "active": True}]
     assert not log["slsqp"]
 
 
-def test_qn15_keeps_the_steps_finisher_below_its_budget_floor(spies):
+def test_qn17_keeps_the_steps_finisher_below_its_budget_floor(spies):
     log, reading = spies
     reading["beta"] = 1.0
-    h = wide_handover(5, Calls.calls + 639 * 5)
-    options = api._qn_local_phase(QN_ROUTES["qn15"], h, Calls())
+    h = wide_handover(20, Calls.calls + 639 * 20)
+    options = api._qn_local_phase(QN_ROUTES["qn17"], h, Calls())
     assert options == {**POP, "lambda_rule": "steps"}
     assert not log["pop"]
 
 
 @pytest.mark.parametrize("beta", [2.0])
-def test_qn15_runs_the_smooth_stage_as_qn12(spies, beta):
+def test_qn17_runs_the_smooth_stage_as_qn12(spies, beta):
     log, reading = spies
     reading["beta"] = beta
     calls = []
-    for name in ("qn12", "qn15"):
+    for name in ("qn12", "qn17"):
         log["slsqp"].clear()
         h = wide_handover(5, Calls.calls + 3000 * 5)
         api._qn_local_phase(QN_ROUTES[name], h, Calls())

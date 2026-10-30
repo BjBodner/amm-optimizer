@@ -31,7 +31,6 @@ from typing import Any
 
 import numpy as np
 
-from . import qn_phase
 from .bounds import Box
 from .es_phase import EsResult
 from .objective import CountedObjective
@@ -49,12 +48,8 @@ def run_step_phase(
     box: Box,
     evaluations: int,
     parabolic: bool = False,
-    parabolic_late: bool = False,
-    pair_check: bool = False,
     pair_when_stuck: bool = False,
     check_tol: float = CHECK_TOL,
-    box_check: bool = False,
-    ties_out: list[int] | None = None,
 ) -> EsResult:
     """Spend up to ``evaluations`` on round-robin STEP from ``x`` (cost ``cost``).
 
@@ -65,9 +60,7 @@ def run_step_phase(
     vertex of the parabola through its best stored point and the two neighbours
     when that parabola is convex and the vertex lies strictly inside their bracket,
     away from both, instead of STEP's least-difficult midpoint. On a separable
-    quadratic (bbob f2) one such step lands on an axis's minimum. ``parabolic_late``:
-    only once the separability check has passed, so a non-separable function sees
-    exactly the plain search (Batch 37's noise).
+    quadratic (bbob f2) one such step lands on an axis's minimum.
     ``pair_when_stuck`` (cycle 29): the check uses ``pair_check``'s two-axis
     additivity test only when the best value has not improved over the last two
     sweeps. Re-evaluating a stored point of one axis at an unchanged best returns the
@@ -75,14 +68,6 @@ def run_step_phase(
     minimum (f15-f18 at D 5 spent 600-1800 x dim there).
     ``check_tol`` replaces ``CHECK_TOL`` (``sep_route``, cycle 50: inf turns the
     check off once a pair test has read the function separable).
-    ``box_check`` (``Variant.step_box_check``, the novel-ideas toy): the separability
-    check also runs once right after the box ends, on axis 0, when the best point has
-    moved along another axis since axis 0's ends were probed (otherwise it could not
-    fail); a non-separable function then stops a sweep (``dim`` evaluations) earlier.
-    ``ties_out`` (research, parked2), if given, receives the index of every probe
-    whose value repeats the incumbent's exactly (a plateau reading at no cost: only
-    bbob f7's steps tie inside the box).
-
     Each axis keeps its samples in arrays (cycle 50; they were lists converted at
     every turn, O(samples) Python work per evaluation: 4 ms per evaluation at D 40,
     3000 x D). The points evaluated are the same. Since 2026-10-23 (post-freeze)
@@ -98,7 +83,6 @@ def run_step_phase(
     used = 0
     # Per coordinate: sampled positions and their values relative to its best.
     axes = [_Axis(float(best[i])) for i in range(dim)]
-    moved: set[int] = set()  # ``box_check``: axes the best point moved along
 
     def probe(i: int, t: float) -> float | None:
         nonlocal used, f_best
@@ -108,11 +92,8 @@ def run_step_phase(
         if value is None:
             return None
         used += 1
-        if ties_out is not None and float(value) == f_best:
-            ties_out.append(used)
         h = float(value) - f_best if np.isfinite(value) else np.inf
         if h < 0:  # a new best along axis i: re-base coordinate i's values
-            moved.add(i)
             best[i] = t
             f_best = float(value)
             axes[i].insert(float(t), 0.0, rebase=h)
@@ -126,24 +107,8 @@ def run_step_phase(
                 return EsResult(best, f_best, 0.0, used, False)
             if end != best[i] and probe(i, float(end)) is None:
                 return EsResult(best, f_best, 0.0, used, False)
-    if box_check and dim > 1 and moved - {0} and used < evaluations:
-        early = axes[0].median_stored()
-        if early is not None:
-            predicted = f_best + early[1]
-            point = best.copy()
-            point[0] = early[0]
-            value = objective.evaluate_point(point)
-            if value is None:
-                return EsResult(best, f_best, 0.0, used, False)
-            used += 1
-            scale = max(abs(predicted), abs(float(value)), 1.0)
-            if not abs(float(value) - predicted) <= check_tol * scale:
-                if value < f_best:
-                    best, f_best = point, float(value)
-                return EsResult(best, f_best, 0.0, used, True)
     sweep = 0
     turns = [0] * dim
-    checks_passed = 0
     after_sweep: list[float] = []  # the best value after each sweep
     while used < evaluations:
         progressed = False
@@ -151,11 +116,7 @@ def run_step_phase(
             if used >= evaluations:
                 break
             turns[i] += 1
-            if (
-                parabolic
-                and turns[i] % 2 == 1
-                and (not parabolic_late or checks_passed)
-            ):
+            if parabolic and turns[i] % 2 == 1:
                 vertex = axes[i].vertex()
                 if vertex is not None:
                     if probe(i, vertex) is None:
@@ -185,8 +146,7 @@ def run_step_phase(
             point[j] = stored[0]
             other = (
                 axes[partner].median_stored()
-                if (pair_check or (pair_when_stuck and stuck))
-                and (dim > 1 and partner != j)
+                if pair_when_stuck and stuck and (dim > 1 and partner != j)
                 else None
             )
             if other is not None:
@@ -201,7 +161,6 @@ def run_step_phase(
                 if value < f_best:
                     best, f_best = point, float(value)
                 return EsResult(best, f_best, 0.0, used, True)
-            checks_passed += 1
     return EsResult(best, f_best, 0.0, used, False)
 
 
@@ -212,7 +171,7 @@ def _difficulty(t: np.ndarray, h: np.ndarray) -> np.ndarray:
     Every operation is elementwise, so a slice gives the values the whole axis would.
     """
     widths = np.diff(t)
-    ok = widths > MIN_WIDTH * qn_phase.x_unit()
+    ok = widths > MIN_WIDTH
     ha, hb = np.maximum(h[:-1], 0) + EPS, np.maximum(h[1:], 0) + EPS
     difficulty = ((np.sqrt(ha) + np.sqrt(hb)) / np.where(ok, widths, 1.0)) ** 2
     return np.where(ok & np.isfinite(difficulty), difficulty, np.inf)
@@ -225,7 +184,7 @@ def _pair_difficulty(t1: Any, h1: Any, t2: Any, h2: Any) -> float:
     ``** 2``), so the same value as the vectorised form gives for that interval.
     """
     width = t2 - t1
-    if not width > MIN_WIDTH * qn_phase.x_unit():
+    if not width > MIN_WIDTH:
         return math.inf
     q = (math.sqrt(max(h1, 0.0) + EPS) + math.sqrt(max(h2, 0.0) + EPS)) / width
     difficulty = float(q * q)
@@ -439,4 +398,4 @@ def _bracket_vertex(
     gap = 0.01 * (c - a)
     if not a + gap < vertex < c - gap:
         return None
-    return vertex, max(gap, MIN_WIDTH * qn_phase.x_unit())
+    return vertex, max(gap, MIN_WIDTH)

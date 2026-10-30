@@ -88,21 +88,7 @@ def test_a_positive_coordinate_opens_both_gates():
 
 
 # research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
-def test_the_variant_maps_to_the_option():
-    assert sample_options(Variant(targeted_gate="any")) == SampleOptions(
-        targeted_gate_any=True
-    )
-
-
 # research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
-def test_the_variant_maps_the_amplitude_to_the_option():
-    assert sample_options(Variant(targeted_amplitude="loguniform")) == SampleOptions(
-        targeted_loguniform=True
-    )
-
-
 def test_loguniform_targeted_step_is_a_bounded_multiple_of_the_move():
     change = np.array([1.0, -2.0, 0.5])
     low, high = TARGETED_MULTIPLIER_RANGE
@@ -121,26 +107,3 @@ def test_loguniform_targeted_step_is_a_bounded_multiple_of_the_move():
 
 
 # research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
-def test_the_variant_maps_no_reset_to_the_option():
-    assert sample_options(Variant(reset_on_success=False)) == SampleOptions(
-        keep_random_growth=True
-    )
-
-
-@pytest.mark.parametrize("keep", [False, True])
-def test_a_significant_move_resets_the_random_counter_unless_asked_not_to(keep):
-    options = SampleOptions(keep_random_growth=keep)
-    (_, random_growth, targeted_growth), _ = draw(
-        [1.0, 1.0, 1.0], options, random_growth=7.0
-    )
-    assert random_growth == (8.0 if keep else 1.0)  # reset to 0, then +1 for this draw
-    assert targeted_growth == 2.0
-
-
-def test_an_insignificant_move_never_touches_the_random_counter():
-    (_, random_growth, targeted_growth), _ = draw(
-        [1e-6, 0.0, 0.0], SampleOptions(keep_random_growth=True), random_growth=7.0
-    )
-    assert random_growth == 8.0
-    assert targeted_growth == 0

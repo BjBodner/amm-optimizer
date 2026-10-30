@@ -40,8 +40,6 @@ def digest(points):
     return sha.hexdigest()
 
 
-# research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_new_fields_leave_every_recorded_hash_as_it_was():
     assert presets.get("c46").config_hash() == "2153948ebed51150"
     assert ATMConfig().config_hash() == "f8fc4662f473b680"
@@ -202,8 +200,6 @@ def test_earlier_samples_seed_the_sampled_restarts():
     )
 
 
-# research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_handover_gets_what_is_left_and_the_archive():
     """Stages up to the switch are replayed; then one run gets the rest of the
     budget, its repeats answered from the replay part's memory."""
@@ -230,8 +226,6 @@ def test_a_run_within_the_switch_never_hands_over():
     assert all("handover" not in e for e in anytime.STAGE_LOG)
 
 
-# research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_handover_maps_its_archive_onto_a_normalised_box():
     """``box_normalize`` runs on [-5, 5]^D; the archive is mapped there too."""
     seen = Logged(lambda x: float(np.sum((np.asarray(x) - 0.3) ** 2)))

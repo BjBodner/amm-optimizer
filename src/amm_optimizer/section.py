@@ -12,15 +12,10 @@ import numpy as np
 from .bounds import Box, repair, uniform_columns
 from .conductor import ResourceConductor
 from .config import N_SAMPLERS, ATMConfig
-from .control import (
-    learned_scales,
-    update_covariance,
-    update_log_widths,
-    update_scale_moment,
-)
+from .control import update_covariance, update_log_widths
 from .objective import CountedObjective
 from .profiling import NULL_PROFILER, Profiler
-from .restart import check_restart, stagnated, stagnation_window
+from .restart import check_restart
 from .sampler import sample_options, two_mode_samples
 from .state import SamplerState, SearchState, best_eighth, runner_up
 
@@ -57,12 +52,6 @@ class SectionRunner:
         self._conductor = ResourceConductor(config.conductor)
         self._options = sample_options(config.variant)
         self.initial_design = True  # set per search by ``Search.run``
-        # The last draw's covariance-shaped noise (variants ``cov_steps``/``cov_path``).
-        self._noise: np.ndarray | None = None
-        # Variant ``restart_mode``: the smallest log-width that still counts as
-        # searching (``stag_tolx`` of the mean box width).
-        box_width = 1.0 if box is None else float(np.mean(box.upper - box.lower))
-        self._min_log_width = float(np.log(config.variant.stag_tolx * box_width))
 
     def run(self, state: SearchState, samplers: list[SamplerState]) -> np.ndarray:
         """Run ``iterations_per_hyperparameter_set`` iterations.
@@ -121,22 +110,9 @@ class SectionRunner:
         parents = state.parents
         parts = []
         prof = self._profiler
-        learned = (
-            learned_scales(state.scale_moment, self._config.variant.scale_cap)
-            if state.scale_moment is not None
-            else None
-        )
-        variant = self._config.variant
-        noise: list[np.ndarray] | None = (
-            []
-            if state.cov is not None
-            and (variant.cov_steps == "noise" or variant.cov_path == "noise")
-            else None
-        )
         for sampler in samplers:
-            vector = sampler.adaptive_vector if learned is None else learned
             adaptive = np.broadcast_to(
-                vector[:, np.newaxis], (n_params, sampler.n_samples)
+                sampler.adaptive_vector[:, np.newaxis], (n_params, sampler.n_samples)
             )
             with prof.block("sample"):
                 samples, sampler.random_growth, sampler.targeted_growth = (
@@ -153,21 +129,12 @@ class SectionRunner:
                         prof,
                         self._options,
                         state.cov_factor,
-                        noise,
                     )
                 )
             if self._box is not None:
                 self._shape_to_box(samples, state)
             parts.append(samples)
         boundaries = np.cumsum([0] + [p.shape[1] for p in parts])
-        # The uniform first pool replaces the drawn samples: no noise to learn from.
-        designed = (
-            self._box is not None
-            and variant.initial_design == "uniform"
-            and self.initial_design
-            and not state.cost_history
-        )
-        self._noise = np.concatenate(noise, axis=1) if noise and not designed else None
         return np.concatenate(parts, axis=1), boundaries
 
     def _shape_to_box(self, samples: np.ndarray, state: SearchState) -> None:
@@ -203,29 +170,9 @@ class SectionRunner:
         real[boundaries[:-1]] = False  # the incumbent's own columns carry no step
         if not real.any():
             return
-        variant = self._config.variant
-        if variant.cov_steps == "noise":
-            if self._noise is None:
-                return
-            steps = self._noise[:, real].T
-        else:
-            steps = ((samples[:, real] - state.best[:, np.newaxis]) / widths[real]).T
-        rank_one = None
-        winner = int(np.argmin(cost))
-        if state.cov_path is not None and cost[winner] < state.previous_cost:
-            if variant.cov_path == "noise":
-                taken = None if self._noise is None else self._noise[:, winner]
-            else:
-                taken = (samples[:, winner] - state.best) / widths[winner]
-            if taken is not None:
-                dim = len(state.best)
-                c_c = 4.0 / (dim + 4)
-                state.cov_path = (1 - c_c) * state.cov_path + np.sqrt(
-                    c_c * (2 - c_c)
-                ) * taken
-                rank_one = state.cov_path
+        steps = ((samples[:, real] - state.best[:, np.newaxis]) / widths[real]).T
         state.cov, state.cov_factor = update_covariance(
-            state.cov, steps, cost[real], variant, rank_one
+            state.cov, steps, cost[real], self._config.variant
         )
 
     def _advance(
@@ -244,10 +191,6 @@ class SectionRunner:
             new_change = samples[:, winner] - state.best
             if state.cov is not None:
                 self._learn_covariance(state, samplers, samples, boundaries, cost)
-            if state.scale_moment is not None:
-                update_scale_moment(
-                    state.scale_moment, new_change, self._config.variant.scale_rate
-                )
 
         # Legacy (audit B1): the original also updated an "adaptive amplitude"
         # here, but never read the result. It is omitted.
@@ -278,16 +221,6 @@ class SectionRunner:
                 state.cost_history,
                 self._config.restart,
             )
-            if not state.restart and self._config.variant.restart_mode != "legacy":
-                state.restart = stagnated(
-                    state.cost_history,
-                    [s.random_growth for s in samplers],
-                    stagnation_window(
-                        len(state.best), self._config.conductor.total_resources
-                    ),
-                    self._config.variant.stag_tolfun,
-                    self._min_log_width,
-                )
         return gains
 
     def _reallocate(

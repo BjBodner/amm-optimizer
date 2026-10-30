@@ -13,7 +13,6 @@ import warnings
 
 import numpy as np
 
-from . import qn_phase
 from .bounds import Box
 from .es_phase import EsResult
 from .objective import CountedObjective
@@ -78,7 +77,7 @@ def run_cobyqa_restarts(
                         "maxfev": left,
                         "maxiter": 10 * left,
                         "initial_tr_radius": radius,
-                        "final_tr_radius": FINAL_RADIUS * qn_phase.x_unit(),
+                        "final_tr_radius": FINAL_RADIUS,
                     },
                 )
         except _SpentError:
@@ -149,7 +148,7 @@ def run_cobyqa_from(
                         "maxfev": left,
                         "maxiter": 10 * left,
                         "initial_tr_radius": radius,
-                        "final_tr_radius": FINAL_RADIUS * qn_phase.x_unit(),
+                        "final_tr_radius": FINAL_RADIUS,
                     },
                 )
         except _SpentError:

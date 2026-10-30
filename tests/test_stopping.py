@@ -17,7 +17,7 @@ import pytest
 import amm_optimizer as amm
 from amm_optimizer import presets
 from amm_optimizer.bounds import Box
-from amm_optimizer.config import ATMConfig, Variant
+from amm_optimizer.config import ATMConfig
 from amm_optimizer.objective import CountedObjective, Watch, _Stop
 from amm_optimizer.qn_phase import run_lbfgsb_restarts
 from preset_cases import wave5_variant
@@ -223,24 +223,6 @@ def _hybrid(**changes):
     return ATMConfig(iterations_per_hyperparameter_set=1000000, variant=variant)
 
 
-# Phases reached only through research options (deprecated in 0.6.0) are stopped too.
-pytestmark = pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
-
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", FutureWarning)
-    _NELDER_MEAD = ATMConfig(
-        variant=Variant(
-            amplitude_control="success_rate_targeted",
-            initial_design="uniform",
-            bounds="fold",
-            pool_rule="budget",
-            pool_min=12,
-            reevaluate_incumbent=False,
-            refine_fraction=0.5,
-            local_method="nelder_mead",
-        )
-    )
-
 # (frames that must be on the stack, configuration, fun, dim, budget[, which
 # improvement inside the phase stops the run, default the second]); each route was
 # found by recording the modules on the stack at each improvement
@@ -269,14 +251,6 @@ with warnings.catch_warnings():
             500,
         ),
         "CMA-ES finisher": (["cma_phase"], presets.get("c23"), rosen, 5, 2000),
-        "BIPOP regimes": (
-            ["regimes"],
-            _hybrid(cma_regimes="bipop"),
-            rastrigin,
-            5,
-            5000,
-        ),
-        "simplex refinement": (["simplex"], _NELDER_MEAD, rosen, 2, 1000),
         "anytime stages": (["anytime", "cobyqa_phase"], ANYTIME, sphere, 3, 2000),
         # the hand-over's ATM sampler improves only once on this run
         "anytime hand-over": (["anytime", "search"], ANYTIME, rosen, 2, 30000, 1),

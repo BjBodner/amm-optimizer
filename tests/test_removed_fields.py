@@ -8,6 +8,8 @@ it only there; any other value raises a ``ValueError`` naming the release.
 
 import dataclasses
 import json
+import re
+from pathlib import Path
 
 import pytest
 
@@ -25,6 +27,7 @@ from amm_optimizer.config import (
 from test_shipped_hashes import RECORDED, shipped
 
 FIELDS = {f.name: f.default for f in dataclasses.fields(Variant)}
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_removed_fields_are_gone_from_variant():
@@ -88,3 +91,37 @@ def test_a_dictionary_of_the_last_release_loads():
         data = shipped(name).to_dict()
         data["variant"].update(REMOVED_FIELDS)
         assert ATMConfig.from_dict(data).config_hash() == want, name
+
+
+def _deprecated_in_060():
+    """(fields, {field: values}) of the 0.6.0 CHANGELOG's Deprecated entry."""
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf8")
+    section = text.split("\n## [0.6.0]", 1)[1].split("\n## [", 1)[0]
+    entry = " ".join(section.split("### Deprecated", 1)[1].split("\n### ")[0].split())
+    listed = entry.split("Fields: ", 1)[1].split(". Values:")[0]
+    fields = re.findall(r"`(\w+)`", listed)
+    values: dict[str, list[str]] = {}
+    for part in entry.split("Values: ", 1)[1].rstrip(".").split("; "):
+        name, *vals = re.findall(r"`\"?(\w+)\"?`", part)
+        values[name] = vals
+    return fields, values
+
+
+def test_every_option_that_060_deprecated_is_removed():
+    fields, values = _deprecated_in_060()
+    assert len(fields) == 92 and sum(map(len, values.values())) == 29
+    assert set(fields) == set(REMOVED_FIELDS)
+    for name, vals in values.items():
+        assert set(vals) <= set(REMOVED_CHOICES[name]), name
+    # the values removed with their fields' routes, beyond the 0.6.0 list
+    extra = {
+        name: set(vals) - set(values.get(name, ()))
+        for name, vals in REMOVED_CHOICES.items()
+    }
+    assert {name: vals for name, vals in extra.items() if vals} == {}
+
+
+def test_with_changes_names_the_release_for_a_removed_field():
+    assert presets.with_changes("c46", sr_eta=1.5) == presets.get("c46")
+    with pytest.raises(ValueError, match=r"Variant\.sr_eta was removed in 0\.7\.0"):
+        presets.with_changes("c46", sr_eta=2.0)
