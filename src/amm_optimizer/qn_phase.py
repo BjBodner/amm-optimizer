@@ -386,6 +386,13 @@ def ridge_reading(records: list[tuple[float, int]]) -> bool:
     )
 
 
+def _travel_sigma(end: np.ndarray, start: np.ndarray, width: float) -> float:
+    """The sigma a quasi-Newton run hands on: a tenth of the per-axis distance from
+    ``start`` to ``end``, within [1e-8, 0.2] of the box width."""
+    travelled = float(np.linalg.norm(end - start)) / np.sqrt(len(end))
+    return float(np.clip(0.1 * travelled, 1e-8 * width, 0.2 * width))
+
+
 def run_slsqp_restarts(
     objective: CountedObjective,
     rng: np.random.RandomState,
@@ -407,27 +414,21 @@ def run_slsqp_restarts(
     """Spend up to ``evaluations`` on restarted SLSQP from ``x`` (cost ``cost``).
 
     Each restart starts from a uniform point. ``ends_out``, if given, receives a
-    ``Descent`` for every completed descent (not for one cut short by the evaluation
-    budget). ``max_descents``: stop after that many completed descents (cycle 17's
-    single descent before the simplex). ``fd_step``: SLSQP's forward-difference
-    step (SciPy's default 1.49e-8 when None; cycle 20).
-    ``extend_to`` (cycle 21): the first descent may go on past ``evaluations``, up to
-    ``extend_to``, while a ``StallMonitor`` reads it as progressing; no restart
-    follows it. ``fallback`` (cycle 28): once failed descents outnumber converged
-    ones (``failure_majority``), the rest goes to ``run_lbfgsb_restarts`` from the
-    best point. ``gate_once`` (cycle 33, ``capgate``): with ``extend_to``, the
-    ``StallMonitor`` is read once, when the first descent reaches ``evaluations``;
-    its verdict (appended to ``gate_out``) holds for the rest of that descent.
-    ``reader`` (``small_switch``, the small10 toy): reads the first descent and may
-    stop the call at one of its checkpoints (``reader.stopped_at``).
-    ``ridge_after`` (the f13 toy): when the first descent's ``StallMonitor`` has
-    recorded that many iterations, ``ridge_reading`` reads them once (the verdict is
-    appended to ``ridge_out``); a ridge stops the call there.
+    ``Descent`` for every completed descent (not one cut short by the budget);
+    ``max_descents`` stops after that many; ``fd_step`` is SLSQP's
+    forward-difference step (SciPy's 1.49e-8 when None). ``extend_to``: the first
+    descent may go on past ``evaluations``, up to ``extend_to``, while a
+    ``StallMonitor`` reads it as progressing (``gate_once``: read once, at the cap,
+    the verdict appended to ``gate_out``); no restart follows it. ``fallback``: once
+    failed descents outnumber converged ones, ``run_lbfgsb_restarts`` takes the rest
+    from the best point. ``reader`` (``small_switch``) reads the first descent and may
+    stop the call at a checkpoint (``reader.stopped_at``); ``ridge_after``: once the
+    first descent's monitor holds that many iterations, ``ridge_reading`` reads them
+    (the verdict appended to ``ridge_out``) and a ridge stops the call.
 
     The returned sigma (the scale ATM's tail starts from) is a tenth of the per-axis
     distance the best run travelled from its start, within [1e-8, 0.2] of the box
-    width. Until 2026-10-18 it was 0, which pinned ATM's widths to their floor
-    (Batches 31-32).
+    width.
     """
     from scipy.optimize import minimize  # type: ignore[import-untyped]
 
@@ -448,7 +449,6 @@ def run_slsqp_restarts(
         else None
     )
     ridge: list[bool] = []
-
     gate: list[bool] = []
 
     def extend_ok() -> bool:
@@ -461,15 +461,12 @@ def run_slsqp_restarts(
                 gate_out.append(gate[0])
         return gate[0]
 
-    def extending() -> bool:
-        """Whether the descent now running may go past ``evaluations``."""
-        return not ends
-
     def fun(z: np.ndarray) -> float:
         nonlocal used, best_x, best_cost, best_start
+        # only the first descent may go past ``evaluations``
         if used >= evaluations and not (
             monitor is not None
-            and extending()
+            and not ends
             and extend_to is not None
             and used < extend_to
             and extend_ok()
@@ -484,7 +481,7 @@ def run_slsqp_restarts(
         used += 1
         if reader is not None:
             reader.after(point, float(value))
-        if monitor is not None and extending():
+        if monitor is not None and not ends:
             monitor.observe(point, float(value))
         if value < best_cost:
             best_x, best_cost, best_start = point.copy(), float(value), start
@@ -541,13 +538,11 @@ def run_slsqp_restarts(
             if rest.cost < best_cost:
                 best_x, best_cost, fallback_sigma = rest.x, rest.cost, rest.sigma
             break
-        start = box.lower + (box.upper - box.lower) * rng.rand(dim)
+        start = box.uniform(rng)
         run_best[1] = start
     if fallback_sigma is not None:
         return EsResult(best_x, best_cost, fallback_sigma, used)
-    travelled = float(np.linalg.norm(best_x - best_start)) / np.sqrt(dim)
-    sigma = float(np.clip(0.1 * travelled, 1e-8 * width, 0.2 * width))
-    return EsResult(best_x, best_cost, sigma, used)
+    return EsResult(best_x, best_cost, _travel_sigma(best_x, best_start, width), used)
 
 
 def kink_check(
@@ -761,6 +756,14 @@ BFGS_C1, BFGS_C2 = 1e-4, 0.5
 BFGS_MAX_EXPAND, BFGS_MAX_BISECT = 30, 40
 
 
+def _free_dir(z: np.ndarray, d: np.ndarray, box: Box) -> np.ndarray:
+    """``d`` without the components that point out of a face ``z`` sits on."""
+    out = np.array(d, dtype=float)
+    out[(z <= box.lower) & (d < 0)] = 0.0
+    out[(z >= box.upper) & (d > 0)] = 0.0
+    return out
+
+
 def run_scaled_bfgs(
     objective: CountedObjective,
     rng: np.random.RandomState,
@@ -773,22 +776,20 @@ def run_scaled_bfgs(
     extend_to: int | None = None,
     extend_gate: Any = None,
 ) -> EsResult:
-    """Restarted scaled-FD nonsmooth BFGS (``run_scaled_bfgs``), the first from ``x``.
+    """Restarted scaled-FD nonsmooth BFGS, the first descent from ``x``.
 
     Each descent: an identity inverse Hessian, a projected quasi-Newton direction, an
     Armijo plus weak-Wolfe bracketing line search (doubling, then bisection; the
     slope is one forward difference along the direction), the BFGS update when
-    s.y > 0, and no small-step
-    stop: a descent ends only when the line search finds no Armijo point or the
-    projected direction is not a descent direction. Later descents start from uniform
-    points. ``box_qp`` (cycle 59): where -H g leaves the box, the direction is the
-    quadratic model's minimiser over the box (``_box_qp``), as in SLSQP. Returns the
-    best point, its value, a sigma from the first descent's
+    s.y > 0, and no small-step stop: a descent ends only when the line search finds
+    no Armijo point or the projected direction is not a descent direction. Later
+    descents start from uniform points. ``box_qp`` (cycle 59): where -H g leaves the
+    box, the direction is the quadratic model's minimiser over the box (``_box_qp``),
+    as in SLSQP. Returns the best point, its value, a sigma from the first descent's
     travel (as ``run_slsqp_restarts``) and the evaluations used.
     ``extend_to`` (the f13 toy, ``Variant.rugged_try_rest``): a descent still running
     when ``evaluations`` are used goes on, the same descent, up to ``extend_to``
-    evaluations, if ``extend_gate(best_x, best_cost)`` (read once; None: always) says
-    so.
+    evaluations, if ``extend_gate(best_x, best_cost)`` (read once; None: always).
     """
     dim = len(x)
     width = float(np.mean(box.upper - box.lower))
@@ -815,12 +816,6 @@ def run_scaled_bfgs(
             best_x, best_cost = point.copy(), float(value)
         return float(value) if np.isfinite(value) else 1e300
 
-    def free_dir(z: np.ndarray, d: np.ndarray) -> np.ndarray:
-        out = np.array(d, dtype=float)
-        out[(z <= box.lower) & (d < 0)] = 0.0
-        out[(z >= box.upper) & (d > 0)] = 0.0
-        return out
-
     descents = 0
     try:
         while max_descents is None or descents < max_descents:
@@ -836,7 +831,7 @@ def run_scaled_bfgs(
             while True:
                 d = -inv_h @ g
                 if not box_qp:
-                    d = free_dir(z, d)
+                    d = _free_dir(z, d, box)
                 elif np.any((z + d < box.lower) | (z + d > box.upper)):
                     # ``box_qp`` (cycle 59, the engine toy): SLSQP's bound handling.
                     # The model's minimiser over the box replaces zeroing the components
@@ -847,11 +842,11 @@ def run_scaled_bfgs(
                         b = np.linalg.inv(0.5 * (inv_h + inv_h.T))
                         d = _box_qp(g, 0.5 * (b + b.T), box.lower - z, box.upper - z)
                     except np.linalg.LinAlgError:
-                        d = free_dir(z, d)
+                        d = _free_dir(z, d, box)
                 gd = float(g @ d)
                 if not gd < 0:
                     inv_h = np.eye(dim)
-                    d = free_dir(z, -g)
+                    d = _free_dir(z, -g, box)
                     gd = float(g @ d)
                     if not gd < 0:
                         break
@@ -907,12 +902,11 @@ def run_scaled_bfgs(
             descents += 1
             if descents == 1:
                 first_end = z.copy()
-            start = box.lower + (box.upper - box.lower) * rng.rand(dim)
+            start = box.uniform(rng)
             start_cost = np.inf
     except SpentError:
         pass
-    travelled = float(np.linalg.norm(first_end - x)) / np.sqrt(dim)
-    sigma = float(np.clip(0.1 * travelled, 1e-8 * width, 0.2 * width))
+    sigma = _travel_sigma(first_end, x, width)
     return EsResult(best_x, best_cost, sigma, used)
 
 
@@ -1025,7 +1019,7 @@ def run_sampled_restarts(
     while used < evaluations - dim - 1:
         try:
             for _ in range(SAMPLE_PER_DIM * dim):
-                point = box.lower + (box.upper - box.lower) * rng.rand(dim)
+                point = box.uniform(rng)
                 value = evaluate(point)
                 missing = value != value
                 key = (missing, 0.0 if missing else value, len(sample_f))
@@ -1044,7 +1038,7 @@ def run_sampled_restarts(
                 break
             heapq.heappop(queue)
         if start is None:
-            start = box.lower + (box.upper - box.lower) * rng.rand(dim)
+            start = box.uniform(rng)
         claim(np.array(start))
         incumbent = best_cost
         local: dict[str, Any] = {"best": np.inf, "x": np.array(start), "hist": []}
@@ -1086,8 +1080,7 @@ def run_sampled_restarts(
         except SpentError:
             break
         claim(np.array(local["x"]))
-    travelled = float(np.linalg.norm(best_x - best_start)) / np.sqrt(dim)
-    sigma = float(np.clip(0.1 * travelled, 1e-8 * width, 0.2 * width))
+    sigma = _travel_sigma(best_x, best_start, width)
     return EsResult(best_x, best_cost, sigma, used)
 
 
@@ -1165,9 +1158,8 @@ def run_lbfgsb_restarts(
                 )
         except SpentError:
             break
-        start = box.lower + (box.upper - box.lower) * rng.rand(dim)
-    travelled = float(np.linalg.norm(best_x - best_start)) / np.sqrt(dim)
-    sigma = float(np.clip(0.1 * travelled, 1e-8 * width, 0.2 * width))
+        start = box.uniform(rng)
+    sigma = _travel_sigma(best_x, best_start, width)
     return EsResult(best_x, best_cost, sigma, used)
 
 

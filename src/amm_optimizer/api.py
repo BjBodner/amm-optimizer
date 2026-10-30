@@ -256,36 +256,9 @@ def _minimize(
     if rng is None:
         rng = np.random.RandomState(seed)
     x0 = np.asarray(x0, dtype=float)
-    if (
-        config is not None
-        and config.variant.box_normalize
-        and bounds is not None
-        and budget >= 1
-    ):
-        # ``box_normalize`` (the novel-ideas toy): run on the box mapped onto bbob's
-        # [-5, 5]^D, coordinate by coordinate, so every share of the box width and
-        # every absolute step means what it means on bbob; bbob's own box is not
-        # mapped (the run is exactly the unnormalised one)
-        norm = Box.make(bounds, len(x0))
-        if not (np.all(norm.lower == -5.0) and np.all(norm.upper == 5.0)):
-            lo, span = norm.lower, (norm.upper - norm.lower) / 10.0
-
-            def mapped(u: np.ndarray) -> float:
-                return fun(lo + (np.asarray(u, dtype=float) + 5.0) * span)
-
-            inner = _minimize(
-                mapped,
-                np.clip((x0 - lo) / span - 5.0, -5.0, 5.0),
-                budget,
-                seed=None,
-                rng=rng,
-                config=config,
-                profile=profile,
-                bounds=(-5.0, 5.0),
-                warm=None if warm is None else warm.mapped(lo, span),
-            )
-            inner.x = lo + (np.asarray(inner.x, dtype=float) + 5.0) * span
-            return inner
+    normalized = _box_normalized(fun, x0, budget, rng, config, profile, bounds, warm)
+    if normalized is not None:
+        return normalized
     config = resolve_config(config or ATMConfig(), budget, len(x0))
     total_iterations = iteration_limit(config, budget)
     if budget < 1:
@@ -294,28 +267,9 @@ def _minimize(
         raise ValueError("this variant needs bounds=(lower, upper)")
     box = None if bounds is None else Box.make(bounds, len(x0))
     profiler = resolve_profiler(profile)
-    # Variant ``cma_warm_start``: ATM's evaluations, kept while ``recording[0]``.
-    recorded_x: list[np.ndarray] = []
-    recorded_f: list[float] = []
-    if warm is not None and config.variant.cma_warm_start:
-        # the anytime hand-over: the first CMA run's shape learns from every point
-        # the earlier stages evaluated, not only from this stage's ATM sample
-        recorded_x.extend(warm.x)
-        recorded_f.extend(warm.f.tolist())
-    recording = [False]
-    evaluated = fun
-    if config.variant.cma_warm_start:
-
-        def evaluated(x: np.ndarray) -> float:
-            kept = np.array(x, dtype=float)  # before ``fun``, which may write into x
-            value = fun(x)
-            if recording[0]:
-                recorded_x.append(kept)
-                recorded_f.append(float(value))
-            return value
-
+    record = _Recording(config.variant.cma_warm_start, warm)
     objective = CountedObjective(
-        evaluated,
+        record.wrap(fun),
         budget,
         strict=config.strict_budget,
         profiler=profiler,
@@ -327,14 +281,9 @@ def _minimize(
     allocation = start.step(start.rest, np.zeros(N_SAMPLERS))
 
     search = Search(objective, rng, config, total_iterations, profiler, box)
-    best_cost: float = 10**100
-    best_x = x0.copy()
-    x_start = x0
     nrestarts = 0
     known_cost: float | None = None
     width_scale: float | None = None
-    explored = False
-    out_of_budget = False
     with (
         np.errstate(invalid="ignore"),
         profiler.block("total"),
@@ -344,144 +293,36 @@ def _minimize(
         dim = len(x0)
         use_model = variant.cma_model == "quadratic" and dim <= CMA_MODEL_MAX_DIM
         cma_options = _cma_options(variant, dim)
-        pop_options = _pop_options(variant)
         sep = (
             variant.sep_probe
             and box is not None
             and budget >= SEP_MIN_BUDGET_PER_DIM * dim
         )
-        spent = 0
-        descent_calls = 0  # ``basin_keep_atm``: the descents' evaluations
-        if (
-            box is not None
-            and variant.small_engine == "cobyqa"
-            and dim <= variant.small_engine_max_dim
-            and budget <= SMALL_ENGINE_MAX_PER_DIM * dim
-        ):
-            # ``small_engine`` (cycle 61): restarted COBYQA spends the whole budget
-            out = cobyqa_phase.run_cobyqa_restarts(
-                objective, rng, x0, box, budget, SMALL_ENGINE_RADIUS
-            )
-            best_x, best_cost = out.x, out.cost
-            spent = objective.calls
-            explored = out_of_budget = True
-        if (
-            box is not None
-            and not out_of_budget
-            and dim >= ADDITIVE_MIN_DIM
-            and (
-                (variant.chain_route and budget >= CHAIN_MIN_PER_DIM * dim)
-                or (variant.sep_route and budget >= SEP_ROUTE_MIN_PER_DIM * dim)
-            )
-        ):
-            routed, best_x, best_cost = _additive_route(
-                objective, rng, box, budget, variant, x0
-            )
-            spent = objective.calls
-            if routed:  # ``chain_route`` / ``sep_route``: the budget is spent
-                explored = out_of_budget = True
-        if (
-            box is not None
-            and not out_of_budget
-            and variant.basin_route
-            and 2 <= dim <= BASIN_MAX_DIM
-            and budget >= BASIN_MIN_PER_DIM * dim
-        ):
-            # ``basin_route`` (cycle 53, the D 2 toy): a design reading; on a smooth
-            # multi-basin reading MLSL spends the budget, otherwise the usual path
-            # continues from the design's best point
-            # ``basin_descents`` (cycle 60): passed only when on, so the other
-            # configurations' calls stay exactly as recorded
-            basin_start: list[tuple[np.ndarray, float]] = []
-            descents: dict[str, Any] = (
-                {"descents": variant.basin_descents, "start_out": basin_start}
-                if variant.basin_descents and budget <= BASIN_DESCENTS_MAX_PER_DIM * dim
-                else {}
-            )
-            routed, best_x, best_cost, basin_readings = basin_phase.multi_basin_route(
-                objective,
-                rng,
-                box,
-                budget - objective.calls,
-                **descents,
-            )
-            spent = objective.calls
-            if variant.basin_keep_atm:
-                descent_calls = int(basin_readings.get("descent_calls", 0.0))
-            if routed or objective.calls >= budget:
-                explored = out_of_budget = True
-            else:
-                # after descents the usual path starts from the design's best point,
-                # while their best stays ``best_cost`` unless something beats it
-                x0 = x_start = np.array(
-                    basin_start[0][0] if basin_start else best_x, dtype=float
-                )
+        early = _EarlyRoutes(x0)
+        if box is not None:
+            early = _early_routes(objective, rng, box, budget, variant, x0)
+        best_x, best_cost, x_start = early.best_x, early.best_cost, early.x_start
+        explored, out_of_budget = early.done, early.done
         if box is not None and not out_of_budget and _prefix_runs(variant, dim, budget):
-            prefix_kind = _prefix_kind(variant, dim, budget)
-            init_points = max(4, int(np.ceil(ES_INIT_FACTOR * dim)))
-            warm_design: dict[str, Any] = (
-                {} if warm is None else {"design": warm.best(init_points)}
-            )
-            # ``prefix_full_per_dim`` (cycle 38): no ATM tail at small budgets
-            whole = (
-                variant.prefix_full_min_per_dim * dim
-                < budget
-                <= variant.prefix_full_per_dim * dim
-            )
-            es = run_es_phase(
+            es = _run_prefix(
                 objective,
                 rng,
-                x0,
                 box,
-                (budget if whole else max(1, int(variant.es_fraction * budget)))
-                - spent,
-                init_points,
-                prefix_kind,
+                budget,
+                variant,
+                early.x_start,
+                early.spent,
+                warm,
                 use_model,
                 cma_options,
-                1.0,
-                SEP_SHARE if sep else 0.0,
-                variant.es_lq_nonsep,
-                ("lq2" if budget >= variant.es_lq_min_budget_per_dim * dim else "cma"),
-                fd_step=QN_FD_STEP
-                if variant.es_kind in ("slsqplq10h", "slsqplq10hd")
-                else None,
-                **(
-                    {"step_pair_when_stuck": True}
-                    if variant.sep_check == "stall"
-                    and budget >= variant.sep_stall_min_per_dim * dim
-                    else {}
-                ),
-                **({"qn_fallback": True} if variant.qn_fallback == "lbfgsb" else {}),
-                **({"sep_smooth_probe": True} if variant.prefix_sep_probe else {}),
-                # ``preplat``: above 30 x dim only (its 8 probe evaluations cost the
-                # smooth functions at 30 x dim in scratch)
-                **(
-                    {"plateau_pop": True}
-                    if variant.prefix_plateau_pop
-                    and budget > QN_MIN_BUDGET_PER_DIM * dim
-                    and dim >= variant.prefix_plateau_min_dim
-                    else {}
-                ),
-                **_small_switch_kw(variant, dim, budget),
-                nan_reading=variant.prefix_nan_reading,  # cycle 64
-                **_prefix_ridge_kw(variant, dim, budget),  # the f13 toy
-                **_parked2_kw(variant, dim, budget),
-                # the anytime hand-over: the design is the best points evaluated so
-                # far (answered from memory) instead of fresh uniform draws
-                **warm_design,
+                sep,
             )
             x_start, known_cost, width_scale = es.x, es.cost, es.sigma
             explored = True
         handoff = box is not None and variant.cma_handoff > 0 and not explored
         if handoff:
-            atm_share = int(variant.cma_handoff * budget)
-            cap = variant.cma_handoff_cap_per_dim
-            if cap > 0 and dim >= CMA_HANDOFF_CAP_MIN_DIM:
-                atm_share = min(atm_share, int(cap * dim))
-            # ``basin_keep_atm`` (cycle 60): the descents do not shorten ATM's sample
-            objective.set_limit(max(1, atm_share + descent_calls))
-            recording[0] = variant.cma_warm_start
+            objective.set_limit(_handoff_limit(variant, budget, dim, early))
+            record.on = variant.cma_warm_start
         last_widths: tuple[float, ...] = ()
         # the anytime hand-over: the first search skips the uniform first pool, which
         # the replay part's points stand in for (and starts with its value known
@@ -511,50 +352,18 @@ def _minimize(
                 best_x = outcome.x
         if handoff and objective.calls < budget:
             assert box is not None
-            objective.set_limit(budget)
-            nonseparable = False  # the separable search's check failed
-            if sep:
-                from .step_phase import run_step_phase
-
-                stuck: dict[str, Any] = (
-                    {"pair_when_stuck": True}
-                    if variant.sep_check == "stall"
-                    and budget >= variant.sep_stall_min_per_dim * dim
-                    else {}
-                )
-                probe = run_step_phase(
-                    objective,
-                    best_x,
-                    best_cost,
-                    box,
-                    int(SEP_SHARE * (budget - objective.calls)),
-                    **stuck,
-                )
-                if probe.cost <= best_cost:
-                    best_cost, best_x = probe.cost, probe.x
-                nonseparable = probe.stalled
-            objective.set_limit(budget)
-            recording[0] = False
-            handover = _Handover(
-                variant=variant,
-                rng=rng,
-                box=box,
-                budget=budget,
-                dim=dim,
-                use_model=use_model,
-                cma_options=cma_options,
-                pop_options=pop_options,
-                nonseparable=nonseparable,
-                recorded_x=recorded_x,
-                recorded_f=recorded_f,
-                best_x=best_x,
-                best_cost=best_cost,
-                a0=_warm_shape(variant, dim, recorded_x, recorded_f),
-                last_widths=last_widths,
-                warm_samples=None if warm is None else (warm.x, warm.f),
+            best_x, best_cost = _hand_over(
+                objective,
+                rng,
+                box,
+                budget,
+                variant,
+                (best_x, best_cost),
+                (use_model, cma_options, sep),
+                record,
+                last_widths,
+                warm,
             )
-            _local_phase(handover, objective)
-            best_x, best_cost = handover.best_x, handover.best_cost
 
     return OptimizeResult(
         x=np.array(best_x),
@@ -563,6 +372,323 @@ def _minimize(
         nrestarts=nrestarts,
         timings=profiler.report(),
     )
+
+
+def _box_normalized(
+    fun: Callable[[np.ndarray], float],
+    x0: np.ndarray,
+    budget: int,
+    rng: np.random.RandomState,
+    config: ATMConfig | None,
+    profile: bool | Profiler,
+    bounds: tuple[object, object] | None,
+    warm: Warm | None,
+) -> OptimizeResult | None:
+    """``box_normalize``: the run on the box mapped onto bbob's [-5, 5]^D, coordinate
+    by coordinate, so every share of the box width and every absolute step means what
+    it means on bbob; None on bbob's own box (the run is exactly the unnormalised one)
+    and without the option."""
+    if config is None or not config.variant.box_normalize or bounds is None:
+        return None
+    if budget < 1:
+        return None
+    norm = Box.make(bounds, len(x0))
+    if np.all(norm.lower == -5.0) and np.all(norm.upper == 5.0):
+        return None
+    lo, span = norm.lower, (norm.upper - norm.lower) / 10.0
+
+    def mapped(u: np.ndarray) -> float:
+        return fun(lo + (np.asarray(u, dtype=float) + 5.0) * span)
+
+    inner = _minimize(
+        mapped,
+        np.clip((x0 - lo) / span - 5.0, -5.0, 5.0),
+        budget,
+        seed=None,
+        rng=rng,
+        config=config,
+        profile=profile,
+        bounds=(-5.0, 5.0),
+        warm=None if warm is None else warm.mapped(lo, span),
+    )
+    inner.x = lo + (np.asarray(inner.x, dtype=float) + 5.0) * span
+    return inner
+
+
+class _Recording:
+    """``cma_warm_start``: the evaluations ATM makes while ``on``, for the first CMA
+    run's shape (with the anytime hand-over, every point the earlier stages
+    evaluated too)."""
+
+    def __init__(self, enabled: bool, warm: Warm | None) -> None:
+        self.enabled = enabled
+        self.on = False
+        self.x: list[np.ndarray] = []
+        self.f: list[float] = []
+        if warm is not None and enabled:
+            self.x.extend(warm.x)
+            self.f.extend(warm.f.tolist())
+
+    def wrap(self, fun: Callable[[np.ndarray], float]) -> Callable[[np.ndarray], float]:
+        """``fun``, recording while ``on`` (``fun`` itself when not enabled)."""
+        if not self.enabled:
+            return fun
+
+        def evaluated(x: np.ndarray) -> float:
+            kept = np.array(x, dtype=float)  # before ``fun``, which may write into x
+            value = fun(x)
+            if self.on:
+                self.x.append(kept)
+                self.f.append(float(value))
+            return value
+
+        return evaluated
+
+
+@dataclass
+class _EarlyRoutes:
+    """What the routes before the prefix left: the best point, where the run goes on
+    from, the evaluations they spent (``descent_calls``: the basin descents', for
+    ``basin_keep_atm``) and whether they spent the budget."""
+
+    x_start: np.ndarray
+    best_x: np.ndarray = field(init=False)
+    best_cost: float = 10**100
+    spent: int = 0
+    descent_calls: int = 0
+    done: bool = False
+
+    def __post_init__(self) -> None:
+        self.best_x = self.x_start.copy()
+
+
+def _early_routes(
+    objective: CountedObjective,
+    rng: np.random.RandomState,
+    box: Box,
+    budget: int,
+    variant: Variant,
+    x0: np.ndarray,
+) -> _EarlyRoutes:
+    """The routes that run before the prefix, in order: ``small_engine``, the pair
+    test (``chain_route`` / ``sep_route``) and ``basin_route``."""
+    dim = len(x0)
+    out = _EarlyRoutes(x0)
+    if (
+        variant.small_engine == "cobyqa"
+        and dim <= variant.small_engine_max_dim
+        and budget <= SMALL_ENGINE_MAX_PER_DIM * dim
+    ):
+        # ``small_engine`` (cycle 61): restarted COBYQA spends the whole budget
+        cobyqa = cobyqa_phase.run_cobyqa_restarts(
+            objective, rng, x0, box, budget, SMALL_ENGINE_RADIUS
+        )
+        out.best_x, out.best_cost = cobyqa.x, cobyqa.cost
+        out.spent = objective.calls
+        out.done = True
+    if (
+        not out.done
+        and dim >= ADDITIVE_MIN_DIM
+        and (
+            (variant.chain_route and budget >= CHAIN_MIN_PER_DIM * dim)
+            or (variant.sep_route and budget >= SEP_ROUTE_MIN_PER_DIM * dim)
+        )
+    ):
+        routed, out.best_x, out.best_cost = _additive_route(
+            objective, rng, box, budget, variant, x0
+        )
+        out.spent = objective.calls
+        out.done = routed  # ``chain_route`` / ``sep_route``: the budget is spent
+    if (
+        not out.done
+        and variant.basin_route
+        and 2 <= dim <= BASIN_MAX_DIM
+        and budget >= BASIN_MIN_PER_DIM * dim
+    ):
+        _basin_route(objective, rng, box, budget, variant, out)
+    return out
+
+
+def _basin_route(
+    objective: CountedObjective,
+    rng: np.random.RandomState,
+    box: Box,
+    budget: int,
+    variant: Variant,
+    out: _EarlyRoutes,
+) -> None:
+    """``basin_route`` (cycle 53, the D 2 toy): a design reading; on a smooth
+    multi-basin reading MLSL spends the budget, otherwise the usual path continues
+    from the design's best point. ``basin_descents`` (cycle 60) are passed only when
+    on, so the other configurations' calls stay exactly as recorded."""
+    dim = len(out.x_start)
+    basin_start: list[tuple[np.ndarray, float]] = []
+    descents: dict[str, Any] = (
+        {"descents": variant.basin_descents, "start_out": basin_start}
+        if variant.basin_descents and budget <= BASIN_DESCENTS_MAX_PER_DIM * dim
+        else {}
+    )
+    routed, out.best_x, out.best_cost, readings = basin_phase.multi_basin_route(
+        objective,
+        rng,
+        box,
+        budget - objective.calls,
+        **descents,
+    )
+    out.spent = objective.calls
+    if variant.basin_keep_atm:
+        out.descent_calls = int(readings.get("descent_calls", 0.0))
+    if routed or objective.calls >= budget:
+        out.done = True
+    else:
+        # after descents the usual path starts from the design's best point, while
+        # their best stays ``best_cost`` unless something beats it
+        out.x_start = np.array(
+            basin_start[0][0] if basin_start else out.best_x, dtype=float
+        )
+
+
+def _run_prefix(
+    objective: CountedObjective,
+    rng: np.random.RandomState,
+    box: Box,
+    budget: int,
+    variant: Variant,
+    x0: np.ndarray,
+    spent: int,
+    warm: Warm | None,
+    use_model: bool,
+    cma_options: dict[str, object],
+    sep: bool,
+) -> EsResult:
+    """The ES prefix (``es_phase="prefix"``) with the local search of
+    :func:`_prefix_kind`; ``spent``: the evaluations the earlier routes used."""
+    dim = len(x0)
+    init_points = max(4, int(np.ceil(ES_INIT_FACTOR * dim)))
+    # the anytime hand-over: the design is the best points evaluated so far
+    # (answered from memory) instead of fresh uniform draws
+    warm_design: dict[str, Any] = (
+        {} if warm is None else {"design": warm.best(init_points)}
+    )
+    # ``prefix_full_per_dim`` (cycle 38): no ATM tail at small budgets
+    whole = (
+        variant.prefix_full_min_per_dim * dim
+        < budget
+        <= variant.prefix_full_per_dim * dim
+    )
+    return run_es_phase(
+        objective,
+        rng,
+        x0,
+        box,
+        (budget if whole else max(1, int(variant.es_fraction * budget))) - spent,
+        init_points,
+        _prefix_kind(variant, dim, budget),
+        use_model,
+        cma_options,
+        1.0,
+        SEP_SHARE if sep else 0.0,
+        variant.es_lq_nonsep,
+        ("lq2" if budget >= variant.es_lq_min_budget_per_dim * dim else "cma"),
+        fd_step=QN_FD_STEP
+        if variant.es_kind in ("slsqplq10h", "slsqplq10hd")
+        else None,
+        **_pair_when_stuck_kw(variant, budget, dim, "step_pair_when_stuck"),
+        **({"qn_fallback": True} if variant.qn_fallback == "lbfgsb" else {}),
+        **({"sep_smooth_probe": True} if variant.prefix_sep_probe else {}),
+        # ``preplat``: above 30 x dim only (its 8 probe evaluations cost the smooth
+        # functions at 30 x dim in scratch)
+        **(
+            {"plateau_pop": True}
+            if variant.prefix_plateau_pop
+            and budget > QN_MIN_BUDGET_PER_DIM * dim
+            and dim >= variant.prefix_plateau_min_dim
+            else {}
+        ),
+        **_small_switch_kw(variant, dim, budget),
+        nan_reading=variant.prefix_nan_reading,  # cycle 64
+        **_prefix_ridge_kw(variant, dim, budget),  # the f13 toy
+        **_parked2_kw(variant, dim, budget),
+        **warm_design,
+    )
+
+
+def _pair_when_stuck_kw(
+    variant: Variant, budget: int, dim: int, name: str
+) -> dict[str, Any]:
+    """``sep_check="stall"`` from ``sep_stall_min_per_dim`` x dim, as STEP's option
+    ``name`` (passed only when on, so the other calls stay exactly as recorded)."""
+    if variant.sep_check == "stall" and budget >= variant.sep_stall_min_per_dim * dim:
+        return {name: True}
+    return {}
+
+
+def _handoff_limit(variant: Variant, budget: int, dim: int, early: _EarlyRoutes) -> int:
+    """The evaluations ATM gets before the hand-over: ``cma_handoff`` of the budget,
+    at most ``cma_handoff_cap_per_dim`` x dim from ``CMA_HANDOFF_CAP_MIN_DIM``; the
+    basin descents do not shorten ATM's sample (``basin_keep_atm``, cycle 60)."""
+    atm_share = int(variant.cma_handoff * budget)
+    cap = variant.cma_handoff_cap_per_dim
+    if cap > 0 and dim >= CMA_HANDOFF_CAP_MIN_DIM:
+        atm_share = min(atm_share, int(cap * dim))
+    return max(1, atm_share + early.descent_calls)
+
+
+def _hand_over(
+    objective: CountedObjective,
+    rng: np.random.RandomState,
+    box: Box,
+    budget: int,
+    variant: Variant,
+    best: tuple[np.ndarray, float],
+    cma: tuple[bool, dict[str, object], bool],
+    record: _Recording,
+    last_widths: tuple[float, ...],
+    warm: Warm | None,
+) -> tuple[np.ndarray, float]:
+    """After ATM's share (``cma_handoff``): the separable search (``sep_probe``),
+    then :func:`_local_phase`; returns the best point and its value."""
+    best_x, best_cost = best
+    use_model, cma_options, sep = cma
+    dim = len(best_x)
+    objective.set_limit(budget)
+    nonseparable = False  # the separable search's check failed
+    if sep:
+        from .step_phase import run_step_phase
+
+        probe = run_step_phase(
+            objective,
+            best_x,
+            best_cost,
+            box,
+            int(SEP_SHARE * (budget - objective.calls)),
+            **_pair_when_stuck_kw(variant, budget, dim, "pair_when_stuck"),
+        )
+        if probe.cost <= best_cost:
+            best_cost, best_x = probe.cost, probe.x
+        nonseparable = probe.stalled
+    objective.set_limit(budget)
+    record.on = False
+    handover = _Handover(
+        variant=variant,
+        rng=rng,
+        box=box,
+        budget=budget,
+        dim=dim,
+        use_model=use_model,
+        cma_options=cma_options,
+        pop_options=_pop_options(variant),
+        nonseparable=nonseparable,
+        recorded_x=record.x,
+        recorded_f=record.f,
+        best_x=best_x,
+        best_cost=best_cost,
+        a0=_warm_shape(variant, dim, record.x, record.f),
+        last_widths=last_widths,
+        warm_samples=None if warm is None else (warm.x, warm.f),
+    )
+    _local_phase(handover, objective)
+    return handover.best_x, handover.best_cost
 
 
 def _additive_route(
@@ -624,7 +750,7 @@ def _additive_route(
                 check_tol=float("inf"),
             )
             keep(step.x, step.cost)
-            x = box.lower + (box.upper - box.lower) * rng.rand(dim)
+            x = box.uniform(rng)
             value = objective.evaluate_point(x)
             if value is None:
                 break
@@ -814,7 +940,7 @@ class _Handover:
     def uniform_point(self) -> np.ndarray:
         """A uniform point of the box (one ``rand(dim)`` draw)."""
         box = self.box
-        return np.asarray(box.lower + (box.upper - box.lower) * self.rng.rand(self.dim))
+        return box.uniform(self.rng)
 
     def done(self) -> EsResult:
         return EsResult(self.best_x, float(self.best_cost), 0.0, 0)
@@ -900,192 +1026,22 @@ def _qn_local_phase(
         if plateau
         else qn_phase.curvature_beta(objective, rng, h.best_x, h.best_cost, box)
     )
+    beta: float | None = None
     if probed is not None:
         beta, probe_x, probe_cost, _ = probed
         h.keep(probe_x, probe_cost)
     elif not plateau:
         return None
-    smooth = probed is not None and beta >= qn_phase.BETA_THRESHOLD
-    fd_step = QN_FD_STEP if route.fd_step else None
-    fallback = variant.qn_fallback == "lbfgsb"
-    # passed only when on, so the other routes' calls stay exactly as recorded
-    on: dict[str, Any] = {"fallback": True} if fallback else {}
+    smooth = beta is not None and beta >= qn_phase.BETA_THRESHOLD
     if (
         smooth
         and route.smooth_bfgs_max_per_dim
         and budget <= route.smooth_bfgs_max_per_dim * dim
+        and _smooth_bfgs(route, h, objective)
     ):
-        # ``smooth_bfgs_max_per_dim`` (cycle 56): at small budgets the scaled-FD BFGS
-        # takes the rest of a smooth reading, instead of the SLSQP stage and finisher
-        # passed only when on, so the recorded arms stay exactly as recorded
-        bfgs_on: dict[str, Any] = {}
-        if route.smooth_bfgs_descents:
-            bfgs_on["max_descents"] = route.smooth_bfgs_descents
-        if route.smooth_bfgs_box_qp:
-            bfgs_on["box_qp"] = True
-        given = budget - objective.calls
-        polished = qn_phase.run_scaled_bfgs(
-            objective,
-            rng,
-            h.best_x,
-            h.best_cost,
-            box,
-            given,
-            **bfgs_on,
-        )
-        h.keep(polished.x, polished.cost)
-        # ``smooth_bfgs_descents`` (cycle 59): after that many descents the usual staged
-        # route continues from the BFGS's best point
-        if not route.smooth_bfgs_descents:
-            return None
+        return None
     if smooth:
-        stage = qn_phase.QN_LOCAL_SHARE * (budget - objective.calls)
-        stage = min(stage, qn_phase.QN_LOCAL_CAP_PER_DIM * dim)
-        ends: list[Descent] = []
-        gate: list[bool] = []
-        # passed only when on, so the other routes' calls stay exactly as recorded
-        gated: dict[str, Any] = (
-            {"gate_once": True, "gate_out": gate} if route.cap_gate else {}
-        )
-        qn = qn_phase.run_slsqp_restarts(
-            objective,
-            rng,
-            h.best_x,
-            h.best_cost,
-            box,
-            int(stage),
-            ends,
-            fd_step=fd_step,
-            extend_to=(
-                int(
-                    budget
-                    - objective.calls
-                    - max(
-                        qn_phase.QN_RESERVE_SHARE * (budget - objective.calls),
-                        qn_phase.QN_RESERVE_PER_DIM * dim,
-                    )
-                )
-                if route.extend_in_descent
-                else None
-            ),
-            **on,
-            **gated,
-        )
-        h.keep(qn.x, qn.cost)
-        # ``cap_gate``: the extended first descent passed the gate at the cap
-        passed = bool(gate) and gate[0]
-        if fallback and qn_phase.failure_majority([d.status for d in ends]):
-            # Most of the stage's SLSQP descents failed: in c31's own runs only f12
-            # (bent cigar) does this (cycle 27 trace). L-BFGS-B restarts take the
-            # rest of the budget (cycle 28, COCO leaders report rank 1).
-            bent = qn_phase.run_lbfgsb_restarts(
-                objective, rng, h.best_x, h.best_cost, box, budget - objective.calls
-            )
-            h.keep(bent.x, bent.cost)
-            return None
-        if route.extend != "none" and (
-            not ends or (passed and ends[0].status != 0)
-        ):  # ``cap_gate``: an extended descent that failed (f12) still continues
-            # The first descent was still running at the cap (f8, f9, f13 at
-            # D 20-40): let SLSQP go on for a share of what is left (at most
-            # another capped stage), then the CMA finisher.
-            more_budget = qn_phase.QN_EXTEND_SHARE * (budget - objective.calls)
-            more_budget = min(more_budget, qn_phase.QN_LOCAL_CAP_PER_DIM * dim)
-            more = qn_phase.run_slsqp_restarts(
-                objective,
-                rng,
-                h.best_x,
-                h.best_cost,
-                box,
-                int(more_budget),
-                fd_step=fd_step,
-                **on,
-            )
-            h.keep(more.x, more.cost)
-            if more.used:  # else keep the stage's hand-over sigma
-                qn = more
-        elif route.basins:
-            basins = qn_phase.multi_basin(objective, ends, box)
-            if basins is None:
-                return None
-            if basins:
-                # Smooth with several basins (Gallagher-like): keep restarting
-                # SLSQP for the rest of the budget (``basins_sampled``: from the
-                # best unclaimed sample point, with the gap-scaled stop).
-                warm_samples: dict[str, Any] = (
-                    {} if h.warm_samples is None else {"samples": h.warm_samples}
-                )
-                more = (
-                    qn_phase.run_sampled_restarts(
-                        objective,
-                        rng,
-                        h.best_x,
-                        h.best_cost,
-                        box,
-                        budget - objective.calls,
-                        fd_step=None if route.basins_scipy_step else fd_step,
-                        **warm_samples,
-                    )
-                    if route.basins_sampled
-                    else qn_phase.run_slsqp_restarts(
-                        objective,
-                        rng,
-                        h.best_x,
-                        h.best_cost,
-                        box,
-                        budget - objective.calls,
-                        # ``basins_scipy_step``: SciPy's step here (more, cheaper
-                        # descents for Gallagher's lottery)
-                        fd_step=None if route.basins_scipy_step else fd_step,
-                        **on,
-                    )
-                )
-                h.keep(more.x, more.cost)
-                return None
-        left = budget - objective.calls
-        if (
-            route.second_descent_min_left_per_dim
-            and passed
-            and len(ends) == 1
-            and ends[0].status == 0
-            and left >= route.second_descent_min_left_per_dim * dim
-        ):
-            # Rosenbrock's second minimum (f8, f9 at D 20-40; cycle 33): one more
-            # descent from a uniform point, leaving the finisher its reserve.
-            start = h.uniform_point()
-            reserve = max(
-                qn_phase.QN_RESERVE_SHARE * left, qn_phase.QN_RESERVE_PER_DIM * dim
-            )
-            second = qn_phase.run_slsqp_restarts(
-                objective,
-                rng,
-                start,
-                np.inf,
-                box,
-                int(left - reserve),
-                max_descents=1,
-                fd_step=fd_step,
-                **on,
-            )
-            h.keep(second.x, second.cost)
-        if route.kink_small_step and dim >= route.kink_min_dim and gate and not gate[0]:
-            # f13 (cycles 36, 44): the gate read the first descent at its cap as not
-            # progressing; on a kink at the hand-over point the scaled-FD BFGS takes
-            # the rest instead of the finisher.
-            kinked = qn_phase.kink_check(objective, h.best_x, h.best_cost, box)
-            if kinked is None:
-                return None
-            kink, _d2, x_k, cost_k = kinked
-            h.keep(x_k, cost_k)
-            left = budget - objective.calls
-            if kink and left >= qn_phase.KINK_MIN_LEFT_PER_DIM * dim:
-                fine = qn_phase.run_scaled_bfgs(
-                    objective, rng, h.best_x, h.best_cost, box, left
-                )
-                h.keep(fine.x, fine.cost)
-                return None
-        h.sigma_override.append(qn.sigma)
-        return h.pop_options
+        return _qn_smooth_stage(route, h, objective)
     if route.plateau_ipop4 and plateau:
         # Plateaus (f7; literature report rank 3, BIPOP's large populations):
         # IPOP runs from a uniform point at sigma0 = box / 5 with 4x the default
@@ -1108,8 +1064,7 @@ def _qn_local_phase(
     low = 0 < route.rugged_ipop_low_dim <= dim < route.rugged_ipop_min_dim
     if (
         route.rugged_ipop
-        and probed is not None
-        and not smooth
+        and beta is not None
         and (
             (
                 dim >= route.rugged_ipop_min_dim
@@ -1118,59 +1073,17 @@ def _qn_local_phase(
             or (low and left >= qn_phase.RUGGED_IPOP_LOW_LEFT_PER_DIM * dim)
         )
     ):
-        # Rugged with a large budget left (f15-f18, f23; cycle 29): the plateau
-        # route's schedule, no (1+1) first and no protection.
-        if route.fractal_exempt and not low:
-            # ``fract`` (cycle 35): a fractal reading (f23-like) is no case for
-            # populations; restarted SLSQP leads f23 at D 20-40 on the field.
-            micro = qn_phase.micro_slopes(
-                objective,
-                h.best_x,
-                h.best_cost,
-                box,
-                centered=True,
-            )
-            if micro is None:
-                return None
-            fractal, _slopes, x_m, cost_m = micro
-            h.keep(x_m, cost_m)
-            if fractal:
-                rest = qn_phase.run_slsqp_restarts(
-                    objective, rng, h.best_x, h.best_cost, box, budget - objective.calls
-                )
-                h.keep(rest.x, rest.cost)
-                return None
-            # Otherwise the populations keep the schedule they had before the probe
-            # (its evaluations come off their end), so the run stays ``qn19``'s.
-        wide = (
-            dim >= qn_phase.RUGGED_IPOP8_MIN_DIM
-            and left >= qn_phase.RUGGED_IPOP8_MIN_LEFT_PER_DIM * dim
-        )
-        rough = run_population_restarts(
-            objective,
-            rng,
-            h.uniform_point(),
-            np.inf,
-            INITIAL_SIGMA_SHARE * h.width,
-            box,
-            left,
-            True,
-            lambda_rule="ipop8" if wide else "ipop4",
-            active=variant.pop_active,
-        )
-        h.keep(rough.x, rough.cost)
+        _rugged_populations(route, h, objective, left, low)
         return None
-    # The c45 candidate's rugged branch composes in this order (each only when on):
-    # ``rugged_direct_beta`` (gaps3) reads the hand-over probe's beta first; a reading
-    # in [``rugged_direct_min_beta``, ``rugged_direct_beta``) skips the capped try and
-    # the finisher's first (1+1). Otherwise the try runs (with the f13 toy's cap and
-    # envelope overrides) and ``rugged_try_rest`` may continue it: kinked tries (f13)
-    # read above 1.0, so ``cutkink`` and a ``rugged_direct_beta`` of 1.0 act on
-    # different runs.
+    # The rugged branch composes in this order (each only when on):
+    # ``rugged_direct_beta`` reads the hand-over probe's beta first; a reading in
+    # [``rugged_direct_min_beta``, ``rugged_direct_beta``) skips the capped try and
+    # the finisher's first (1+1). Otherwise the try runs and ``rugged_try_rest`` may
+    # continue it: kinked tries (f13) read above 1.0, so ``cutkink`` and a
+    # ``rugged_direct_beta`` of 1.0 act on different runs.
     direct = (
         variant.rugged_direct_beta > 0
-        and probed is not None
-        and not smooth
+        and beta is not None
         and beta < variant.rugged_direct_beta
         # ``rugged_direct_min_beta`` (0: no lower bound)
         and (
@@ -1178,40 +1091,285 @@ def _qn_local_phase(
             or beta >= variant.rugged_direct_min_beta
         )
     )
-    try_per_dim = route.rugged_try_per_dim
-    try_max_budget_per_dim = route.rugged_try_max_budget_per_dim
-    if (
-        route.rugged_try_per_dim
-        and not direct
-        and probed is not None
-        and not smooth
-        and budget - objective.calls >= 2 * try_per_dim * dim
-        and (not route.rugged_try_max_dim or dim <= route.rugged_try_max_dim)
-        and (not try_max_budget_per_dim or budget <= try_max_budget_per_dim * dim)
-    ):
-        # ``rugged_try_per_dim`` (cycle 44): f13 reads rugged at ATM's best point
-        # below D 20; one capped scaled-FD BFGS descent first, then the populations
-        cap = int(try_per_dim * dim)
-        # ``rugged_try_rest="cutkink"`` (the f13 toy): a try still descending at its
-        # cap goes on (the same descent, its inverse Hessian kept) to the end of the
-        # budget where its best point then reads a kink (f13's ridge). Passed only
-        # when on, so the recorded calls stay exactly as recorded
-        extend: dict[str, Any] = {}
-        if variant.rugged_try_rest == "cutkink":
-            extend["extend_to"] = budget - objective.calls
-            extend["extend_gate"] = lambda x_e, cost_e: _kink_reads(
-                objective, x_e, cost_e, box
-            )
-        tried = qn_phase.run_scaled_bfgs(
-            objective, rng, h.best_x, h.best_cost, box, cap, max_descents=1, **extend
-        )
-        h.keep(tried.x, tried.cost)
+    if route.rugged_try_per_dim and not direct and beta is not None:
+        _rugged_try(route, h, objective)
     if route.rugged_steps:
         # Rugged or plateau: populations sized to the budget left.
         if direct:
             h.direct_populations = True
         return {**h.pop_options, "lambda_rule": "steps"}
     return h.pop_options
+
+
+def _qn_options(route: QnRoute, h: _Handover) -> tuple[float | None, dict[str, Any]]:
+    """The route's SLSQP step and the options its SLSQP calls pass (only when on,
+    so the other routes' calls stay exactly as recorded)."""
+    fd_step = QN_FD_STEP if route.fd_step else None
+    on: dict[str, Any] = {"fallback": True} if h.variant.qn_fallback == "lbfgsb" else {}
+    return fd_step, on
+
+
+def _smooth_bfgs(route: QnRoute, h: _Handover, objective: Any) -> bool:
+    """``smooth_bfgs_max_per_dim`` (cycle 56): at small budgets the scaled-FD BFGS
+    takes a smooth reading; True when it took the rest of the budget.
+
+    With ``smooth_bfgs_descents`` (cycle 59) it runs that many descents, and the
+    usual staged route continues from its best point.
+    """
+    # passed only when on, so the recorded arms stay exactly as recorded
+    bfgs_on: dict[str, Any] = {}
+    if route.smooth_bfgs_descents:
+        bfgs_on["max_descents"] = route.smooth_bfgs_descents
+    if route.smooth_bfgs_box_qp:
+        bfgs_on["box_qp"] = True
+    polished = qn_phase.run_scaled_bfgs(
+        objective,
+        h.rng,
+        h.best_x,
+        h.best_cost,
+        h.box,
+        h.budget - objective.calls,
+        **bfgs_on,
+    )
+    h.keep(polished.x, polished.cost)
+    return not route.smooth_bfgs_descents
+
+
+def _qn_smooth_stage(
+    route: QnRoute, h: _Handover, objective: Any
+) -> dict[str, object] | None:
+    """A smooth reading: the SLSQP stage, its extension or the multi-basin restarts,
+    Rosenbrock's second descent and the kink check; the finisher's options, or None
+    when the local phase is over."""
+    dim, box, rng, budget = h.dim, h.box, h.rng, h.budget
+    fd_step, on = _qn_options(route, h)
+    stage = qn_phase.QN_LOCAL_SHARE * (budget - objective.calls)
+    stage = min(stage, qn_phase.QN_LOCAL_CAP_PER_DIM * dim)
+    ends: list[Descent] = []
+    gate: list[bool] = []
+    # passed only when on, so the other routes' calls stay exactly as recorded
+    gated: dict[str, Any] = (
+        {"gate_once": True, "gate_out": gate} if route.cap_gate else {}
+    )
+    qn = qn_phase.run_slsqp_restarts(
+        objective,
+        rng,
+        h.best_x,
+        h.best_cost,
+        box,
+        int(stage),
+        ends,
+        fd_step=fd_step,
+        extend_to=(
+            int(
+                budget
+                - objective.calls
+                - max(
+                    qn_phase.QN_RESERVE_SHARE * (budget - objective.calls),
+                    qn_phase.QN_RESERVE_PER_DIM * dim,
+                )
+            )
+            if route.extend_in_descent
+            else None
+        ),
+        **on,
+        **gated,
+    )
+    h.keep(qn.x, qn.cost)
+    # ``cap_gate``: the extended first descent passed the gate at the cap
+    passed = bool(gate) and gate[0]
+    if on and qn_phase.failure_majority([d.status for d in ends]):
+        # Most of the stage's SLSQP descents failed: in c31's own runs only f12
+        # (bent cigar) does this (cycle 27 trace). L-BFGS-B restarts take the
+        # rest of the budget (cycle 28, COCO leaders report rank 1).
+        bent = qn_phase.run_lbfgsb_restarts(
+            objective, rng, h.best_x, h.best_cost, box, budget - objective.calls
+        )
+        h.keep(bent.x, bent.cost)
+        return None
+    if route.extend != "none" and (
+        not ends or (passed and ends[0].status != 0)
+    ):  # ``cap_gate``: an extended descent that failed (f12) still continues
+        # The first descent was still running at the cap (f8, f9, f13 at
+        # D 20-40): let SLSQP go on for a share of what is left (at most
+        # another capped stage), then the CMA finisher.
+        more_budget = qn_phase.QN_EXTEND_SHARE * (budget - objective.calls)
+        more_budget = min(more_budget, qn_phase.QN_LOCAL_CAP_PER_DIM * dim)
+        more = qn_phase.run_slsqp_restarts(
+            objective,
+            rng,
+            h.best_x,
+            h.best_cost,
+            box,
+            int(more_budget),
+            fd_step=fd_step,
+            **on,
+        )
+        h.keep(more.x, more.cost)
+        if more.used:  # else keep the stage's hand-over sigma
+            qn = more
+    elif route.basins:
+        basins = qn_phase.multi_basin(objective, ends, box)
+        if basins is None:
+            return None
+        if basins:
+            _basin_restarts(route, h, objective, fd_step, on)
+            return None
+    left = budget - objective.calls
+    if (
+        route.second_descent_min_left_per_dim
+        and passed
+        and len(ends) == 1
+        and ends[0].status == 0
+        and left >= route.second_descent_min_left_per_dim * dim
+    ):
+        # Rosenbrock's second minimum (f8, f9 at D 20-40; cycle 33): one more
+        # descent from a uniform point, leaving the finisher its reserve.
+        start = h.uniform_point()
+        reserve = max(
+            qn_phase.QN_RESERVE_SHARE * left, qn_phase.QN_RESERVE_PER_DIM * dim
+        )
+        second = qn_phase.run_slsqp_restarts(
+            objective,
+            rng,
+            start,
+            np.inf,
+            box,
+            int(left - reserve),
+            max_descents=1,
+            fd_step=fd_step,
+            **on,
+        )
+        h.keep(second.x, second.cost)
+    if route.kink_small_step and dim >= route.kink_min_dim and gate and not gate[0]:
+        # f13 (cycles 36, 44): the gate read the first descent at its cap as not
+        # progressing; on a kink at the hand-over point the scaled-FD BFGS takes
+        # the rest instead of the finisher.
+        kinked = qn_phase.kink_check(objective, h.best_x, h.best_cost, box)
+        if kinked is None:
+            return None
+        kink, _d2, x_k, cost_k = kinked
+        h.keep(x_k, cost_k)
+        left = budget - objective.calls
+        if kink and left >= qn_phase.KINK_MIN_LEFT_PER_DIM * dim:
+            fine = qn_phase.run_scaled_bfgs(
+                objective, rng, h.best_x, h.best_cost, box, left
+            )
+            h.keep(fine.x, fine.cost)
+            return None
+    h.sigma_override.append(qn.sigma)
+    return h.pop_options
+
+
+def _basin_restarts(
+    route: QnRoute,
+    h: _Handover,
+    objective: Any,
+    fd_step: float | None,
+    on: dict[str, Any],
+) -> None:
+    """Smooth with several basins (Gallagher-like): restarted SLSQP for the rest of
+    the budget (``basins_sampled``: from the best unclaimed sample point, with the
+    gap-scaled stop; ``basins_scipy_step``: at SciPy's step, more and cheaper
+    descents for Gallagher's lottery)."""
+    step = None if route.basins_scipy_step else fd_step
+    left = h.budget - objective.calls
+    if route.basins_sampled:
+        warm_samples: dict[str, Any] = (
+            {} if h.warm_samples is None else {"samples": h.warm_samples}
+        )
+        more = qn_phase.run_sampled_restarts(
+            objective,
+            h.rng,
+            h.best_x,
+            h.best_cost,
+            h.box,
+            left,
+            fd_step=step,
+            **warm_samples,
+        )
+    else:
+        more = qn_phase.run_slsqp_restarts(
+            objective, h.rng, h.best_x, h.best_cost, h.box, left, fd_step=step, **on
+        )
+    h.keep(more.x, more.cost)
+
+
+def _rugged_populations(
+    route: QnRoute, h: _Handover, objective: Any, left: int, low: bool
+) -> None:
+    """Rugged with a large budget left (f15-f18, f23; cycle 29): the plateau route's
+    schedule, no (1+1) first and no protection.
+
+    ``fractal_exempt`` (cycle 35): a fractal reading (f23-like) is no case for
+    populations; restarted SLSQP leads f23 at D 20-40 on the field. Otherwise the
+    populations keep the schedule they had before the probe (its evaluations come
+    off their end).
+    """
+    dim, box, rng = h.dim, h.box, h.rng
+    if route.fractal_exempt and not low:
+        micro = qn_phase.micro_slopes(
+            objective, h.best_x, h.best_cost, box, centered=True
+        )
+        if micro is None:
+            return
+        fractal, _slopes, x_m, cost_m = micro
+        h.keep(x_m, cost_m)
+        if fractal:
+            rest = qn_phase.run_slsqp_restarts(
+                objective, rng, h.best_x, h.best_cost, box, h.budget - objective.calls
+            )
+            h.keep(rest.x, rest.cost)
+            return
+    wide = (
+        dim >= qn_phase.RUGGED_IPOP8_MIN_DIM
+        and left >= qn_phase.RUGGED_IPOP8_MIN_LEFT_PER_DIM * dim
+    )
+    rough = run_population_restarts(
+        objective,
+        rng,
+        h.uniform_point(),
+        np.inf,
+        INITIAL_SIGMA_SHARE * h.width,
+        box,
+        left,
+        True,
+        lambda_rule="ipop8" if wide else "ipop4",
+        active=h.variant.pop_active,
+    )
+    h.keep(rough.x, rough.cost)
+
+
+def _rugged_try(route: QnRoute, h: _Handover, objective: Any) -> None:
+    """``rugged_try_per_dim`` (cycle 44): f13 reads rugged at ATM's best point below
+    D 20; one capped scaled-FD BFGS descent first, then the populations, within the
+    route's dimension and budget envelope.
+
+    ``rugged_try_rest="cutkink"`` (the f13 toy): a try still descending at its cap
+    goes on (the same descent, its inverse Hessian kept) to the end of the budget
+    where its best point then reads a kink (f13's ridge).
+    """
+    dim, box, budget = h.dim, h.box, h.budget
+    try_per_dim = route.rugged_try_per_dim
+    try_max_budget_per_dim = route.rugged_try_max_budget_per_dim
+    if not (
+        budget - objective.calls >= 2 * try_per_dim * dim
+        and (not route.rugged_try_max_dim or dim <= route.rugged_try_max_dim)
+        and (not try_max_budget_per_dim or budget <= try_max_budget_per_dim * dim)
+    ):
+        return
+    cap = int(try_per_dim * dim)
+    # passed only when on, so the recorded calls stay exactly as recorded
+    extend: dict[str, Any] = {}
+    if h.variant.rugged_try_rest == "cutkink":
+        extend["extend_to"] = budget - objective.calls
+        extend["extend_gate"] = lambda x_e, cost_e: _kink_reads(
+            objective, x_e, cost_e, box
+        )
+    tried = qn_phase.run_scaled_bfgs(
+        objective, h.rng, h.best_x, h.best_cost, box, cap, max_descents=1, **extend
+    )
+    h.keep(tried.x, tried.cost)
 
 
 def _kink_reads(objective: Any, x: np.ndarray, cost: float, box: Box) -> bool:

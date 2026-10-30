@@ -92,7 +92,11 @@ src = ["src", "tests"]
 extend-exclude = ["reference"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "N", "SIM", "NPY"]
+select = ["E", "F", "I", "B", "UP", "N", "SIM", "NPY", "C901"]
+
+[tool.ruff.lint.mccabe]
+# no function above this cyclomatic complexity (0.7.0's split; the largest is 32)
+max-complexity = 40
 
 [tool.ruff.lint.per-file-ignores]
 # The golden/parity tests drive the legacy global stream on purpose.

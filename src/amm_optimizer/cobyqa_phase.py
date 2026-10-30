@@ -47,7 +47,6 @@ def run_cobyqa_restarts(
     from scipy.optimize import OptimizeWarning  # type: ignore[import-untyped]
     from scipy.optimize import minimize as scipy_minimize
 
-    dim = len(x)
     radius = radius_share * float(np.mean(box.upper - box.lower))
     bounds = list(zip(box.lower, box.upper, strict=True))
     known = cost is not None
@@ -88,6 +87,6 @@ def run_cobyqa_restarts(
         fun.known = None
         if fun.used == before:  # nothing evaluated: never loop without progress
             break
-        start = box.lower + (box.upper - box.lower) * rng.rand(dim)
+        start = box.uniform(rng)
     assert fun.best_x is not None
     return EsResult(fun.best_x, fun.best_cost, sigma, fun.used)

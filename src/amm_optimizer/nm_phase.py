@@ -65,7 +65,7 @@ def run_nm_restarts(
             assert fun.best_x is not None
             start, size = fun.best_x.copy(), max(size / 2, MIN_SCALE_SHARE * width)
         else:
-            start = box.lower + (box.upper - box.lower) * rng.rand(dim)
+            start = box.uniform(rng)
             size = INITIAL_SIGMA_SHARE * width
     assert fun.best_x is not None
     return EsResult(fun.best_x, fun.best_cost, size, fun.used)
