@@ -1,9 +1,10 @@
-"""A low-D multi-basin route: a design reading and MLSL (cycle 53, the D 2 toy study).
+"""A low-D multi-basin route: a design reading and MLSL.
 
-At D 2-3, ``c37`` trails the field on Gallagher's functions (bbob f21, f22) at
-100-1000 x D, where many smooth basins of different depths defeat one descent and the
-populations alike. MLSL (Rinnooy Kan and Timmer 1987) starts SLSQP only from sample
-points that no better point within the critical radius r_N beats, and keeps sampling.
+At D 2-3, the composite without this route trails the field on Gallagher's functions
+(bbob f21, f22) at 100-1000 x D, where many smooth basins of different depths defeat
+one descent and the populations alike. MLSL (Rinnooy Kan and Timmer 1987) starts
+SLSQP only from sample points that no better point within the critical radius r_N
+beats, and keeps sampling.
 A D 2 calibration study (on bbob instances 1-3) routed to it with two readings:
 * the design's rank-quadratic fit (``r2q`` at most ``GATE_R2Q``): many basins;
 * ``local_reading`` at the design's best point (``lcurv`` at most ``GATE_LCURV``, not
@@ -31,8 +32,8 @@ DESIGN_PER_DIM = 16
 MLSL_STARTS = 3  # descents per round
 MLSL_SIGMA = 2.0  # the critical radius's sigma
 LOCAL_SHARES = (1e-3, 1e-5)  # local_reading's steps, as shares of the box width
-GATE_LCURV, GATE_R2Q = 0.1, 0.5  # the toy's rule G
-DESCENT_FAR = 0.25  # cycle 60: the second descent's start, as a share of the box
+GATE_LCURV, GATE_R2Q = 0.1, 0.5  # the calibration study's gate
+DESCENT_FAR = 0.25  # the second descent's start, as a share of the box
 
 
 def design_size(budget: int, dim: int) -> int:
@@ -202,7 +203,7 @@ def multi_basin_route(
 
     Not routed, the caller's path continues from the returned best point; the
     evaluations spent are counted.
-    ``descents`` (cycle 60): on a smooth reading that is not multi-basin, up to that
+    ``descents``: on a smooth reading that is not multi-basin, up to that
     many SLSQP descents, from the design's best point and from the best point at
     least ``DESCENT_FAR`` of the box away; the returned best point is then the best
     seen, and ``start_out`` receives the design's best point and value, where the

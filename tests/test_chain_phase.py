@@ -232,6 +232,3 @@ def test_the_routes_keep_the_budget():
     )
     assert len(calls) <= 600
     assert api is not None
-
-
-# research-only options (deprecated in 0.6.0)

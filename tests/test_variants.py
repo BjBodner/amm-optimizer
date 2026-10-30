@@ -151,6 +151,4 @@ def test_knowing_the_box_changes_nothing_for_the_default(scenario):
 # for a research cycle that leaves ``atm``'s core and the harness alone.
 pytestmark = [
     pytest.mark.merge,
-    # research-only options, deprecated in 0.6.0 (they warn when set)
-    pytest.mark.filterwarnings("ignore:Variant:FutureWarning"),
 ]

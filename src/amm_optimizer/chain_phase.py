@@ -1,4 +1,4 @@
-"""Additivity readings and the decoupled coordinate search (cycle 50, the f20 toy).
+"""Additivity readings and the decoupled coordinate search (from a study of bbob f20).
 
 A function separable in w = M x, with M unit triangular, has the Hessian
 H = M^T D M at every point, and that factorisation is unique. bbob f20 (Schwefel)
@@ -15,7 +15,7 @@ decoupled coordinate.
 
 A calibration study on bbob instances 1-3 (cold start):
 * ``run_coord_hess`` solved f20 in 120 of 120 runs at 3000 x D, D 5-40, a median of
-  168-289 x D, +.78 over ``c36`` at 300-3000 x D.
+  168-289 x D, +.78 over the composite without it at 300-3000 x D.
 * The pair test read f1-f5 separable 300 of 300 times, f20 a chain 60 of 60 times,
   and the other 17 functions non-separable; f8 also reads as a chain.
 * The band check (threshold ``BAND_TOL``) sent all 480 f20 runs to the search and
@@ -34,7 +34,7 @@ from .es_phase import EsResult
 from .objective import CountedObjective
 
 SEP_TOL = 1e-6  # a pair's additivity residual below this reads additive
-BAND_TOL = 0.02  # f20 0-0.0023, f8 0.089-4.7 (toy dev seeds 90-94, D 5-40)
+BAND_TOL = 0.02  # f20 0-0.0023, f8 0.089-4.7 (development seeds 90-94, D 5-40)
 GOLD = 0.3819660112501051
 
 
@@ -341,7 +341,7 @@ def decoupling_basis(
 
     The LDL^T of the reversed H gives a lower M, that of H an upper one. ``order``
     ("lower" or "upper", from ``band_consistency``) takes that one when it exists.
-    Otherwise the sparser factor is taken, as in the toy: the true M of a banded
+    Otherwise the sparser factor is taken: the true M of a banded
     coupling is banded and the other order's is dense, except for a tridiagonal H,
     where both are bidiagonal and only ``order`` tells them apart. Without a
     factorisation it returns the axes and False.

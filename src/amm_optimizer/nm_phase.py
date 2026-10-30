@@ -1,4 +1,4 @@
-"""Restarted Nelder-Mead for very low dimensions (variant ``nm_max_dim``, cycle 5).
+"""Restarted Nelder-Mead for very low dimensions (variant ``nm_max_dim``).
 
 In 2-D the best solvers of the COCO archive are restarted simplex searches (Hansen's
 NELDER, NELDERDOERR), whose strength is many short local runs. Here SciPy's

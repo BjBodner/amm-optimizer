@@ -585,7 +585,7 @@ def _probe_beta(
     best_x: np.ndarray,
     best_cost: float,
 ) -> tuple[float | None, int, np.ndarray, float]:
-    """``probe_at``: the curvature probe (cycle 9); (beta, evaluations used, best
+    """``probe_at``: the curvature probe; (beta, evaluations used, best
     point, its value), beta None when the objective ran out.
 
     Mirrored pairs along ``PROBE_DIRECTIONS`` directions of the learned metric at

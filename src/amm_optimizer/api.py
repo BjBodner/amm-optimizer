@@ -1,4 +1,4 @@
-"""Public entry point, and the routing between the phases of the research composites.
+"""Public entry point, and the routing between the phases of the composites.
 
 :func:`minimize` runs, in this order (each step only when its ``Variant`` options
 ask for it; the default ``ATMConfig()`` runs ATM alone, as the original):
@@ -7,7 +7,7 @@ ask for it; the default ``ATMConfig()`` runs ATM alone, as the original):
    ``es_phase.run_es_phase`` with the local search of :func:`_prefix_kind`
    (the (1+1)-CMA-ES, SLSQP where the curvature probe reads smooth, lq2
    populations, Nelder-Mead at very low D, ...). ATM then continues from its best.
-   With ``qn_fallback="lbfgsb"`` (``c32``) an SLSQP call whose failed descents
+   With ``qn_fallback="lbfgsb"`` an SLSQP call whose failed descents
    outnumber its converged ones hands the rest to restarted L-BFGS-B.
 2. **ATM** (``search.Search``), restarted by its restart policy; with
    ``cma_handoff`` only for its share of the budget.
@@ -16,11 +16,11 @@ ask for it; the default ``ATMConfig()`` runs ATM alone, as the original):
 4. **The local phase** (:func:`_local_phase`): Nelder-Mead at very low D, the
    SLSQP routes of ``cma_local_nonsep`` (:func:`_qn_local_phase`, configured by
    ``qn_phase.QN_ROUTES``) on non-separable functions: a smooth reading runs an
-   SLSQP stage (L-BFGS-B for the rest when most descents failed, ``c32``), a plateau
-   IPOP populations (``qn8`` on), a rugged reading the finisher's ``steps``
+   SLSQP stage (L-BFGS-B for the rest when most descents failed), a plateau
+   IPOP populations (``"qn8"`` on), a rugged reading the finisher's ``steps``
    populations, or from D 20 with enough budget unprotected IPOP from a uniform
-   point (``qn17``, ``c33``). Then one finisher:
-   :func:`_finish_gated_then_ipop` (the composites ``c23``-``c27``),
+   point (``"qn17"`` on). Then one finisher:
+   :func:`_finish_gated_then_ipop` (the earliest research presets),
    :func:`_finish_then_ipop` or :func:`_finish_one_plus_one`.
 
 The hand-over state that these functions share is a :class:`_Handover`. The phase
@@ -479,7 +479,7 @@ def _early_routes(
         and dim <= variant.small_engine_max_dim
         and budget <= SMALL_ENGINE_MAX_PER_DIM * dim
     ):
-        # ``small_engine`` (cycle 61): restarted COBYQA spends the whole budget
+        # ``small_engine``: restarted COBYQA spends the whole budget
         cobyqa = cobyqa_phase.run_cobyqa_restarts(
             objective, rng, x0, box, budget, SMALL_ENGINE_RADIUS
         )
@@ -517,9 +517,9 @@ def _basin_route(
     variant: Variant,
     out: _EarlyRoutes,
 ) -> None:
-    """``basin_route`` (cycle 53, the D 2 toy): a design reading; on a smooth
+    """``basin_route``: a design reading; on a smooth
     multi-basin reading MLSL spends the budget, otherwise the usual path continues
-    from the design's best point. ``basin_descents`` (cycle 60) are passed only when
+    from the design's best point. ``basin_descents`` are passed only when
     on, so the other configurations' calls stay exactly as recorded."""
     dim = len(out.x_start)
     basin_start: list[tuple[np.ndarray, float]] = []
@@ -570,7 +570,7 @@ def _run_prefix(
     warm_design: dict[str, Any] = (
         {} if warm is None else {"design": warm.best(init_points)}
     )
-    # ``prefix_full_per_dim`` (cycle 38): no ATM tail at small budgets
+    # ``prefix_full_per_dim``: no ATM tail at small budgets
     whole = (
         variant.prefix_full_min_per_dim * dim
         < budget
@@ -596,8 +596,8 @@ def _run_prefix(
         **_pair_when_stuck_kw(variant, budget, dim, "step_pair_when_stuck"),
         **({"qn_fallback": True} if variant.qn_fallback == "lbfgsb" else {}),
         **({"sep_smooth_probe": True} if variant.prefix_sep_probe else {}),
-        # ``preplat``: above 30 x dim only (its 8 probe evaluations cost the smooth
-        # functions at 30 x dim in scratch)
+        # ``prefix_plateau_pop``: above 30 x dim only (its 8 probe evaluations cost
+        # the smooth functions at 30 x dim)
         **(
             {"plateau_pop": True}
             if variant.prefix_plateau_pop
@@ -606,9 +606,9 @@ def _run_prefix(
             else {}
         ),
         **_small_switch_kw(variant, dim, budget),
-        nan_reading=variant.prefix_nan_reading,  # cycle 64
-        **_prefix_ridge_kw(variant, dim, budget),  # the f13 toy
-        **_parked2_kw(variant, dim, budget),
+        nan_reading=variant.prefix_nan_reading,
+        **_prefix_ridge_kw(variant, dim, budget),
+        **_retry_low_beta_kw(variant, dim),
         **warm_design,
     )
 
@@ -626,7 +626,7 @@ def _pair_when_stuck_kw(
 def _handoff_limit(variant: Variant, budget: int, dim: int, early: _EarlyRoutes) -> int:
     """The evaluations ATM gets before the hand-over: ``cma_handoff`` of the budget,
     at most ``cma_handoff_cap_per_dim`` x dim from ``CMA_HANDOFF_CAP_MIN_DIM``; the
-    basin descents do not shorten ATM's sample (``basin_keep_atm``, cycle 60)."""
+    basin descents do not shorten ATM's sample (``basin_keep_atm``)."""
     atm_share = int(variant.cma_handoff * budget)
     cap = variant.cma_handoff_cap_per_dim
     if cap > 0 and dim >= CMA_HANDOFF_CAP_MIN_DIM:
@@ -699,7 +699,7 @@ def _additive_route(
     variant: Variant,
     x0: np.ndarray,
 ) -> tuple[bool, np.ndarray, float]:
-    """``chain_route`` / ``sep_route`` (cycle 50): (routed, best point, value).
+    """``chain_route`` / ``sep_route``: (routed, best point, value).
 
     The pair test at ``x0``. A chain reading with ``chain_route`` (and enough budget)
     takes the band check, and on a linear chain ``run_coord_hess`` from ``x0`` spends
@@ -785,7 +785,7 @@ def _pop_options(variant: Variant) -> dict[str, object]:
 
 # ---------------------------------------------------------------- prefix ----
 def _small_switch_kw(variant: Variant, dim: int, budget: int) -> dict[str, Any]:
-    """``run_es_phase``'s ``small_switch`` argument (the small10 toy), passed only
+    """``run_es_phase``'s ``small_switch`` argument, passed only
     inside its envelope so every other call stays exactly as recorded."""
     if not (
         variant.small_switch
@@ -804,7 +804,7 @@ def _small_switch_kw(variant: Variant, dim: int, budget: int) -> dict[str, Any]:
 
 
 def _prefix_ridge_kw(variant: Variant, dim: int, budget: int) -> dict[str, Any]:
-    """``run_es_phase``'s ridge reading (the f13 toy, ``prefix_ridge_after``), passed
+    """``run_es_phase``'s ridge reading (``prefix_ridge_after``), passed
     only when on and inside its ``prefix_ridge_max_per_dim`` envelope, so every other
     call stays exactly as recorded."""
     if not variant.prefix_ridge_after or (
@@ -818,13 +818,13 @@ def _prefix_ridge_kw(variant: Variant, dim: int, budget: int) -> dict[str, Any]:
     }
 
 
-def _parked2_kw(variant: Variant, dim: int, budget: int) -> dict[str, Any]:
-    """``run_es_phase``'s research options (off in every preset), passed only when on so
+def _retry_low_beta_kw(variant: Variant, dim: int) -> dict[str, Any]:
+    """``run_es_phase``'s ``descent_retries`` and ``low_beta``, passed only when on so
     every other call stays exactly as recorded."""
     on: dict[str, Any] = {}
     if variant.prefix_descent_retries:
         on["descent_retries"] = variant.prefix_descent_retries
-    if variant.prefix_low_beta and dim >= variant.prefix_low_beta_min_dim:  # gaps4
+    if variant.prefix_low_beta and dim >= variant.prefix_low_beta_min_dim:
         on["low_beta"] = variant.prefix_low_beta
     return on
 
@@ -848,10 +848,9 @@ def _prefix_kind(variant: Variant, dim: int, budget: int) -> str:
     * ``"slsqplqc"`` (the two-direction probe) for ``slsqplq10c``, ``slsqplq10h``
       and ``slsqplq10hd`` below 30 x dim; ``"slsqplq"`` for the three ``slsqplq10``
       kinds otherwise; else ``es_kind`` itself.
-    * cycle 33: ``es_kind="slsqplq10hd"`` is ``slsqplq10h`` with ``"slsqpdes"`` (one
-      SLSQP descent from the design's best, then the (1+1)) where ``slsqplq10h`` skips
-      the probe (below 30 x dim and ``QN_MIN_BUDGET``); cycle 58: below
-      ``des_max_per_dim`` x dim instead.
+    * ``es_kind="slsqplq10hd"`` is ``slsqplq10h`` with ``"slsqpdes"`` (one SLSQP
+      descent from the design's best, then the (1+1)) below ``des_max_per_dim`` x dim
+      and ``QN_MIN_BUDGET``, where ``slsqplq10h`` skips the probe.
     """
     small = budget < QN_MIN_BUDGET_PER_DIM * dim
     if (
@@ -910,7 +909,7 @@ class _Handover:
     a0: np.ndarray | None
     last_widths: tuple[float, ...]
     sigma_override: list[float] = field(default_factory=list)
-    # ``rugged_direct_beta`` (research, gaps3): the finisher's populations start at once
+    # ``rugged_direct_beta``: the finisher's populations start at once
     direct_populations: bool = False
     # the anytime hand-over: what earlier stages evaluated (points, values), the
     # sampled restarts' first samples; None in every other run
@@ -1001,7 +1000,7 @@ def _local_phase(h: _Handover, objective: Any) -> EsResult:
 def _qn_local_phase(
     route: QnRoute, h: _Handover, objective: Any
 ) -> dict[str, object] | None:
-    """The SLSQP routes of ``cma_local_nonsep`` (cycles 13-18; ``QN_ROUTES``).
+    """The SLSQP routes of ``cma_local_nonsep`` (``QN_ROUTES``).
 
     Reads the curvature at the best point (after a plateau check, ``plateau_check``)
     and, where it reads smooth, runs restarted SLSQP for a stage (a share of the
@@ -1110,13 +1109,13 @@ def _qn_options(route: QnRoute, h: _Handover) -> tuple[float | None, dict[str, A
 
 
 def _smooth_bfgs(route: QnRoute, h: _Handover, objective: Any) -> bool:
-    """``smooth_bfgs_max_per_dim`` (cycle 56): at small budgets the scaled-FD BFGS
+    """``smooth_bfgs_max_per_dim``: at small budgets the scaled-FD BFGS
     takes a smooth reading; True when it took the rest of the budget.
 
-    With ``smooth_bfgs_descents`` (cycle 59) it runs that many descents, and the
+    With ``smooth_bfgs_descents`` it runs that many descents, and the
     usual staged route continues from its best point.
     """
-    # passed only when on, so the recorded arms stay exactly as recorded
+    # passed only when on, so the other routes' calls stay exactly as recorded
     bfgs_on: dict[str, Any] = {}
     if route.smooth_bfgs_descents:
         bfgs_on["max_descents"] = route.smooth_bfgs_descents
@@ -1179,9 +1178,8 @@ def _qn_smooth_stage(
     # ``cap_gate``: the extended first descent passed the gate at the cap
     passed = bool(gate) and gate[0]
     if on and qn_phase.failure_majority([d.status for d in ends]):
-        # Most of the stage's SLSQP descents failed: in c31's own runs only f12
-        # (bent cigar) does this (cycle 27 trace). L-BFGS-B restarts take the
-        # rest of the budget (cycle 28, COCO leaders report rank 1).
+        # Most of the stage's SLSQP descents failed: on bbob only f12 (bent cigar)
+        # does this. L-BFGS-B restarts take the rest of the budget.
         bent = qn_phase.run_lbfgsb_restarts(
             objective, rng, h.best_x, h.best_cost, box, budget - objective.calls
         )
@@ -1223,7 +1221,7 @@ def _qn_smooth_stage(
         and ends[0].status == 0
         and left >= route.second_descent_min_left_per_dim * dim
     ):
-        # Rosenbrock's second minimum (f8, f9 at D 20-40; cycle 33): one more
+        # Rosenbrock's second minimum (f8, f9 at D 20-40): one more
         # descent from a uniform point, leaving the finisher its reserve.
         start = h.uniform_point()
         reserve = max(
@@ -1242,7 +1240,7 @@ def _qn_smooth_stage(
         )
         h.keep(second.x, second.cost)
     if route.kink_small_step and dim >= route.kink_min_dim and gate and not gate[0]:
-        # f13 (cycles 36, 44): the gate read the first descent at its cap as not
+        # f13: the gate read the first descent at its cap as not
         # progressing; on a kink at the hand-over point the scaled-FD BFGS takes
         # the rest instead of the finisher.
         kinked = qn_phase.kink_check(objective, h.best_x, h.best_cost, box)
@@ -1298,10 +1296,10 @@ def _basin_restarts(
 def _rugged_populations(
     route: QnRoute, h: _Handover, objective: Any, left: int, low: bool
 ) -> None:
-    """Rugged with a large budget left (f15-f18, f23; cycle 29): the plateau route's
+    """Rugged with a large budget left (f15-f18, f23): the plateau route's
     schedule, no (1+1) first and no protection.
 
-    ``fractal_exempt`` (cycle 35): a fractal reading (f23-like) is no case for
+    ``fractal_exempt``: a fractal reading (f23-like) is no case for
     populations; restarted SLSQP leads f23 at D 20-40 on the field. Otherwise the
     populations keep the schedule they had before the probe (its evaluations come
     off their end).
@@ -1341,11 +1339,11 @@ def _rugged_populations(
 
 
 def _rugged_try(route: QnRoute, h: _Handover, objective: Any) -> None:
-    """``rugged_try_per_dim`` (cycle 44): f13 reads rugged at ATM's best point below
+    """``rugged_try_per_dim``: f13 reads rugged at ATM's best point below
     D 20; one capped scaled-FD BFGS descent first, then the populations, within the
     route's dimension and budget envelope.
 
-    ``rugged_try_rest="cutkink"`` (the f13 toy): a try still descending at its cap
+    ``rugged_try_rest="cutkink"``: a try still descending at its cap
     goes on (the same descent, its inverse Hessian kept) to the end of the budget
     where its best point then reads a kink (f13's ridge).
     """
@@ -1395,7 +1393,7 @@ def _finish_gated_then_ipop(
     gate = int(np.ceil(variant.pop_gate_per_dim * dim))
     width = h.width
     if h.direct_populations and budget - objective.calls >= gate:
-        # ``rugged_direct_beta`` (research, gaps3): the populations start at once,
+        # ``rugged_direct_beta``: the populations start at once,
         # as after the (1+1)'s own rugged probe (uniform point, a fifth of the box)
         first = EsResult(h.best_x, float(h.best_cost), h.start_sigma(), 0, True)
     else:

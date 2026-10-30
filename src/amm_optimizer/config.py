@@ -622,7 +622,7 @@ class Variant:
     # non-zero move.
     amplitude_control: str = "legacy"
     # Controller: ``log_width += sr_eta * (success_rate - target)`` per sampler,
-    # starting from ``sr_widths`` and capped at ``sr_max_width``.
+    # starting from ``control.SR_WIDTHS`` and capped at ``control.SR_MAX_WIDTH``.
     # A (1+1)-ES with the 1/5 rule on the first ``es_fraction`` of the budget
     # (after a uniform design of ``es_init_factor * dim`` points, at least 4, to
     # pick its start), then ATM from the ES incumbent with its width ladder scaled
@@ -636,84 +636,82 @@ class Variant:
     # 100 x dim and hurts beyond, where ATM's pool beats a greedy ES on multimodal
     # and ill-conditioned functions).
     es_max_budget_per_dim: float = 1e9
-    # Correlated search directions. ``"rank_mu"``: the random search is Gaussian
-    # with a full covariance matrix (unit geometric mean, so the widths keep their
-    # meaning) learned CMA-style from the best ``cov_select`` share of every
-    # iteration's evaluated samples, weighted by log rank, with the rank-mu learning
-    # rate times ``cov_rate``; the eigenvalue ratio is limited to ``cov_cap``. This
-    # is the one variant with a DxD object. Needs a success-rate
-    # ``amplitude_control``.
+    # Correlated search directions. ``"rank_mu"``: the random search is Gaussian with a
+    # full covariance matrix (unit geometric mean, so the widths keep their meaning)
+    # learned CMA-style from the best ``cov_select`` share of every iteration's
+    # evaluated samples, weighted by log rank, with the rank-mu learning rate times
+    # ``cov_rate``; the eigenvalue ratio is limited to ``control.COV_CAP``. This is the
+    # one variant with a DxD object. Needs a success-rate ``amplitude_control``.
     covariance: str = "none"
     cov_rate: float = 1.0
     cov_select: float = 0.25
-    # Only used up to this dimension: the covariance is learned from a few samples
-    # per iteration, which is too slow beyond about 10 dimensions (at 20 it costs
-    # .03 at 300 x dim and gains nothing).
+    # Only used up to ``search.COV_MAX_DIM``: the covariance is learned from a few
+    # samples per iteration, which is too slow beyond about 10 dimensions (at 20 it
+    # costs .03 at 300 x dim and gains nothing).
     # The local search of the ES prefix after its uniform design: ``"isotropic"``:
     # the (1+1)-ES with the 1/5 rule; ``"cma"``: the restarted (1+1)-Cholesky-
     # CMA-ES of ``cma_phase``; ``"lq2"``: IPOP population CMA-ES runs ranked by
     # the linear-quadratic surrogate of ``surrogate`` (active update, pycma's
     # style), and ``"cma"`` for budgets below ``es_lq_min_budget_per_dim`` times dim;
     # ``"slsqplq"``: restarted SLSQP (``qn_phase``) where a curvature probe reads
-    # the function as smooth (cycles 11-12), lq2
+    # the function as smooth, lq2
     # where rugged (budgets >= ``es_lq_min_budget_per_dim``), else the (1+1), and the
-    # (1+1) below 30 dim evaluations (cycle 12); ``"slsqplq10c"``: the same, except
-    # that it also runs below 30 dim evaluations once the budget reaches 200 (cycle 17;
-    # ``qn_phase.QN_MIN_BUDGET``), with a two-direction (12-evaluation) probe there;
+    # (1+1) below 30 dim evaluations; ``"slsqplq10c"``: the same, except that it also
+    # runs below 30 dim evaluations once the budget reaches 200
+    # (``qn_phase.QN_MIN_BUDGET``), with a two-direction (12-evaluation) probe there;
     # ``"slsqplq10h"``:
-    # ``"slsqplq10c"`` with SLSQP's finite-difference step 1e-9 (cycle 20);
+    # ``"slsqplq10c"`` with SLSQP's finite-difference step 1e-9;
     # ``"slsqplq10hd"``: ``"slsqplq10h"``, and where that skips the probe one SLSQP
-    # descent from the design's best, then the (1+1) (cycle 33, ``q7ed``).
+    # descent from the design's best, then the (1+1).
     es_kind: str = "isotropic"
     es_lq_min_budget_per_dim: float = 0.0
     # The surrogate prefix only where the separable search finds the function
-    # non-separable (cycle 10: ``pre2`` lost f3 at D = 5).
+    # non-separable (the surrogate prefix everywhere lost f3 at D = 5).
     es_lq_nonsep: bool = False
-    # Cycle 38 (small budgets; c34 trails restarted SLSQP at 10-30 x D on f10-f14
-    # by .05-.06): ``prefix_sep_probe``: with ``es_lq_nonsep``, a passed separability
-    # check no longer forces the (1+1) on the ``"slsqplq"`` prefix; the curvature probe
-    # decides (SLSQP where smooth). ``prefix_full_per_dim``: at budgets up to that many
-    # x dim the ES prefix gets the whole budget (no ATM tail), above
-    # ``prefix_full_min_per_dim`` x dim (Batch 62: at 10 x D the tail's global samples
-    # still help multimodal functions a little).
+    # Small budgets (an earlier composite trailed restarted SLSQP at 10-30 x D on
+    # f10-f14 by .05-.06): ``prefix_sep_probe``: with ``es_lq_nonsep``, a passed
+    # separability check no longer forces the (1+1) on the ``"slsqplq"`` prefix; the
+    # curvature probe decides (SLSQP where smooth). ``prefix_full_per_dim``: at budgets
+    # up to that many x dim the ES prefix gets the whole budget (no ATM tail), above
+    # ``prefix_full_min_per_dim`` x dim (at 10 x D the tail's global samples still help
+    # multimodal functions a little).
     prefix_sep_probe: bool = False
-    # Cycle 42 (``preplat``): above 30 x dim the ES prefix checks for a plateau after
-    # its design and separable search; on one (f7) restarted CMA-ES populations take the
-    # prefix's rest (c36 trails pycma IPOP on f7 at D 5, 100 x D by .33).
+    # Above 30 x dim the ES prefix checks for a plateau after its design and separable
+    # search; on one (f7) restarted CMA-ES populations take the prefix's rest (without
+    # it the composite trailed pycma IPOP on f7 at D 5, 100 x D by .33).
     prefix_plateau_pop: bool = False
-    # ``prefix_plateau_min_dim``: no plateau check below that dim (cycle 43).
+    # ``prefix_plateau_min_dim``: no plateau check below that dim.
     prefix_plateau_min_dim: int = 0
-    # Cycle 50 (the f20 toy study, ``chain_phase``): from ``additive_min_dim`` and
+    # From a study of bbob f20 (``chain_phase``): from ``api.ADDITIVE_MIN_DIM`` and
     # with a box, a pair test at x0 (3 x dim evaluations) reads the function as
     # separable, a chain (only neighbouring coordinates interact) or neither.
     # ``chain_route``: a chain that also passes the band check (6 x dim; f20, not
     # Rosenbrock) gets the decoupled coordinate search for the whole budget, from
-    # ``chain_min_per_dim`` x dim. ``sep_route``: a separable reading gets restarted
-    # STEP with its check off for the whole budget, from ``sep_route_min_per_dim``.
+    # ``api.CHAIN_MIN_PER_DIM`` x dim. ``sep_route``: a separable reading gets restarted
+    # STEP with its check off for the whole budget, from ``api.SEP_ROUTE_MIN_PER_DIM``.
     chain_route: bool = False
     sep_route: bool = False
-    # Cycle 53 (``basin_route``, the D 2 toy): at dim 2 up to ``basin_max_dim`` with at
-    # least ``basin_min_per_dim`` x dim, a Sobol design (min(16 dim, budget / 4)) and a
-    # curvature probe at its best point (4 dim); a smooth multi-basin reading
+    # ``basin_route`` (from a study at D 2): at dim 2 up to ``api.BASIN_MAX_DIM`` with
+    # at least ``api.BASIN_MIN_PER_DIM`` x dim, a Sobol design (min(16 dim, budget / 4))
+    # and a curvature probe at its best point (4 dim); a smooth multi-basin reading
     # (Gallagher) gets MLSL for the budget, any other continues from the design's best
-    # point.
-    # Cycle 60 (``basin_descents``, the D 2 thread): on a smooth reading that is not
-    # multi-basin, up to that many SLSQP descents (the design's best point, then the
-    # best point a quarter of the box away) up to ``basin_descents_max_per_dim`` x dim;
-    # the usual path then continues from the design's best point, the descents' best
-    # stays the result if nothing beats it (restarted SLSQP led `c41` at D 2 on f6 /
-    # f9 / f12 / f13, 100-300 x D).
+    # point. ``basin_descents``: on a smooth reading that is not multi-basin, up to that
+    # many SLSQP descents (the design's best point, then the best point a quarter of the
+    # box away) up to ``api.BASIN_DESCENTS_MAX_PER_DIM`` x dim; the usual path then
+    # continues from the design's best point, the descents' best stays the result if
+    # nothing beats it (restarted SLSQP led the earlier composite at D 2 on f6 / f9 /
+    # f12 / f13, 100-300 x D).
     basin_route: bool = False
     basin_descents: int = 0
-    # ``basin_keep_atm`` (cycle 60, Batch 72): ATM's hand-over share is counted after
-    # the descents, so they do not shorten ATM's sample, which seeds the CMA warm start
-    # (f4 at D 2-3, 300 x D lost −.19 / −.21 when they did)
+    # ``basin_keep_atm``: ATM's hand-over share is counted after the descents, so
+    # they do not shorten ATM's sample, which seeds the CMA warm start (f4 at D 2-3,
+    # 300 x D lost −.19 / −.21 when they did)
     basin_keep_atm: bool = False
-    # Cycle 61 (``small_engine``, the small-budget engines toy): ``"cobyqa"`` spends
-    # budgets up to ``small_engine_max_per_dim`` x dim at dim up to
+    # ``small_engine`` (from a study of small-budget engines): ``"cobyqa"`` spends
+    # budgets up to ``api.SMALL_ENGINE_MAX_PER_DIM`` x dim at dim up to
     # ``small_engine_max_dim``
     # on restarted SciPy COBYQA (``cobyqa_phase``), initial trust radius
-    # ``small_engine_radius`` x box width, instead of every other route.
+    # ``api.SMALL_ENGINE_RADIUS`` x box width, instead of every other route.
     small_engine: str = "none"
     small_engine_max_dim: int = 2
     # From a study of bbob f13 (sharp ridge): what follows the local
@@ -723,12 +721,12 @@ class Variant:
     # best point at the cap reads a kink (``qn_phase.kink_check``, 6 evaluations;
     # f13's ridge).
     rugged_try_rest: str = "none"
-    # The f13 toy: ``prefix_ridge_after`` > 0 reads the gated prefix's SLSQP descent
+    # ``prefix_ridge_after`` > 0 reads the gated prefix's SLSQP descent
     # (``"slsqplq"`` / ``"slsqplqc"`` on a smooth reading) once, when its
     # ``StallMonitor`` has recorded that many iterations: a ridge reading
     # (``qn_phase.ridge_reading``: every full step overshoots by a similar factor and
     # one backtrack recovers it, as across f13's sharp ridge) hands the rest of the
-    # prefix to restarted COBYQA (initial trust radius ``prefix_ridge_radius`` x box
+    # prefix to restarted COBYQA (initial trust radius ``api.PREFIX_RIDGE_RADIUS`` x box
     # width). 0: off.
     prefix_ridge_after: int = 0
     # ``prefix_ridge_max_per_dim`` > 0: the ridge reading only at budgets up to that
@@ -737,39 +735,37 @@ class Variant:
     prefix_ridge_max_per_dim: float = 0.0
     prefix_full_per_dim: float = 0.0
     prefix_full_min_per_dim: float = 0.0
-    # Cycle 58 (``des30``): ``es_kind="slsqplq10hd"`` runs its one-descent prefix
-    # (``"slsqpdes"``) below ``des_max_per_dim`` x dim (and ``QN_MIN_BUDGET``); the
-    # default 30 is ``q7ed``'s 10 x D envelope.
+    # ``es_kind="slsqplq10hd"`` runs its one-descent prefix (``"slsqpdes"``) below
+    # ``des_max_per_dim`` x dim (and ``QN_MIN_BUDGET``).
     des_max_per_dim: float = 30.0
-    # Research (``small_switch``, from a study of budgets up to 10 x D):
-    # at budgets up to ``small_switch_max_per_dim`` x dim and dim up to
-    # ``small_switch_max_dim``, the prefix's first SLSQP descent is read at two
-    # checkpoints (the first probe after its first / second line search) and hands
-    # the rest to restarted COBYQA (initial trust radius ``small_switch_radius`` x box
-    # width): at checkpoint 1 when that line search took at least
-    # ``small_switch_trials`` trials (0: off), at checkpoint 2 when the two gradients
-    # are not parallel, |cos| < ``small_switch_cos`` (0: off), unless
+    # ``small_switch`` (from a study of budgets up to 10 x D): at budgets up to
+    # ``api.SMALL_SWITCH_MAX_PER_DIM`` x dim and dim up to ``api.SMALL_SWITCH_MAX_DIM``,
+    # the prefix's first SLSQP descent is read at two checkpoints (the first probe after
+    # its first / second line search) and hands the rest to restarted COBYQA (initial
+    # trust radius ``api.SMALL_SWITCH_RADIUS`` x box width): at checkpoint 1 when that
+    # line search took at least ``small_switch_trials`` trials (0: off), at checkpoint 2
+    # when the two gradients are not parallel, |cos| < ``api.SMALL_SWITCH_COS``, unless
     # ``small_switch_keep_unit`` and the second line search accepted its first trial.
-    # ``small_switch_rest``: COBYQA also instead of the prefix's (1+1) (after a descent
-    # that ended early, or after the curvature probe's rugged reading).
+    # ``api.SMALL_SWITCH_REST``: COBYQA also instead of the prefix's (1+1) (after a
+    # descent that ended early, or after the curvature probe's rugged reading).
     small_switch: bool = False
     small_switch_trials: float = 0.0
     small_switch_keep_unit: bool = False
-    # Cycle 64 (from a study of the cells where SLSQP leads):
+    # From a study of the cells where SLSQP leads:
     # ``prefix_nan_reading`` says where an undefined curvature reading of the
     # ``slsqplq`` / ``slsqplqc`` prefix goes (NaN beta: fewer than two positive
-    # mirrored losses, mostly probe pairs clipped at a box face): ``"rugged"`` (c43),
-    # ``"smooth"``, or ``"plateau"`` (smooth unless one ``plateau_check`` then reads
+    # mirrored losses, mostly probe pairs clipped at a box face): ``"rugged"``
+    # or ``"plateau"`` (smooth unless one ``plateau_check`` then reads
     # a plateau, f7). On ids 1-3, 14 of f13's 24 readings at D 40, 100 x D were NaN.
     prefix_nan_reading: str = "rugged"
-    # ``box_normalize`` (the novel-ideas toy): ``minimize`` maps any box onto bbob's
+    # ``box_normalize``: ``minimize`` maps any box onto bbob's
     # [-5, 5]^D coordinate by coordinate and runs there (bbob's box: unchanged).
     box_normalize: bool = False
     # ``prefix_descent_retries`` > 0: the one-descent prefixes (``"slsqpdes"`` outside
     # ``small_switch``, ``"slsqpnm"``) retry a descent that did not move from uniform
-    # points, unless its first gradient was exactly zero (the toy's ``retry5``).
+    # points, unless its first gradient was exactly zero.
     prefix_descent_retries: int = 0
-    # Research (gaps3 toy): on a hand-over curvature reading below
+    # On a hand-over curvature reading below
     # ``rugged_direct_beta`` (0: off) in the SLSQP routes' rugged branch, no capped
     # BFGS try and no first (1+1) in the finisher: its populations start at once (from
     # a uniform point, as after the (1+1)'s own rugged probe). On calibration ids f13
@@ -778,7 +774,7 @@ class Variant:
     # ``rugged_direct_min_beta`` (0: none): only readings at or above it (rough
     # readings near 0, f19 / f23 / f24, keep the (1+1) first, which gained there).
     rugged_direct_min_beta: float = 0.0
-    # Research (gaps4 toy): ``prefix_low_beta`` (0: off): in the ES prefix, a finite
+    # ``prefix_low_beta`` (0: off): in the ES prefix, a finite
     # rugged curvature reading below it takes the (1+1)-CMA-ES where the rugged kind
     # would be the ``lq2`` populations (from ``es_lq_min_budget_per_dim``, 100 x dim);
     # on calibration ids f23 reads -0.3 to 0.3 at 100 x dim, f19 mostly 0.1-0.8.
@@ -794,7 +790,7 @@ class Variant:
     # Quadratic model steps in the CMA phase (prefix and hand-over): every other
     # candidate is the minimiser of a least-squares quadratic fitted to the run's
     # recent points (``cma_phase.quadratic_step``), for dim up to
-    # ``cma_model_max_dim``. ``"none"``: only random steps.
+    # ``api.CMA_MODEL_MAX_DIM``. ``"none"``: only random steps.
     cma_model: str = "none"
     # When a CMA run gives up (``cma_phase.run_cma``): ``"legacy"``: no progress
     # over 100 + 50 dim evaluations; ``"short"``: over 10 + 30 dim.
@@ -805,8 +801,8 @@ class Variant:
     # At the hand-over, start the CMA phase with the shape (unit determinant) of the
     # regularised covariance of ATM's best max(2 dim, 1/8 of its) evaluations.
     cma_warm_start: bool = False
-    # For dim >= ``cma_handoff_cap_min_dim``: ATM's share of the hand-over is at most
-    # ``cma_handoff_cap_per_dim * dim`` evaluations (0: no cap).
+    # For dim >= ``api.CMA_HANDOFF_CAP_MIN_DIM``: ATM's share of the hand-over is at
+    # most ``cma_handoff_cap_per_dim * dim`` evaluations (0: no cap).
     cma_handoff_cap_per_dim: float = 0.0
     # The hand-over's local phase for dim >= ``cma_local_min_dim``:
     # ``"one_plus_one"``: the restarted (1+1)-Cholesky-CMA-ES of ``cma_phase``;
@@ -815,7 +811,7 @@ class Variant:
     # population runs from uniform points.
     cma_local: str = "one_plus_one"
     cma_local_min_dim: int = 10
-    # Batch 12: ``cma_model_high="diagonal"``: above ``cma_model_max_dim``, a
+    # ``cma_model_high="diagonal"``: above ``api.CMA_MODEL_MAX_DIM``, a
     # ratio-gated, rank-weighted diagonal quadratic model (2 dim + 1 parameters,
     # fitted to the last 3 (2 dim + 1) points; ``cma_phase.model_step``).
     cma_model_high: str = "none"
@@ -828,27 +824,26 @@ class Variant:
     pop_active: bool = False
     pop_lambda: str = "default"
     pop_gate_per_dim: float = 0.0
-    # Population runs (Batch 13): ``pop_protect`` stops launching population runs
+    # Population runs: ``pop_protect`` stops launching population runs
     # once one ends without beating the best point found, so the (1+1) restarts
     # take the rest.
     pop_protect: bool = False
-    # With ``sep_probe``, for dim >= ``cma_local_nonsep_min_dim``: when the separable
-    # search's check finds the function non-separable, the local phase is a route
-    # of ``qn_phase.QN_ROUTES`` instead of ``cma_local``. ``"qn3"``: a plateau check
-    # first (a plateau skips the curvature probe), then on a smooth reading SLSQP for
-    # a third of the local budget, at most 100 dim evaluations, then ``cma_local``
+    # With ``sep_probe``, for dim >= ``api.CMA_LOCAL_NONSEP_MIN_DIM``: when the
+    # separable search's check finds the function non-separable, the local phase is a
+    # route of ``qn_phase.QN_ROUTES`` instead of ``cma_local``. ``"qn3"``: a plateau
+    # check first (a plateau skips the curvature probe), then on a smooth reading SLSQP
+    # for a third of the local budget, at most 100 dim evaluations, then ``cma_local``
     # from its best. ``"qn7"``: as ``"qn3"``, but rugged or plateau readings get
     # ``steps`` populations; smooth functions whose converged SLSQP descents end in
     # separate basins (hill-valley test) keep restarting SLSQP instead of the CMA
-    # finisher, and a stage that ends mid-descent continues for 2/3 of what is left,
-    # at most another 100 dim evaluations, before the finisher. ``"qn8"``: as
-    # ``"qn7"``, but a plateau reading (f7) launches IPOP populations from a uniform
-    # point with 4x the default lambda instead (cycle 18). ``"qn9"``: ``"qn8"`` with
-    # SLSQP's finite-difference step 1e-9 instead of SciPy's 1.49e-8 (cycle 20,
-    # ``qn_phase.QN_FD_STEP``). ``"qn12"``: ``"qn9"`` with SciPy's default step in the
-    # multi-basin route's restarts (cycle 24: the 1e-9 step makes each Gallagher
-    # descent dearer, so fewer restarts fit).
-    # The later routes are described in ``qn_phase.QnRoute``.
+    # finisher, and a stage that ends mid-descent continues for 2/3 of what is left, at
+    # most another 100 dim evaluations, before the finisher. ``"qn8"``: as ``"qn7"``,
+    # but a plateau reading (f7) launches IPOP populations from a uniform point with 4x
+    # the default lambda instead. ``"qn9"``: ``"qn8"`` with SLSQP's finite-difference
+    # step 1e-9 instead of SciPy's 1.49e-8 (``qn_phase.QN_FD_STEP``). ``"qn12"``:
+    # ``"qn9"`` with SciPy's default step in the multi-basin route's restarts (the 1e-9
+    # step makes each Gallagher descent dearer, so fewer restarts fit). The later routes
+    # are described in ``qn_phase.QnRoute``.
     cma_local_nonsep: str = "none"
     # With ``pop_gate_per_dim``: the first (1+1) run also hands over to the
     # population after this many times dim evaluations without a stall (0: only at
@@ -868,9 +863,9 @@ class Variant:
     cma_probe_min_dim: int = 1
     # ``sep_probe``: before the local phase (after the ES prefix's design, or after
     # ATM at the hand-over) run the separable coordinate search of
-    # ``step_phase`` on at most ``sep_share`` of the remaining budget; it stops
+    # ``step_phase`` on at most ``api.SEP_SHARE`` of the remaining budget; it stops
     # after about 3 dim evaluations on non-separable functions. Only for budgets of
-    # at least ``sep_min_budget_per_dim`` times dim.
+    # at least ``api.SEP_MIN_BUDGET_PER_DIM`` times dim.
     # For dim <= ``nm_max_dim`` (0: off) the local search is the restarted
     # Nelder-Mead of ``nm_phase``: in the prefix, at the hand-over or both
     # (``nm_stage``); ``"qnprefix30"``: in the prefix only, after one SLSQP descent
@@ -884,13 +879,13 @@ class Variant:
     # testing additivity) only after two sweeps without improvement, when
     # re-evaluating a stored point at an unchanged best can no longer fail.
     sep_check: str = "axis"
-    # ``sep_stall_min_per_dim`` (cycle 54, the late-router study): ``"stall"`` acts
+    # ``sep_stall_min_per_dim``: ``"stall"`` acts
     # only from this many x dim (below it the axis check alone, as ``"axis"``).
     sep_stall_min_per_dim: float = 0.0
     # ``"lbfgsb"``: every restarted-SLSQP call (prefix and local phase) hands its
     # remaining evaluations to restarted L-BFGS-B once failed descents outnumber
     # converged ones, and a local stage that ends that way gives L-BFGS-B the rest of
-    # the budget (f12, bent cigar; cycle 28, ``qn_phase.run_lbfgsb_restarts``).
+    # the budget (f12, bent cigar; ``qn_phase.run_lbfgsb_restarts``).
     qn_fallback: str = "none"
     # Samples per iteration. ``"fixed"``: 64 at the start and 60 afterwards
     # (``initial_population`` and the conductor's total), whatever the budget.
@@ -993,7 +988,7 @@ class Variant:
         if not isinstance(self.box_normalize, bool):
             raise ValueError("box_normalize must be a bool")
         if self.prefix_descent_retries < 0:
-            raise ValueError("the parked2 prefix options must not be negative")
+            raise ValueError("prefix_descent_retries must be >= 0")
         if self.rugged_direct_beta < 0 or self.rugged_direct_min_beta < 0:
             raise ValueError("rugged_direct_beta and _min_beta must be >= 0")
         _choose("anytime", self.anytime, _LATE_CHOICES["anytime"])
