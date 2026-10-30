@@ -35,6 +35,11 @@ def _reject_unknown(kind: type, data: dict[str, Any]) -> None:
 
 
 def _choose(name: str, value: object, allowed: tuple[str, ...]) -> None:
+    if value in REMOVED_CHOICES.get(name, ()):
+        raise ValueError(
+            f"{name}={value!r} was removed in {REMOVED_IN} (it was a research "
+            f"option); amm-optimizer 0.6.x still has it. Allowed: {allowed}"
+        )
     if value not in allowed:
         raise ValueError(f"{name} must be one of {allowed}, got {value!r}")
 
@@ -42,6 +47,68 @@ def _choose(name: str, value: object, allowed: tuple[str, ...]) -> None:
 # ``Variant`` fields added after the freeze of 2026-10-22: ``ATMConfig.config_hash``
 # reads them only when set, so the configurations recorded before keep their hashes.
 HASH_IF_SET = ("anytime", "anytime_start_per_dim", "anytime_factor", "anytime_switch")
+
+# The release that removed the fields of :data:`REMOVED_FIELDS`.
+REMOVED_IN = "0.7.0"
+# ``Variant`` fields removed in :data:`REMOVED_IN`, each with the default it had in
+# 0.5.0 and 0.6.0. ``ATMConfig.config_hash`` hashes every one of them at that default,
+# so a hash recorded before the removal stays valid; ``from_dict`` accepts one only at
+# that default (a dictionary written by 0.6.0 still loads).
+REMOVED_FIELDS: dict[str, Any] = {}
+# String values removed in :data:`REMOVED_IN` from fields that remain.
+REMOVED_CHOICES: dict[str, tuple[str, ...]] = {}
+
+
+def _same_value(value: object, default: object) -> bool:
+    """Whether ``value`` is ``default`` (a list matches a tuple, as JSON gives it)."""
+    if isinstance(default, tuple) and isinstance(value, list):
+        value = tuple(value)
+    if isinstance(default, bool) or isinstance(value, bool):
+        return value is default
+    return bool(
+        type(value) is type(default)
+        or {type(value), type(default)}
+        <= {
+            int,
+            float,
+        }
+    ) and bool(value == default)
+
+
+def _drop_removed(data: dict[str, Any]) -> dict[str, Any]:
+    """``data`` (``Variant`` fields) without the removed fields at their old defaults.
+
+    Raises
+    ------
+    ValueError
+        If ``data`` sets a removed field to anything but its old default.
+    """
+    removed = [name for name in data if name in REMOVED_FIELDS]
+    for name in removed:
+        if not _same_value(data[name], REMOVED_FIELDS[name]):
+            raise ValueError(
+                f"Variant.{name} was removed in {REMOVED_IN} (it was a research "
+                f"option); only its old default {REMOVED_FIELDS[name]!r} is accepted, "
+                f"got {data[name]!r}. amm-optimizer 0.6.x still has it."
+            )
+    return {name: value for name, value in data.items() if name not in removed}
+
+
+def _hash_payload(data: dict[str, Any]) -> str:
+    """The text that ``ATMConfig.config_hash`` digests, from a ``to_dict`` result.
+
+    Every removed field is put back at its old default and the late fields of
+    :data:`HASH_IF_SET` are left out at their defaults, so the text is the one the
+    release that recorded a hash wrote.
+    """
+    variant = dict(data["variant"])
+    for name in HASH_IF_SET:
+        if name in variant and variant[name] == _FIELD_DEFAULTS[name]:
+            del variant[name]
+    for name, default in REMOVED_FIELDS.items():
+        variant[name] = list(default) if isinstance(default, tuple) else default
+    return json.dumps({**data, "variant": variant}, sort_keys=True)
+
 
 # Research-only options, deprecated in 0.6.0 and removed in 0.7.0 (CONTRIBUTING.md,
 # "Deprecation policy"). Measured, not chosen: a field is listed when no shipped
@@ -1583,7 +1650,8 @@ class Variant:
         Raises
         ------
         ValueError
-            If ``data`` names an unknown field or a value is invalid.
+            If ``data`` names an unknown field or a value is invalid, or sets a
+            field of :data:`REMOVED_FIELDS` to anything but its old default.
 
         Warns
         -----
@@ -1591,6 +1659,7 @@ class Variant:
             For each research-only field or value it sets (see
             :data:`RESEARCH_FIELDS`).
         """
+        data = _drop_removed(data)
         _reject_unknown(cls, data)
         return cls(**data)
 
@@ -1749,7 +1818,8 @@ class ATMConfig:
         ------
         ValueError
             If ``data`` names an unknown field, at any level, or a value is
-            invalid.
+            invalid, or sets a field of :data:`REMOVED_FIELDS` to anything but its
+            old default.
 
         Warns
         -----
@@ -1764,6 +1834,8 @@ class ATMConfig:
             "restart": RestartPolicy,
             "variant": Variant,
         }
+        if "variant" in data:
+            data["variant"] = _drop_removed(data["variant"])
         for name, kind in nested.items():
             if name in data:
                 _reject_unknown(kind, data[name])
@@ -1777,18 +1849,14 @@ class ATMConfig:
         results are equal, except that the ``Variant`` fields of
         :data:`HASH_IF_SET` count only when they differ from their defaults: they
         were added later, and every hash recorded before them stays valid. The
-        hash does not depend on the platform or the package version (``c46`` is
-        ``2153948ebed51150``).
+        fields removed since (:data:`REMOVED_FIELDS`) are hashed at the defaults
+        they had, for the same reason. The hash does not depend on the platform or
+        the package version (``c46`` is ``2153948ebed51150``).
 
         Returns
         -------
         str
             16 hexadecimal digits (the start of a SHA-256 digest).
         """
-        data = self.to_dict()
-        defaults = Variant()
-        for name in HASH_IF_SET:
-            if getattr(self.variant, name) == getattr(defaults, name):
-                del data["variant"][name]
-        text = json.dumps(data, sort_keys=True)
+        text = _hash_payload(self.to_dict())
         return hashlib.sha256(text.encode()).hexdigest()[:16]

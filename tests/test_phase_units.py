@@ -398,8 +398,7 @@ def test_a_population_run_starts_from_a_given_covariance():
     assert run.cost == min(rotated_ellipsoid(c) for c in calls)
 
 
-@pytest.mark.parametrize("style", ["lq", "lq2"])
-def test_a_surrogate_run_stops_cleanly_when_the_objective_runs_out(style):
+def test_a_surrogate_run_stops_cleanly_when_the_objective_runs_out():
     objective, calls = counted(rotated_ellipsoid, 97)
     run = pop_cma.run_population_cma(
         objective,
@@ -409,7 +408,7 @@ def test_a_surrogate_run_stops_cleanly_when_the_objective_runs_out(style):
         BOX5,
         1_000,
         10,
-        surrogate=style,
+        surrogate="lq2",
     )
     assert len(calls) == 97
     assert run.cost == min(rotated_ellipsoid(c) for c in calls)
@@ -519,18 +518,6 @@ def test_step_phase_spends_its_budget_on_a_constant_function():
     objective, calls = counted(lambda x: 1.0, 10_000)
     result = step_phase.run_step_phase(objective, np.zeros(2), 1.0, BOX2, 300)
     assert len(calls) == 300 and not result.stalled
-
-
-def test_the_parabola_vertex_needs_an_interior_convex_bracket():
-    t = np.array([0.0, 1.0, 2.0])
-    assert step_phase._parabola_vertex(t, np.array([0.0, 1.0, 2.0])) is None  # edge
-    assert step_phase._parabola_vertex(t, np.array([1.0, 0.0, -0.5])) is None
-    assert step_phase._parabola_vertex(t, np.array([1.0, 2.0, 1.0])) is None  # concave
-    assert step_phase._parabola_vertex(t, np.array([1.0, 0.0, 1.0])) is None  # on t[1]
-    vertex = step_phase._parabola_vertex(t, np.array([1.0, 0.0, 3.0]))
-    assert vertex is not None and 0.0 < vertex < 1.0
-    with_nan = np.array([np.nan, 0.0, 1.0])
-    assert step_phase._parabola_vertex(t, with_nan) is None
 
 
 def test_one_interval_difficulty_is_the_vectorised_one_bit_for_bit():

@@ -1,5 +1,0 @@
-{
-  "base": {"config": ""},
-  "random": {"solver": "random"},
-  "es11": {"solver": "es11"}
-}

@@ -33,7 +33,7 @@ python tools/ci.py --tier merge   # also the harness tests and the recent preset
 python tools/ci.py --tier full    # everything incl. the 400-case parity sweep; before a release
 ruff check . && ruff format .
 mypy
-pytest -m "not slow and not merge and not research" -n auto
+pytest -m "not slow and not merge" -n auto
 ```
 
 The documentation site (`mkdocs.yml`, pages in `docs/`, the API reference generated from the
@@ -43,10 +43,7 @@ listed in `tests/test_docs_examples.py`, which runs them.
 
 Tests are tiered by marker: the default tier is what you run while working, the `merge`
 tier is for pull requests that touch presets, and `slow` is the full tier for releases.
-Tests marked `research` pin research-only options or read the research harness's data
-(`benchmarks/arms`, `benchmarks/quick_scan.py`, `tests/characterisation_arms.json`); the
-default tier leaves them out, the merge and full tiers run them, and they skip where that
-data is absent. A test that needs `cocoex` skips itself when it is not installed.
+A test that needs `cocoex` skips itself when it is not installed.
 
 Two optional hooks run checks before a push; neither is enabled by default:
 

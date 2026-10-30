@@ -143,7 +143,7 @@ python benchmarks/block_profile.py   # where the time goes, per algorithm block
 | `tests/golden/` | recorded trajectories from the original |
 | `docs/DEVIATIONS.md` | every difference from the original |
 | `docs/legacy.md` | the original ATM sampler and the older presets |
-| `benchmarks/` | speed harness (`perf.py`, `profiler_overhead.py`), per-block timing (`block_profile.py`), the COCO/bbob harness (`run_bbob.py`), and the research harness with its recorded configurations (`quick_scan.py`, `legacy_vs_reference.py`, `process_pool.py`, `arms/`) |
+| `benchmarks/` | speed harness (`perf.py`, `profiler_overhead.py`), per-block timing (`block_profile.py`), the COCO/bbob harness (`run_bbob.py`), and the process pool of the snapshot recorder (`process_pool.py`) |
 
 ## Continuous integration
 

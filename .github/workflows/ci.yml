@@ -117,11 +117,8 @@ jobs:
       - name: Environment
         shell: bash
         run: uv run --no-sync python -c "import numpy, scipy, sys; print(sys.version); print('numpy', numpy.__version__, 'scipy', scipy.__version__)"
-      # The default tier of tools/ci.py ("not slow and not merge and not research") plus
-      # the research tests: the research options still ship in src until 0.7.0 removes
-      # them, and these tests are their only behavioural check on Linux and macOS (they
-      # skip themselves where benchmarks/arms or the arm snapshots are absent).
-      - name: "Tests (default tier and research tests: not slow and not merge)"
+      # The default tier of tools/ci.py ("not slow and not merge").
+      - name: "Tests (default tier: not slow and not merge)"
         shell: bash
         run: >
           uv run --no-sync pytest -m "not slow and not merge" -n auto --timeout=900

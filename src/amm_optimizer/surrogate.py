@@ -1,4 +1,4 @@
-"""A linear-quadratic surrogate for population CMA-ES runs (``pop_surrogate="lq"``).
+"""A linear-quadratic surrogate for population CMA-ES runs (``surrogate="lq2"``).
 
 After Hansen's lq-CMA-ES (GECCO 2019, "A global surrogate assisted CMA-ES"): a
 regression model of f, linear, then diagonal-quadratic, then full quadratic as data
@@ -9,16 +9,11 @@ latest evaluated points agrees with their true values (Kendall tau at least
 generation by true values where known and by the bias-corrected model elsewhere.
 
 Our own choices: the fit is in the run's current frame ((x - mean) / sigma) by
-weighted normal equations with a tiny ridge; the full model is used only up to
-``full_max_dim`` (its cost grows as dim^6); the number evaluated doubles while the
-model disagrees, starting from one; the agreement is checked with the fit made at
-the start of the generation (out of sample for the newest points), and the model is
-refitted only when it disagrees. After a generation the model needed in full, the
-next ``misses`` generations (at most ``MAX_PAUSE``) are evaluated without it.
-
-``style="lq2"`` follows pycma's implementation (``cma.fitness_models``) more closely,
-after the first Batch 29 runs showed it reaches 1e-9 on f9 and f10 at D = 5 and
-100 x D where ``"lq"`` does not:
+weighted normal equations with a tiny ridge (after Jacobi scaling); the full model is
+used only up to ``full_max_dim`` (its cost grows as dim^6). After a generation the
+model needed in full, the next ``misses`` generations (at most ``MAX_PAUSE``) are
+evaluated without it. Otherwise it follows pycma's implementation
+(``cma.fitness_models``):
 * the fit uses only the best ``TRUNCATION`` share of the recent points, weighted
   linearly from ``MAX_WEIGHT`` (best) to 1 (worst used);
 * after each batch of evaluations the model is refitted and its Kendall tau is taken
@@ -86,9 +81,8 @@ def kendall_tau(a: np.ndarray, b: np.ndarray) -> float:
 class QuadraticSurrogate:
     """Linear / diagonal / full quadratic least squares on the most recent points."""
 
-    def __init__(self, dim: int, full_max_dim: int = 20, style: str = "lq") -> None:
+    def __init__(self, dim: int, full_max_dim: int = 20) -> None:
         self.dim = dim
-        self.style = style
         self.sizes = [dim + 1, 2 * dim + 1]
         if dim <= full_max_dim:
             self.sizes.append((dim + 1) * (dim + 2) // 2)
@@ -124,7 +118,7 @@ class QuadraticSurrogate:
     def fit(self, center: np.ndarray, scale: float) -> bool:
         """Refit in the frame (x - center) / scale; False if too few points."""
         n = len(self.xs)
-        usable = int(TRUNCATION * (n + 1)) if self.style == "lq2" else n
+        usable = int(TRUNCATION * (n + 1))
         fitting = [p for p in self.sizes if MIN_SIZE_FACTOR * p <= usable]
         if not fitting:
             self.coef = None
@@ -134,35 +128,24 @@ class QuadraticSurrogate:
         size = min(n, int(np.ceil(MAX_SIZE_FACTOR * self.terms)))
         x = np.array(self.xs[-size:])
         f = np.array(self.fs[-size:])
-        if self.style == "lq2":
-            # The best share only, weighted linearly from MAX_WEIGHT down to 1.
-            used = min(size, max(self.terms + 2, int(TRUNCATION * (size + 1))))
-            best = np.argsort(f, kind="stable")[:used]
-            x, f = x[best], f[best]
-            # Rows scaled by the weight, as in pycma: squared residuals by its square.
-            w = np.linspace(MAX_WEIGHT, 1.0, used) ** 2
-        else:
-            # Rank weights: the better half of the data counts more.
-            ranks = np.empty(size)
-            ranks[np.argsort(f, kind="stable")] = np.arange(size)
-            w = np.maximum(1.0 - ranks / size, 0.1)
+        # The best share only, weighted linearly from MAX_WEIGHT down to 1.
+        used = min(size, max(self.terms + 2, int(TRUNCATION * (size + 1))))
+        best = np.argsort(f, kind="stable")[:used]
+        x, f = x[best], f[best]
+        # Rows scaled by the weight, as in pycma: squared residuals by its square.
+        w = np.linspace(MAX_WEIGHT, 1.0, used) ** 2
         phi = self.features(x, self.terms)
         offset, spread = float(np.median(f)), float(np.std(f)) or 1.0
         weighted = phi.T * w
         gram = weighted @ phi
         rhs = weighted @ ((f - offset) / spread)
         try:
-            if self.style == "lq2":
-                # Jacobi scaling: old points far out in the current frame make
-                # the columns' scales differ by many orders of magnitude.
-                col = 1.0 / np.sqrt(np.maximum(np.diag(gram), 1e-300))
-                scaled = gram * col[:, None] * col[None, :]
-                scaled[np.diag_indices_from(scaled)] += RIDGE
-                self.coef = col * _solve_pos(scaled, col * rhs)
-            else:
-                ridge = RIDGE * max(float(np.trace(gram)), 1e-300) / self.terms
-                gram[np.diag_indices_from(gram)] += ridge
-                self.coef = _solve_pos(gram, rhs)
+            # Jacobi scaling: old points far out in the current frame make the
+            # columns' scales differ by many orders of magnitude.
+            col = 1.0 / np.sqrt(np.maximum(np.diag(gram), 1e-300))
+            scaled = gram * col[:, None] * col[None, :]
+            scaled[np.diag_indices_from(scaled)] += RIDGE
+            self.coef = col * _solve_pos(scaled, col * rhs)
         except (np.linalg.LinAlgError, ValueError):
             self.coef = None
             return False
@@ -192,74 +175,6 @@ def evaluate_generation(
     not finite, evaluations used), or None if ``evaluate`` reports the budget spent.
     At most ``left`` points are evaluated; the generation is cut there.
     """
-    if model.style == "lq2":
-        return _evaluate_lq2(evaluate, shown, model, center, scale, left)
-    lam = len(shown)
-    true = np.full(lam, np.nan)
-    known = np.zeros(lam, dtype=bool)
-    used = 0
-
-    def run(k: int) -> bool:
-        nonlocal used
-        value = evaluate(shown[k])
-        if value is None:
-            return False
-        true[k] = value if np.isfinite(value) else np.inf
-        known[k] = True
-        model.add(shown[k], true[k])
-        used += 1
-        return True
-
-    if model.pause > 0 or not model.fit(center, scale):
-        model.pause = max(model.pause - 1, 0)
-        for k in range(min(lam, left)):
-            if not run(k):
-                return None
-        return np.where(known, true, np.inf), true, used
-    pending = list(np.argsort(model.predict(shown), kind="stable"))
-    batch = 1
-    while pending and used < left:
-        take, pending = pending[:batch], pending[batch:]
-        for k in take[: left - used]:
-            if not run(int(k)):
-                return None
-        if not pending:
-            break
-        # The current fit's ranking of the latest points (the newest are out of
-        # sample); refit with them only when it disagrees.
-        n_tau = max(15, min(int(1.2 * used), int(0.75 * lam)))
-        x_recent, f_recent = model.recent(n_tau)
-        if kendall_tau(model.predict(x_recent), f_recent) >= TAU_TRUTH:
-            break
-        if not model.fit(center, scale):
-            break
-        batch = used
-        rest = np.array(pending)
-        pending = list(rest[np.argsort(model.predict(shown[rest]), kind="stable")])
-    if known.all():
-        model.misses += 1
-        model.pause = min(model.misses, MAX_PAUSE)
-    else:
-        model.misses = 0
-    if model.coef is None:
-        values = np.where(known, true, np.inf)
-        return values, true, used
-    pred = model.predict(shown)
-    finite = known & np.isfinite(true)
-    bias = float(np.median(true[finite] - pred[finite])) if finite.any() else 0.0
-    values = np.where(known, true, pred + bias)
-    return values, true, used
-
-
-def _evaluate_lq2(
-    evaluate: Callable[[np.ndarray], float | None],
-    shown: np.ndarray,
-    model: QuadraticSurrogate,
-    center: np.ndarray,
-    scale: float,
-    left: int,
-) -> tuple[np.ndarray, np.ndarray, int] | None:
-    """``evaluate_generation`` for ``style="lq2"`` (see the module docstring)."""
     lam = len(shown)
     true = np.full(lam, np.nan)
     known = np.zeros(lam, dtype=bool)

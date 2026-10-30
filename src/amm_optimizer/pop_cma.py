@@ -176,7 +176,7 @@ def run_population_cma(
     ``dim / |C^-1/2 y|^2`` rescaling of their outer products.
     ``bounds_mode="reflect"``: the mean and the steps stay unbounded and the
     evaluated point is ``reflect_into(x, box)``; the update uses the sampled steps.
-    ``surrogate="lq"``: generations are ranked by ``surrogate.evaluate_generation``
+    ``surrogate="lq2"``: generations are ranked by ``surrogate.evaluate_generation``
     (true values where evaluated, the model elsewhere); the run may end inside a
     generation when its evaluations are spent.
     """
@@ -217,10 +217,10 @@ def run_population_cma(
     used, generation = 0, 0
     stalled = False
     model = None
-    if surrogate in ("lq", "lq2"):
+    if surrogate == "lq2":
         from .surrogate import QuadraticSurrogate, evaluate_generation
 
-        model = QuadraticSurrogate(dim, style=surrogate)
+        model = QuadraticSurrogate(dim)
     # lq2: every step used in the update is capped at this Mahalanobis length
     # (Hansen 2011, injecting external solutions into CMA-ES). The cap covers
     # box-clipped points: with a thin covariance, clipping

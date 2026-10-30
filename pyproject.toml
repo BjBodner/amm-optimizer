@@ -78,9 +78,8 @@ testpaths = ["tests"]
 addopts = "-ra"
 markers = [
   "slow: the full tier (nightly / release): every named config and recorded arm",
-  "merge: the merge tier, deselected in the default tier (-m \"not slow and not merge and not research\")",
+  "merge: the merge tier, deselected in the default tier (-m \"not slow and not merge\")",
   "snapshot: bit-exact or trajectory-pinned; valid only in the environment of tests/characterisation.json (skipped elsewhere, see tests/conftest.py)",
-  "research: research-only options or data (benchmarks/arms, benchmarks/quick_scan.py, tests/characterisation_arms.json); deselected in the default tier, and skipped where the data is absent",
 ]
 filterwarnings = [
   "error::DeprecationWarning",

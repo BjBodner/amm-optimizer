@@ -32,13 +32,8 @@ def test_default_tier_is_lint_format_types_and_quick_tests():
     assert steps[0].command[1:4] == ["-m", "ruff", "check"]
     assert "--check" in steps[1].command
     assert steps[2].command[-1] == "mypy"
-    assert steps[3].command[-2:] == ["-m", "not slow and not merge and not research"]
+    assert steps[3].command[-2:] == ["-m", "not slow and not merge"]
     assert ci.steps(False) == steps  # the old fast flag
-
-
-def test_research_tests_run_in_the_merge_and_full_tiers():
-    assert "research" not in " ".join(ci.steps("merge")[-1].command)
-    assert "research" not in " ".join(ci.steps("full")[-1].command)
 
 
 def test_merge_tier_deselects_only_the_slow_sweep():

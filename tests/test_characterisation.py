@@ -1,21 +1,17 @@
-"""The shipped configurations and the recorded arms reproduce their bbob runs exactly.
+"""The shipped configurations reproduce their bbob runs exactly.
 
 Refactors of ``atm`` must keep these snapshots bit for bit (``docs/DEVIATIONS.md``);
 a deliberate behaviour change re-records them with
 ``tools/record_characterisation.py`` in its own commit. See ``characterisation_cases``
 for what is hashed and for the tiers (``tools/ci.py --tier``):
 
-* default (``-m "not slow and not merge and not research"``): the whole grid for
-  ``PINNED`` (the default configuration and the current composite);
-* merge (``-m "not slow"``): also the whole grid for ``RECENT``, the ``SEPARATING``
-  cases for every named config, and the arm-snapshot completeness check;
-* full (``-m slow`` included): every named config on the grid, every recorded arm.
+* default (``-m "not slow and not merge"``): the whole grid for ``PINNED`` (the
+  default configuration and the current composite);
+* merge (``-m "not slow"``): also the whole grid for ``RECENT`` and the
+  ``SEPARATING`` cases for every named config;
+* full (``-m slow`` included): every named config on the grid.
 
-The arm tests are ``research``: they need ``benchmarks/arms``,
-``benchmarks/quick_scan.py`` and ``tests/characterisation_arms.json``, and skip
-without them.
-
-Each test item checks one config (or arm) on all of its cases and lists the cases
+Each test item checks one config on all of its cases and lists the cases
 that differ. The fixtures record only the configs of the selected items, so ``-k``
 narrows the work too.
 
@@ -40,29 +36,8 @@ pytestmark = pytest.mark.snapshot
 import characterisation_cases as cc  # noqa: E402
 
 NAMED = json.loads(cc.NAMED_SNAPSHOTS.read_text(encoding="utf-8"))
-ARMS = (
-    json.loads(cc.ARM_SNAPSHOTS.read_text(encoding="utf-8"))
-    if cc.ARM_SNAPSHOTS.exists()
-    else {"_meta": {}, "configs": {}}
-)
 RECORDER = cc.ROOT / "tools" / "record_characterisation.py"
 JOBS = os.environ.get("ATM_CHARACTERISATION_JOBS", "2")
-ARM_KEYS = sorted(set(ARMS["configs"]) - set(cc.REMOVED_BY_MERGE))
-research = [
-    pytest.mark.research,
-    # the recorded arms set research-only options, deprecated in 0.6.0
-    pytest.mark.filterwarnings("ignore:Variant:FutureWarning"),
-    pytest.mark.skipif(
-        cc.RESEARCH_DATA_MISSING is not None,
-        reason=f"research data not in this checkout: {cc.RESEARCH_DATA_MISSING}",
-    ),
-]
-
-
-def _research(test):
-    for mark in research:
-        test = mark(test)
-    return test
 
 
 def _same_environment(meta):
@@ -86,9 +61,7 @@ def _record(tmp_path_factory, *args):
         capture_output=True,
     )
     return {
-        which: json.loads(path.read_text(encoding="utf-8"))
-        for which in ("named", "arms")
-        if (path := out.with_name(f"run_{which}.json")).exists()
+        "named": json.loads(out.with_name("run_named.json").read_text(encoding="utf-8"))
     }
 
 
@@ -145,36 +118,12 @@ def grid_runs(request, tmp_path_factory):
     ]
 
 
-@pytest.fixture(scope="module")
-def arm_runs(request, tmp_path_factory):
-    _same_environment(ARMS["_meta"])
-    keys = _selected(request, "test_recorded_arm", "key", ARM_KEYS)
-    return _record(tmp_path_factory, "--set", "arms", "--only", ",".join(keys))["arms"]
-
-
 def test_the_snapshots_cover_every_named_config_and_case():
     stored = NAMED["configs"]
     assert set(stored) == set(cc.NAMED)
     for name, text in cc.NAMED.items():
         assert stored[name]["config"] == text
         assert set(stored[name]["cases"]) == {c.name for c in cc.GRID}, name
-
-
-@pytest.mark.merge
-@_research
-def test_every_recorded_arm_has_a_snapshot():
-    stored = ARMS["configs"]
-    current = set(cc.arm_configs())
-    assert not current & set(cc.REMOVED_BY_MERGE)
-    missing = current - set(stored)
-    assert not missing, (
-        f"{len(missing)} arm configs lack a snapshot: run "
-        "`python tools/record_characterisation.py --set arms --missing`"
-    )
-    assert set(stored) == current | set(cc.REMOVED_BY_MERGE)
-    assert all(
-        set(e["cases"]) == {c.name for c in cc.ARM_PROBES} for e in stored.values()
-    )
 
 
 def test_every_named_config_changes_some_case_of_its_base():
@@ -238,11 +187,3 @@ def test_separating_set(separating_runs, name):
 def test_named_grid(grid_runs, name):
     differing = _differing(grid_runs, NAMED, name)
     assert not differing, f"{name}: {len(differing)} cases differ: {differing[:12]}"
-
-
-@pytest.mark.slow
-@_research
-@pytest.mark.parametrize("key", ARM_KEYS)
-def test_recorded_arm(arm_runs, key):
-    differing = _differing(arm_runs, ARMS, key)
-    assert not differing, f"arm {key}: probes differ: {differing}"

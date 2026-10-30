@@ -1,14 +1,10 @@
 """``ATMConfig.composite()`` is the composite that was confirmed on three holdouts."""
 
-import sys
-from pathlib import Path
-
 import numpy as np
 import pytest
 
 import amm_optimizer as atm
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "benchmarks"))
+import characterisation_cases
 
 # The exact string the first held-out evaluation was run with.
 HOLDOUT_CONFIG = (
@@ -23,15 +19,10 @@ def rastrigin(x):
     return float(10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x)))
 
 
-@pytest.mark.research
-@pytest.mark.skipif(
-    not (Path(__file__).resolve().parents[1] / "benchmarks" / "quick_scan.py").exists(),
-    reason="the research harness (benchmarks/quick_scan.py) is not in this checkout",
-)
 def test_preset_is_exactly_the_configuration_that_was_held_out():
-    import quick_scan
-
-    assert atm.ATMConfig.composite() == quick_scan.parse_config(HOLDOUT_CONFIG)
+    # the holdout's configuration text, item by item, as the snapshots spell it
+    text = characterisation_cases.text_of(atm.ATMConfig.composite())
+    assert set(text.split(",")) == set(HOLDOUT_CONFIG.split(","))
 
 
 def test_defaults_are_untouched_by_the_preset():

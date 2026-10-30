@@ -374,7 +374,10 @@ class _Axis:
         return 0.5 * (chunk.t[j] + after[0])
 
     def vertex(self) -> float | None:
-        """``_parabola_vertex`` of the axis's samples."""
+        """The vertex of the parabola through the best stored point and its
+        neighbours on the axis, or None unless the three points exist, the parabola
+        is convex, and the vertex lies inside the bracket at least 1% of its width
+        away from every stored point."""
         b = bisect.bisect_left(self.last, self.zero)
         chunk = self.chunks[b]
         j = int(chunk.t[: chunk.m].searchsorted(self.zero))
@@ -437,23 +440,3 @@ def _bracket_vertex(
     if not a + gap < vertex < c - gap:
         return None
     return vertex, max(gap, MIN_WIDTH * qn_phase.x_unit())
-
-
-def _parabola_vertex(t: np.ndarray, h: np.ndarray) -> float | None:
-    """The vertex of the parabola through the best stored point and its neighbours.
-
-    None unless the three points exist, the parabola is convex, and the vertex lies
-    inside the bracket at least 1% of its width away from every stored point
-    (``_Axis.vertex`` does the same on its chunks).
-    """
-    m = int(np.argmin(h))
-    if m == 0 or m == len(t) - 1:
-        return None
-    (a, b, c), (fa, fb, fc) = t[m - 1 : m + 2], h[m - 1 : m + 2]
-    found = _bracket_vertex(a, b, c, fa, fb, fc)
-    if found is None:
-        return None
-    vertex, keep = found
-    if np.min(np.abs(t - vertex)) < keep:
-        return None
-    return float(vertex)

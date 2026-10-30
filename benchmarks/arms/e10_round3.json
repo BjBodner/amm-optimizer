@@ -1,8 +1,0 @@
-{
-  "base": {"config": ""},
-  "sr2_UFPN_P12": {"config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=12"},
-  "sr2_UFPN_P8": {"config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=8"},
-  "sr2_UFPN_P12_d20": {"config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=12,variant.pool_divisor=20"},
-  "sr2_UFPN_P12_d45": {"config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=12,variant.pool_divisor=45"},
-  "sr2_UFPN_P12_max32": {"config": "variant.amplitude_control=success_rate_targeted,variant.initial_design=uniform,variant.bounds=fold,variant.corner_clip=0.25,variant.pool_rule=budget,variant.reevaluate_incumbent=false,variant.pool_min=12,variant.pool_max=32"}
-}

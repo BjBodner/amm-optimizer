@@ -7,8 +7,8 @@ creation; the handle is still valid after unpickling and after multiprocessing's
 Python code in the worker closes it, and a profiler or an extra import early in the
 worker hides it, so the closer is native and timing-bound. Its rate rises with the
 work the worker does at start under load: a 2-worker pool whose initializer imports
-SciPy and builds a cocoex Suite (``quick_scan``'s) lost a worker in 7-11 of 30 runs at
-100% CPU; SciPy alone, the Suite alone or no initializer, in 0 of 30.
+SciPy and builds a cocoex Suite (as the research harness's did) lost a worker in 7-11
+of 30 runs at 100% CPU; SciPy alone, the Suite alone or no initializer, in 0 of 30.
 
 Two failure modes follow (lesson 23):
 
