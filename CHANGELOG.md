@@ -10,6 +10,71 @@ Public API is deprecated, with a warning, for at least one minor release before 
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
+The research-only options that 0.6.0 deprecated are removed. The algorithm is unchanged: every configuration that ships, the research presets included, runs bit for bit as in 0.6.0, and every config hash is the same.
+
+### Removed
+
+- **The 92 research-only `Variant` fields and 29 research-only option values that 0.6.0
+  deprecated.** No shipped configuration used them (`c23`-`c46`, `ATMConfig()`,
+  `ATMConfig.composite()`, `anytime=True`), and every one of those runs and hashes exactly as
+  in 0.6.0. Setting a removed field to anything but its old default, or choosing a removed
+  value, raises `ValueError` naming 0.7.0 (0.6.x still has them); a 0.6.0 configuration
+  dictionary that holds a removed field at its old default still loads.
+  `config.REMOVED_FIELDS` and `config.REMOVED_CHOICES` list them. Fields: `local_method`,
+  `simplex_max_dim`, `nm_refine_max_dim`, `refine_fraction`, `refine_min_budget_per_dim`,
+  `refine_max_dim`, `cma_regimes`, `cma_lq_max_dim`, `cma_model_sigma`, `cma_placement`,
+  `cma_placement_max_dim`, `probe_faces`, `sampled_polish_per_dim`, `cma_restart`,
+  `es_small_dim`, `es_small_max_budget_per_dim`, `local_force`, `fork_seed`,
+  `prefix_plateau_rugged`, `rugged_try_cap_per_dim`, `rugged_try_max_per_dim`,
+  `prefix_nan_min_per_dim`, `prefix_plateau_ties`, `smooth_bfgs_second`,
+  `cma_handoff_cap_low_per_dim`, `cma_handoff_cap_low_max_per_dim`, `es_lean_start`,
+  `sep_parabolic`, `sep_parabolic_late`, `sep_parabolic_scope`, `targeted_gate`,
+  `targeted_amplitude`, `reset_on_success`, `scale_learning`, `scale_rate`, `scale_cap`,
+  `cov_steps`, `cov_path`, `eval_memo`, `width_units`, `crossover`, `noise`, `skip_starved`,
+  `width_mode`, `sr_shared_target`, `restart_mode`, `stag_tolfun`, `stag_tolx`, `ipop_factor`,
+  `ipop_max_pool`, `qn_false_success`, `qn_floor`, `step_box_check`, `box_steps`,
+  `prefix_nan_clip`, `prefix_nan_reprobe`, `prefix_fractal_min_dim`,
+  `prefix_fractal_min_per_dim`, `stage_extend_restart`, `stage_extend_max_per_dim`,
+  `sep_route_low`, `sep_route_low_dim`, `centre_point`, `centre_point_min_dim`, `sr_eta`,
+  `sr_targets`, `sr_widths`, `sr_max_width`, `es_init_factor`, `cov_cap`, `cov_max_dim`,
+  `chain_min_per_dim`, `sep_route_min_per_dim`, `additive_min_dim`, `basin_max_dim`,
+  `basin_min_per_dim`, `basin_descents_max_per_dim`, `small_engine_max_per_dim`,
+  `small_engine_radius`, `prefix_ridge_radius`, `small_switch_max_dim`,
+  `small_switch_max_per_dim`, `small_switch_cos`, `small_switch_radius`, `small_switch_rest`,
+  `cma_model_max_dim`, `cma_handoff_cap_min_dim`, `cma_local_nonsep_min_dim`, `sep_share`,
+  `sep_min_budget_per_dim`, `pool_max`, `pool_divisor`. Values: `amplitude_control`
+  `"success_rate"`; `nm_stage` `"qnprefix"`, `"qnprefix30g"`; `cma_restart_rule` `"economy"`;
+  `sep_check` `"pair"`; `pop_lambda` `"cap4"`, `"budget"`, `"steps"`, `"ipop4"`,
+  `"stepsgrow"`; `pop_switch_start` `"carry"`; `rugged_try_rest` `"cut"`; `prefix_nan_reading`
+  `"smooth"`; `cma_local` `"population"`, `"ipop"`; `cma_local_nonsep` `"ipop"`,
+  `"population"`, `"qn"`, `"qn2"`, `"qn5"`, `"qn6"`, `"qn10"`, `"qn11"`, `"qn13"`, `"qn13n"`,
+  `"qn15"`; `es_kind` `"slsqplq10"`, `"slsqplq10hk"`; `cma_model` `"lq"`.
+- The deprecation machinery for them: `config.RESEARCH_FIELDS`, `config.RESEARCH_CHOICES`,
+  their `FutureWarning` and `tools/research_fields.py`.
+- The research material that the package does not need: the research arms, `quick_scan.py`
+  and `legacy_vs_reference.py` of `benchmarks`, the research arms of the characterisation
+  snapshots (`tests/characterisation_arms.json`) and the tests of the removed
+  options. The named-configuration snapshots, the golden traces and the reference files stay.
+
+### Changed
+
+- **`Variant` has 72 fields, down from 164.** The options that every configuration left at one
+  value (the `sr_*` widths, `es_init_factor`, `cov_cap`, `cov_max_dim`, `pool_max`,
+  `pool_divisor` and the routing thresholds of `api`) are module constants with those values;
+  `config_hash` still hashes each removed field at its old default, so every hash is unchanged
+  (the default and `c46` are `2153948ebed51150`).
+- Internal restructuring with identical results: the phases share one budgeted objective
+  (`_budget.py`), `cobyqa_phase.run_cobyqa_restarts` absorbs `run_cobyqa_from`, `Box.uniform`
+  draws the uniform points, and the long routing functions (`api._minimize`,
+  `es_phase.run_es_phase`, `cma_phase.run_cma`, `pop_cma.run_population_cma`, the SLSQP
+  routes) are split into helpers in the same draw order. Ruff checks McCabe complexity (at
+  most 40).
+- Source comments no longer cite research cycles, batches or intermediate composites
+  (`tests/test_no_research_ids.py`); `docs/HISTORY.md` keeps the provenance.
+- The full CI tier's coverage gate is raised (`tools/ci.py`).
+
 ## [0.6.0] - 2026-10-28
 
 Bug fixes, a SciPy-compatible API and early stopping, with the research options deprecated. The default algorithm is unchanged: every configuration that ships runs bit for bit as in 0.5.0 on inputs that worked before, the default and `c46` reproduce the paper's benchmark runs exactly, and `c46`'s config hash is still `2153948ebed51150`.
@@ -196,7 +261,8 @@ benchmark runs bit for bit).
   `2153948ebed51150`), plus the `amm` alias package, `CITATION.cff`, and an AMM README. No
   algorithmic change. Yanked from PyPI: use 0.3.0 or later.
 
-[Unreleased]: https://github.com/BjBodner/amm-optimizer/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/BjBodner/amm-optimizer/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/BjBodner/amm-optimizer/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/BjBodner/amm-optimizer/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/BjBodner/amm-optimizer/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/BjBodner/amm-optimizer/compare/v0.3.0...v0.4.0
