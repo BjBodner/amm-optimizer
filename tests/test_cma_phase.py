@@ -82,7 +82,7 @@ def test_restarts_keep_the_best_point_and_the_budget():
     assert result.cost == min(seen)
 
 
-def handoff(fraction, restart="uniform"):
+def handoff(fraction):
     return ATMConfig(
         variant=Variant(
             amplitude_control="success_rate_targeted",
@@ -91,7 +91,6 @@ def handoff(fraction, restart="uniform"):
             pool_min=12,
             reevaluate_incumbent=False,
             cma_handoff=fraction,
-            cma_restart=restart,
         )
     )
 
@@ -139,26 +138,6 @@ def test_without_restarts_it_returns_at_the_first_stagnation():
 
 
 # research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
-def test_alternating_with_atm_spends_the_budget_and_keeps_the_best():
-    seen = []
-
-    def rastrigin(x):
-        seen.append(float(10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))))
-        return seen[-1]
-
-    result = atm.api.minimize(
-        rastrigin,
-        np.full(3, 4.0),
-        6000,
-        seed=6,
-        config=handoff(0.2, "atm"),
-        bounds=BOX,
-    )
-    assert result.nfev == len(seen) == 6000
-    assert result.fun == min(seen)
-
-
 def test_quadratic_step_finds_the_minimum_of_a_quadratic():
     from amm_optimizer.cma_phase import quadratic_step
 

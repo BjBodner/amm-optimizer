@@ -60,7 +60,7 @@ def test_slsqp_restarts_report_completed_descents_only():
     ends: list[qn_phase.Descent] = []
     x = np.full(5, 3.0)
     result = qn_phase.run_slsqp_restarts(
-        objective, np.random.RandomState(0), x, sphere(x), BOX5, 400, None, ends
+        objective, np.random.RandomState(0), x, sphere(x), BOX5, 400, ends
     )
     assert ends and all(d.status == 0 for d in ends)
     assert result.used <= 400
@@ -235,7 +235,6 @@ def test_the_fallback_hands_a_failing_call_to_lbfgsb(monkeypatch):
             fun(x),
             box,
             6000,
-            None,
             ends,
             fd_step=qn_phase.QN_FD_STEP,
             fallback=fallback,
@@ -315,7 +314,6 @@ def test_the_isotropic_prefix_accepts_ties_and_spends_its_budget_on_a_plateau():
     [
         ("default", 1000, 1),
         ("fixed2", 1000, 2),
-        ("cap4", 1000, 1),
         ("steps", 100, 1),
         ("steps", 200, 2),
         ("steps", 700, 4),
@@ -347,7 +345,7 @@ def test_the_first_population_follows_the_lambda_rule(
     assert sizes == [expected * pop_cma.default_population(dim)]
 
 
-@pytest.mark.parametrize("rule", ["default", "cap4", "ipop4", "ipop8", "budget"])
+@pytest.mark.parametrize("rule", ["default", "ipop4", "ipop8"])
 def test_restarted_populations_grow_as_their_rule_says(monkeypatch, rule):
     sizes = []
 
@@ -371,14 +369,10 @@ def test_restarted_populations_grow_as_their_rule_says(monkeypatch, rule):
     head = [s // base for s in sizes[:4]]
     if rule == "default":
         assert head == [1, 2, 4, 8]
-    elif rule == "cap4":
-        assert head == [1, 2, 4, 1]
     elif rule == "ipop4":
         assert head == [4, 8, 16, 32]
-    elif rule == "ipop8":
+    else:
         assert head == [8, 16, 32, 64]
-    else:  # "budget": the budget left over 35 dim, at least the default
-        assert sizes[0] == int(10**6 / (pop_cma.BUDGET_RUN_LENGTH * 5))
 
 
 def test_a_population_run_starts_from_a_given_covariance():
@@ -547,7 +541,7 @@ def test_step_chunks_do_not_change_the_search(monkeypatch, fun):
         )
         return np.array(calls), result.cost, result.stalled
 
-    for flags in ({}, {"parabolic": True, "pair_when_stuck": True, "box_check": True}):
+    for flags in ({}, {"parabolic": True, "pair_when_stuck": True}):
         whole = run(**flags)
         monkeypatch.setattr(step_phase, "CHUNK", 3)
         chunked = run(**flags)

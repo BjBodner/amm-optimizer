@@ -65,35 +65,22 @@ def run_es_phase(
     step_share: float = 0.0,
     lq_nonsep_only: bool = False,
     rugged_kind: str = "cma",
-    step_parabolic: bool = False,
-    step_parabolic_late: bool = False,
     fd_step: float | None = None,
-    step_pair_check: bool = False,
-    simplex: bool = False,
     qn_fallback: bool = False,
     step_pair_when_stuck: bool = False,
     sep_smooth_probe: bool = False,
     plateau_pop: bool = False,
-    plateau_rugged: bool = False,
     small_switch: Any = None,
     nan_reading: str = "rugged",
     ridge_after: int = 0,
     ridge_radius: float = 0.1,
-    qn_false_success: bool = False,
-    qn_floor: str = "none",
-    probe_faces: bool = False,
-    step_box_check: bool = False,
-    nan_clip: bool = False,
-    nan_reprobe: bool = False,
-    plateau_ties: int = 0,
-    fractal_route: bool = False,
     descent_retries: int = 0,
     low_beta: float = 0.0,
     design: Any = None,  # np.ndarray | None (Any for the callers' **options)
 ) -> EsResult:
     """Spend up to ``evaluations`` on a uniform design and a local search from its best.
 
-    The local search is the (1+1)-ES, or Nelder-Mead if ``simplex``.
+    The local search is the (1+1)-ES (``kind="isotropic"``).
 
     Candidates are clipped onto the box, so a corner optimum is reached exactly.
     A failed or NaN evaluation never replaces the incumbent. Returns the best
@@ -103,16 +90,11 @@ def run_es_phase(
     ``kind="slsqp"`` (internal: where a probe read smooth): restarted SLSQP
     (``qn_phase``); ``"slsqpnm"``: one SLSQP descent, then the Nelder-Mead
     restarts of ``"nm"`` (cycle 17, D <= 2);
-    ``"slsqpnmg"``: the two-direction curvature probe, then restarted SLSQP where it
-    reads smooth, else ``"nm"`` (cycle 19, D <= 2); ``"slsqplq"``: restarted SLSQP
+    ``"slsqplq"``: restarted SLSQP
     where ``qn_phase.curvature_beta`` reads the function as smooth, else
     ``rugged_kind`` (cycle 12, ``c25``); ``"slsqplqc"``: ``"slsqplq"`` with the
     two-direction probe (cycle 17).
-    ``"ctrk"``: the median two-scale curvature probe (``curvature_kappa``, 8
-    evaluations) at the start point, then restarted SLSQP from there where it reads
-    smooth, else ``"cma"`` (cycle 26).
     ``fd_step``: SLSQP's forward-difference step (cycle 20; SciPy's default if None).
-    ``step_pair_check``: the separable search's two-axis additivity check (cycle 23).
     ``qn_fallback``: SLSQP hands a failing call to L-BFGS-B (cycle 28,
     ``run_slsqp_restarts``'s ``fallback``).
     ``"slsqpdes"`` (cycle 33, ``q7ed``): one SLSQP descent from the design's best, then
@@ -137,32 +119,9 @@ def run_es_phase(
     radius ``ridge_radius`` x box width). With ``small_switch`` too, the switch's
     checkpoints (after the first two line searches) come first; the ridge is read
     only on a descent the switch kept.
-    ``qn_false_success`` (research, idea #23): the SLSQP calls count a status-0 exit
-    that never left its start as failed (``run_slsqp_restarts``'s ``false_success``).
-    ``qn_floor`` (research, ideas #24 / #32 / #55): ``run_slsqp_restarts``'s
-    ``floor_bfgs`` (``"bfgs"`` or ``"cd"``).
-    ``probe_faces`` (``Variant.probe_faces="tangent"``, the novel-ideas toy): the
-    curvature probes keep every mirrored pair inside the box
-    (``curvature_beta(faces=True)``). ``step_box_check``
-    (``Variant.step_box_check``): the separable search's early check
-    (``run_step_phase(box_check=True)``).
 
     Research options from a second screen of parked ideas, each off by default:
 
-    * ``nan_clip``: with ``nan_reading`` not ``"rugged"``, an undefined reading goes
-      that way only when clipping explains it (no probe pair whose mirror stayed inside
-      the box has a negative loss); a negative unclipped loss is concavity, so the
-      reading stays rugged.
-    * ``nan_reprobe``: with ``nan_reading`` not ``"rugged"``, an undefined reading is
-      taken again from the point moved inward by the probe's largest scale (no pair
-      clipped there); only a smooth second reading goes that way.
-    * ``plateau_ties``: the plateau checks (``plateau_pop``'s, and the NaN reading's
-      with ``nan_reading="plateau"``) run only when the separable search's own probes
-      repeated the incumbent's value at least that often (``run_step_phase``'s
-      ``ties_out``); without the search they run as before.
-    * ``fractal_route``: on a rugged reading of ``"slsqplq"`` / ``"slsqplqc"``, the
-      local phase's centred ``micro_slopes`` test; a fractal reading (f23) gets
-      restarted SLSQP at SciPy's step for the rest (the SLSQP-cells toy's ``fract``).
     * ``low_beta`` (the gaps4 toy): a finite rugged reading below it takes the
       (1+1)-CMA-ES instead of the ``"lq2"`` populations (f23 at 100 x dim).
     * ``design`` (the anytime hand-over): these points (the best evaluated so far)
@@ -176,36 +135,10 @@ def run_es_phase(
     width = float(np.mean(box.upper - box.lower))
     # passed only when on, so the other prefixes' calls stay exactly as recorded
     qn_on: dict[str, Any] = {"fallback": True} if qn_fallback else {}
-    if qn_false_success:
-        qn_on["false_success"] = True
-    if qn_floor != "none":
-        qn_on["floor_bfgs"] = qn_floor
     x = np.array(x0, dtype=float)
     cost = objective.evaluate_point(x)
     assert cost is not None  # the first evaluation of a run always fits
     used = 1
-    if kind == "ctrk":  # cycle 26: route on the curvature at the start point (x0)
-        from .qn_phase import BETA_THRESHOLD, curvature_kappa, run_slsqp_restarts
-
-        probed = curvature_kappa(objective, rng, x, cost, box)
-        if probed is None:
-            return EsResult(x, cost, INITIAL_SIGMA_SHARE * width * sigma_scale, used)
-        kappa, probe_x, probe_cost, spent = probed
-        used += spent
-        if probe_cost < cost:
-            x, cost = probe_x, probe_cost
-        if kappa >= BETA_THRESHOLD:
-            return run_slsqp_restarts(
-                objective,
-                rng,
-                x,
-                cost,
-                box,
-                evaluations - used,
-                fd_step=fd_step,
-                **qn_on,
-            )
-        kind = "cma"
     if design is None:
         design = box.lower + (box.upper - box.lower) * rng.rand(
             min(init_points, evaluations - used), dim
@@ -218,8 +151,6 @@ def run_es_phase(
         if value is not None and value < cost:
             x, cost = candidate, value
     separable = False
-    step_ties: list[int] = []  # ``plateau_ties``: the search's exact ties
-    step_ran = False
     if step_share > 0:  # ``sep_probe``: the separable coordinate search
         from .step_phase import run_step_phase
 
@@ -227,22 +158,14 @@ def run_es_phase(
         step_on: dict[str, Any] = {}
         if step_pair_when_stuck:
             step_on["pair_when_stuck"] = True
-        if step_box_check:
-            step_on["box_check"] = True
-        if plateau_ties:
-            step_on["ties_out"] = step_ties
         probe = run_step_phase(
             objective,
             x,
             cost,
             box,
             int(step_share * (evaluations - used)),
-            parabolic=step_parabolic,
-            parabolic_late=step_parabolic_late,
-            pair_check=step_pair_check,
             **step_on,
         )
-        step_ran = True
         x, cost, used = probe.x, probe.cost, used + probe.used
         separable = not probe.stalled
         if (
@@ -287,18 +210,7 @@ def run_es_phase(
             x, cost = pop.x, pop.cost
         return True, EsResult(x, cost, pop.sigma, used + pop.used)
 
-    # ``plateau_ties`` (parked2): no check where the search's probes never tied
-    tie_skip = bool(plateau_ties) and step_ran and len(step_ties) < plateau_ties
-    # ``plateau_rugged`` (cycle 43): on the probe's kinds the check runs only after a
-    # rugged reading, so smooth readings (f10-f14) keep every evaluation
-    if (
-        plateau_pop
-        and not tie_skip
-        and (
-            kind in ("nm", "slsqpnm")
-            or (kind in ("slsqplq", "slsqplqc") and not plateau_rugged)
-        )
-    ):
+    if plateau_pop and kind in ("nm", "slsqpnm", "slsqplq", "slsqplqc"):
         handled, checked = plateau_populations(x, cost, used)
         if handled:
             return checked
@@ -306,26 +218,18 @@ def run_es_phase(
     if kind in ("slsqplq", "slsqplqc"):  # SLSQP where the probe reads smooth
         from .qn_phase import (
             BETA_DIRECTIONS,
-            BETA_SCALES,
             BETA_THRESHOLD,
             CHEAP_BETA_DIRECTIONS,
             curvature_beta,
         )
 
         # The c45 candidate's prefix reading composes in this order (each step only
-        # when on): ``probe_faces`` makes the probe's directions face-tangent before
-        # it spends anything (fewer clipped pairs, so fewer NaN slopes; ``nan_clip``'s
-        # ``pairs`` see the directions as probed); a slope that is still NaN is then
-        # read by ``nan_reading`` (with ``nan_clip``, then the plateau check unless
-        # ``plateau_ties`` skips it, then ``nan_reprobe``, whose second probe takes
-        # ``probe_faces`` too); a rugged reading may take ``fractal_route``; on SLSQP,
+        # when on): a NaN slope is read by ``nan_reading`` (then the plateau check);
+        # on SLSQP,
         # ``small_switch``'s checkpoints come first and the ridge reading
         # (``ridge_after``) after them. ``descent_retries`` acts only on the
         # one-descent kinds (``"slsqpdes"``, ``"slsqpnm"``) further down.
-        pairs: list[tuple[float, bool]] = []
         probe_dirs = CHEAP_BETA_DIRECTIONS if kind == "slsqplqc" else BETA_DIRECTIONS
-        faces_on: dict[str, Any] = {"faces": True} if probe_faces else {}
-        pairs_on: dict[str, Any] = {"pairs_out": pairs} if nan_clip else {}
         probed = curvature_beta(
             objective,
             rng,
@@ -333,30 +237,19 @@ def run_es_phase(
             cost,
             box,
             probe_dirs,
-            **faces_on,
-            **pairs_on,
         )
         if probed is None:
             return EsResult(x, cost, INITIAL_SIGMA_SHARE * width * sigma_scale, used)
         beta, x, cost, spent = probed
         used += spent
-        if plateau_pop and plateau_rugged and beta < BETA_THRESHOLD:
-            handled, checked = plateau_populations(x, cost, used)
-            if handled:
-                return checked
-            used = checked.used
         kind = "slsqp" if beta >= BETA_THRESHOLD else rugged_kind
         if low_beta and kind == "lq2" and beta < low_beta:
             # ``low_beta`` (gaps4): very rough readings (Katsuura reads -0.3 to 0.3
             # at 100 x dim) keep the elitist (1+1), which beats the populations there
             kind = "cma"
-        if (
-            nan_reading != "rugged"
-            and np.isnan(beta)
-            and not (nan_clip and any(v < 0 and not c for v, c in pairs))
-        ):
+        if nan_reading != "rugged" and np.isnan(beta):
             flat_nan = False
-            if nan_reading == "plateau" and not tie_skip:
+            if nan_reading == "plateau":
                 from .qn_phase import plateau_check
 
                 flat = plateau_check(objective, rng, x, cost, box)
@@ -366,77 +259,13 @@ def run_es_phase(
                     )
                 used += flat[1]
                 flat_nan = flat[0]
-            if not flat_nan and nan_reprobe:
-                # ``nan_reprobe`` (parked2): the same probe again from the point moved
-                # inward by its largest scale, where no pair is clipped; smooth there
-                # reads smooth, anything else stays rugged
-                margin = BETA_SCALES[-1] * width
-                inner = np.clip(x, box.lower + margin, box.upper - margin)
-                inner_cost = objective.evaluate_point(inner)
-                if inner_cost is None:
-                    return EsResult(
-                        x, cost, INITIAL_SIGMA_SHARE * width * sigma_scale, used
-                    )
-                used += 1
-                again = curvature_beta(
-                    objective,
-                    rng,
-                    inner,
-                    float(inner_cost),
-                    box,
-                    probe_dirs,
-                    **faces_on,
-                )
-                if again is None:
-                    return EsResult(
-                        x, cost, INITIAL_SIGMA_SHARE * width * sigma_scale, used
-                    )
-                used += again[3]
-                if again[2] < cost:
-                    x, cost = again[1], again[2]
-                flat_nan = not again[0] >= BETA_THRESHOLD
             if not flat_nan:
                 kind = "slsqp"
-        if fractal_route and beta < BETA_THRESHOLD:
-            # ``fractal_route`` (parked2; the SLSQP-cells toy's ``fract``): the local
-            # phase's fractal test on the rugged reading; a fractal one (f23) gets
-            # restarted SLSQP at SciPy's step instead of the rugged kind
-            from .qn_phase import micro_slopes, run_slsqp_restarts
-
-            before = objective.calls
-            micro = micro_slopes(objective, x, cost, box, centered=True)
-            if micro is None:
-                return EsResult(
-                    x, cost, INITIAL_SIGMA_SHARE * width * sigma_scale, used
-                )
-            used += objective.calls - before
-            fractal, _slopes, x_m, cost_m = micro
-            if cost_m < cost:
-                x, cost = x_m, cost_m
-            if fractal:  # as the toy measured it: no L-BFGS-B fallback
-                return run_slsqp_restarts(
-                    objective, rng, x, cost, box, evaluations - used
-                )
-    if (
-        kind == "slsqpnmg"
-    ):  # D <= 2, >= 200 evaluations: SLSQP where smooth, else simplex
-        from .qn_phase import BETA_THRESHOLD, CHEAP_BETA_DIRECTIONS, curvature_beta
-
-        nmg_on: dict[str, Any] = {"faces": True} if probe_faces else {}
-        probed = curvature_beta(
-            objective, rng, x, cost, box, CHEAP_BETA_DIRECTIONS, **nmg_on
-        )
-        if probed is None:
-            return EsResult(x, cost, INITIAL_SIGMA_SHARE * width * sigma_scale, used)
-        beta, x, cost, spent = probed
-        used += spent
-        kind = "slsqp" if beta >= BETA_THRESHOLD else "nm"
 
     def switch_reader() -> Any:
-        from . import qn_phase
         from .qn_phase import SCIPY_FD_STEP, SwitchReader
 
-        step = (fd_step if fd_step is not None else SCIPY_FD_STEP) * qn_phase.x_unit()
+        step = fd_step if fd_step is not None else SCIPY_FD_STEP
         return SwitchReader(step, dim, small_switch)
 
     def cobyqa_rest(x: np.ndarray, cost: float, used: int, sigma: float) -> EsResult:
@@ -606,12 +435,6 @@ def run_es_phase(
             model=model,
             **(cma_options or {}),  # type: ignore[arg-type]
         )
-    if simplex:
-        from .simplex import INITIAL_EDGE, run_nelder_mead
-
-        return run_nelder_mead(
-            objective, rng, x, cost, INITIAL_EDGE * width, box, evaluations - used
-        )
     return run_es(
         objective, rng, x, cost, INITIAL_SIGMA_SHARE * width, box, evaluations - used
     )
@@ -654,7 +477,6 @@ def _guarded_descents(
             start_cost,
             box,
             evaluations - used,
-            None,
             ends,
             max_descents=1,
             fd_step=fd_step,

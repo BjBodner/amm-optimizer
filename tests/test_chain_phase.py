@@ -235,33 +235,3 @@ def test_the_routes_keep_the_budget():
 
 
 # research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
-def test_a_fork_seed_keeps_the_run_up_to_the_hand_over_and_changes_the_rest():
-    def run(**changes):
-        calls = []
-
-        def logged(x):
-            calls.append(np.array(x))
-            return rotated(x)
-
-        config = presets.with_changes("c37", **changes)
-        minimize(
-            logged, np.full(6, 2.0), 300 * 6, seed=4, config=config, bounds=(-5, 5)
-        )
-        return calls
-
-    base, fork_a, fork_b = run(), run(fork_seed=1), run(fork_seed=2)
-    shared = 0
-    while shared < min(len(base), len(fork_a)) and np.array_equal(
-        base[shared], fork_a[shared]
-    ):
-        shared += 1
-    assert 0 < shared < len(base)  # the prefix and ATM up to the hand-over are kept
-    assert all(
-        np.array_equal(a, b)
-        for a, b in zip(fork_a[:shared], fork_b[:shared], strict=True)
-    )
-    assert any(
-        not np.array_equal(a, b)
-        for a, b in zip(fork_a[shared:], fork_b[shared:], strict=False)
-    )

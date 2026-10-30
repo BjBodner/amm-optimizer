@@ -13,8 +13,7 @@ from dataclasses import replace
 
 import numpy as np
 
-from .bounds import Box
-from .config import N_SAMPLERS, ATMConfig, Variant
+from .config import N_SAMPLERS, POOL_DIVISOR, POOL_MAX, ATMConfig, Variant
 
 
 def resolve_config(config: ATMConfig, budget: int, dim: int) -> ATMConfig:
@@ -31,38 +30,9 @@ def resolve_config(config: ATMConfig, budget: int, dim: int) -> ATMConfig:
 
 def pool_size(variant: Variant, budget: int) -> int:
     """Samples per iteration for ``budget`` evaluations under ``pool_rule="budget"``."""
-    pool = int(np.floor(budget / variant.pool_divisor + 0.5))
+    pool = int(np.floor(budget / POOL_DIVISOR + 0.5))
     pool = N_SAMPLERS * int(np.floor(pool / N_SAMPLERS + 0.5))
-    return int(np.clip(pool, variant.pool_min, variant.pool_max))
-
-
-def ipop_pool(config: ATMConfig, variant: Variant, restarts: int) -> int:
-    """Pool of the search after ``restarts`` restarts (``restart_mode="ipop"``).
-
-    The resolved pool times ``ipop_factor ** restarts``, rounded to a multiple of
-    the sampler count and capped at ``ipop_max_pool``.
-    """
-    base = config.conductor.total_resources
-    pool = base * variant.ipop_factor**restarts
-    pool = N_SAMPLERS * int(np.floor(pool / N_SAMPLERS + 0.5))
-    return int(min(pool, variant.ipop_max_pool))
-
-
-def in_box_units(config: ATMConfig, box: Box) -> ATMConfig:
-    """``config`` with its widths in absolute units (``width_units="box"``).
-
-    A width of 1 becomes a tenth of the mean box width (1 on the bbob box).
-    """
-    unit = float(np.mean(box.upper - box.lower)) / 10.0
-    variant = config.variant
-    return replace(
-        config,
-        variant=replace(
-            variant,
-            sr_widths=tuple(w * unit for w in variant.sr_widths),
-            sr_max_width=variant.sr_max_width * unit,
-        ),
-    )
+    return int(np.clip(pool, variant.pool_min, POOL_MAX))
 
 
 def with_pool(config: ATMConfig, pool: int) -> ATMConfig:

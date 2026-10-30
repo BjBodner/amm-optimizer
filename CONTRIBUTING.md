@@ -91,12 +91,11 @@ the version is 0.x, the minor number plays the role of the major one.
   shipped configuration uses (the presets, `ATMConfig()`, `ATMConfig.composite()` and
   `anytime=True`). Modules and names starting with `_`, and the internal phase modules,
   can change in any minor release.
-* **Research-only options.** The `Variant` fields and values that no shipped configuration
-  uses are listed in `config.RESEARCH_FIELDS` and `config.RESEARCH_CHOICES`, which
-  `tools/research_fields.py` measures (a test keeps the lists current). They were
-  deprecated in 0.6.0 and are removed in 0.7.0. When an option is removed, its old
-  default is kept for `config_hash`, so the hashes of shipped configurations, and the
-  results recorded with them, stay valid.
+* **Removed options keep their hashes.** The research-only `Variant` fields and values,
+  deprecated in 0.6.0, were removed in 0.7.0; `config.REMOVED_FIELDS` maps each removed
+  field to its old default, which `config_hash` still hashes, so the hashes of shipped
+  configurations, and the results recorded with them, stay valid. A removed field loads
+  from a dictionary only at that default (`tests/test_removed_fields.py`).
 * **Tests of deprecated behaviour** say so with
   `pytest.mark.filterwarnings("ignore:...:FutureWarning")` (or `DeprecationWarning`) on the
   test or the module; `pyproject.toml` makes every other such warning an error, so a shipped

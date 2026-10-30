@@ -54,8 +54,6 @@ def test_invariants(name, scenario):
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         # a research option warns again where minimize rebuilds the variant
-        # (width_units="box"); deprecated in 0.6.0
-        warnings.filterwarnings("ignore", "Variant", FutureWarning)
         costs, _, result = run_case(config_of(name), scenario)
     assert result.nfev == len(costs) <= scenario.budget
     assert np.isfinite(result.x).all()

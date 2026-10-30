@@ -36,14 +36,9 @@ class SearchState:
     current_cost: float
     cost_history: list[float] = field(default_factory=list)
     best_eighth: np.ndarray | None = None
-    # Moving average of the squared relative displacements of accepted moves per
-    # coordinate (variant ``scale_learning``); ``None`` when not learning.
-    scale_moment: np.ndarray | None = None
     # Covariance shape and its square-root factor (variant ``covariance``).
     cov: np.ndarray | None = None
     cov_factor: np.ndarray | None = None
-    # Evolution path of the rank-one covariance update (variant ``cov_path``).
-    cov_path: np.ndarray | None = None
     force_stop: bool = False
     restart: bool = False
 

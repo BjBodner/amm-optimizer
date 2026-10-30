@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from .config import ATMConfig, Variant
+from .config import ATMConfig, Variant, _drop_removed
 
 _C23_VARIANT: dict[str, Any] = {
     "amplitude_control": "success_rate_targeted",
@@ -248,6 +248,12 @@ def with_changes(name: str, **variant_changes: Any) -> ATMConfig:
     ATMConfig
         ``get(name)`` with ``variant`` replaced by a copy carrying the changes.
 
+    Raises
+    ------
+    ValueError
+        If a change sets a field removed in 0.7.0 (``config.REMOVED_FIELDS``) to
+        anything but its old default; at its old default it changes nothing.
+
     Examples
     --------
     >>> from amm_optimizer import presets
@@ -255,4 +261,5 @@ def with_changes(name: str, **variant_changes: Any) -> ATMConfig:
     'replay'
     """
     config = get(name)
-    return replace(config, variant=replace(config.variant, **variant_changes))
+    changes = _drop_removed(variant_changes)
+    return replace(config, variant=replace(config.variant, **changes))

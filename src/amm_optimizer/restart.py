@@ -35,32 +35,6 @@ class RestartPolicy:
     window: int = 30
 
 
-def stagnation_window(dim: int, pool: int) -> int:
-    """Iterations the stagnation test looks back: ``10 + ceil(30 dim / pool)``."""
-    return 10 + -(-30 * dim // pool)
-
-
-def stagnated(
-    cost_history: Sequence[float],
-    log_widths: Sequence[float],
-    window: int,
-    tolfun: float,
-    min_log_width: float,
-) -> bool:
-    """Whether a success-rate controlled search has stopped making progress.
-
-    True once ``window`` iterations exist and either the incumbent's cost moved by
-    at most ``tolfun`` over the last ``window`` iterations, or every sampler's
-    log-width is at or below ``min_log_width``.
-    """
-    if max(log_widths) <= min_log_width:
-        return True
-    if len(cost_history) < window:
-        return False
-    recent = cost_history[-window:]
-    return bool(max(recent) - min(recent) <= tolfun)
-
-
 def check_restart(
     random_growths: Sequence[float],
     cost_history: Sequence[float],

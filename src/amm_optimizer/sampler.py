@@ -20,7 +20,7 @@ MAX_RANDOM_AMPLITUDE = 10.0
 # Targeted amplitudes above this (or NaN) are replaced by ``100 * U(0, 1)``.
 TARGETED_AMPLITUDE_RESET = 1000.0
 TARGETED_AMPLITUDE_FALLBACK = 100.0
-# Range of the log-uniform targeted multiplier (variant ``targeted_amplitude``).
+# Range of the log-uniform targeted multiplier (``success_rate_targeted``).
 TARGETED_MULTIPLIER_RANGE = (0.1, 10.0)
 # ``exp(term)`` is only evaluated below this exponent to avoid overflow.
 MAX_EXPONENT = 100.0
@@ -59,22 +59,11 @@ class SampleOptions:
     targeted_gate_any: bool = False
     # Targeted step length: a log-uniform multiple (0.1 to 10) of the last move.
     targeted_loguniform: bool = False
-    # Do not reset the random-search counter after a significant move.
-    keep_random_growth: bool = False
     # ``random_growth`` is the logarithm of a scalar width, adapted outside
     # (``control``): no sawtooth, no random vector, no growth factors.
     scalar_width: bool = False
-    # No targeted step at all.
-    no_targeted: bool = False
-    # Multiply the scalar width by the per-coordinate scales passed as the
-    # ``adaptive_amplitude`` argument (learned by ``control``).
-    use_scales: bool = False
     # Gaussian noise with the covariance factor passed as ``noise_factor``.
     use_covariance: bool = False
-    # The random part is centred on the seed itself, not on a crossover child.
-    no_crossover: bool = False
-    # Gaussian noise with the uniform noise's standard deviation (no covariance).
-    gaussian_noise: bool = False
 
 
 def sample_options(variant: Variant) -> SampleOptions | None:
@@ -82,15 +71,10 @@ def sample_options(variant: Variant) -> SampleOptions | None:
     rate_controlled = variant.amplitude_control != "legacy"
     with_targeted = variant.amplitude_control == "success_rate_targeted"
     options = SampleOptions(
-        targeted_gate_any=variant.targeted_gate == "any" or with_targeted,
-        targeted_loguniform=variant.targeted_amplitude == "loguniform" or with_targeted,
-        keep_random_growth=not variant.reset_on_success,
+        targeted_gate_any=with_targeted,
+        targeted_loguniform=with_targeted,
         scalar_width=rate_controlled,
-        use_scales=variant.scale_learning != "none",
         use_covariance=variant.covariance != "none",
-        no_targeted=rate_controlled and not with_targeted,
-        no_crossover=variant.crossover == "none",
-        gaussian_noise=variant.noise == "gaussian",
     )
     return None if options == SampleOptions() else options
 
@@ -205,15 +189,13 @@ def two_mode_samples(
     profiler: Profiler = NULL_PROFILER,
     options: SampleOptions | None = None,
     noise_factor: np.ndarray | None = None,
-    noise_out: list[np.ndarray] | None = None,
 ) -> tuple[np.ndarray, float, float]:
     """Generate ``n_samples`` candidate columns around ``seed``.
 
     ``parents`` is either a single second-best vector (two-parent crossover)
     or a matrix of good individuals (multi-parent crossover). Column 0 of the
     result is always ``seed``. Returns the samples and the updated random and
-    targeted growth factors. ``profiler`` times the four stages. ``noise_out``,
-    if given, receives the covariance-shaped noise ``factor @ z`` of every column.
+    targeted growth factors. ``profiler`` times the four stages.
     """
     n_params = len(seed)
     previous_random_growth = random_growth
@@ -224,22 +206,15 @@ def two_mode_samples(
             params.significant_change,
             random_growth,
             targeted_growth,
-            options is None or not options.keep_random_growth,
         )
 
     crossover = two_parent_crossover if parents.ndim == 1 else multi_parent_crossover
     with profiler.block("sample.crossover"):
-        if options is not None and options.no_crossover:
-            seed_tiled = _tile_columns(seed, n_samples)
-            random_part = np.array(seed_tiled)
-        else:
-            seed_tiled, random_part = crossover(seed, parents, n_samples, rng)
+        seed_tiled, random_part = crossover(seed, parents, n_samples, rng)
 
     with profiler.block("sample.amplitude"):
         if scalar_width:
             amplitude = np.exp(random_growth)
-            if options is not None and options.use_scales:
-                amplitude = amplitude * adaptive_amplitude
         else:
             amplitude = random_search_amplitude(
                 params.max_random_search,
@@ -252,10 +227,6 @@ def two_mode_samples(
         if noise_factor is not None and options is not None and options.use_covariance:
             # Gaussian with the uniform noise's standard deviation, 1 / sqrt(3)
             noise = (noise_factor @ rng.randn(n_params, n_samples)) / np.sqrt(3.0)
-            if noise_out is not None:
-                noise_out.append(noise * np.sqrt(3.0))
-        elif options is not None and options.gaussian_noise:
-            noise = rng.randn(n_params, n_samples) / np.sqrt(3.0)
         else:
             noise = 2 * (rng.rand(n_params, n_samples) - 0.5)
         random_part += noise * amplitude - seed_tiled
@@ -265,7 +236,7 @@ def two_mode_samples(
         gate_open = bool(change_vector.any())
     else:
         gate_open = bool(change_vector.max() > 0)
-    if gate_open and not (options is not None and options.no_targeted):
+    if gate_open:
         with profiler.block("sample.targeted"):
             targeted = targeted_search(
                 change_vector,

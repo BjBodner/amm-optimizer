@@ -11,10 +11,7 @@ spent. Points are clipped onto the box before evaluation.
 
 from __future__ import annotations
 
-import contextlib
-import contextvars
 import heapq
-from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -46,10 +43,8 @@ QN_LOCAL_SHARE = 1.0 / 3.0
 # the finisher keeps the warm-start shape (Batch 35 lost f10, f11 and f14 at
 # 1000 x D when SLSQP took a third of the budget and the shape was dropped).
 QN_LOCAL_CAP_PER_DIM = 100.0
-# ``"qn5"`` (cycle 15): MLSL-style restart seeds from the best ``SEED_SHARE`` of the
-# global phase's archive, skipping seeds within ``SEED_GAP`` x width x sqrt(dim)
+# ``multi_basin``: ends within ``SEED_GAP`` x width x sqrt(dim)
 # of a basin already descended.
-SEED_SHARE = 0.05
 SEED_GAP = 0.02
 # ``"qn6"`` (cycle 16): a capped stage whose first descent is still running when the
 # cap is reached (f8, f9, f13 at D 20-40) continues for this share of what is left
@@ -101,22 +96,6 @@ RUGGED_IPOP8_MIN_LEFT_PER_DIM = 2500
 SAMPLE_PER_DIM = 10
 SAMPLE_GAP_SHARE = 0.1
 GAP_STOP_SHARE = 0.01
-# Research (``sampled_polish_per_dim``, idea #33 of the retrospective, the multistart
-# study's ``G3CD``): a sampled-restart descent that ends
-# normally below every earlier end is polished by SLSQP with central differences at
-# ``POLISH_H_SHARE`` x the mean box width (Gallagher's quartic global peak; a forward
-# difference at 1e-9 floors its last targets).
-POLISH_H_SHARE = 1e-4
-# Research (``qn_false_success``, idea #23): a status-0 SLSQP exit after at most this
-# many iterations without improving on the start point counts as a failure (the
-# report's 19 of 40 bounded discus runs that exited with a false status 0).
-FALSE_SUCCESS_MAX_ITER = 5
-# Research (``qn_floor_bfgs``, ideas #24 / #32; the local-engines toy's exploratory
-# ``slsqp_hsu``, f12 / f14 +.315 at 300-1000 x D standalone): an SLSQP descent is on
-# its floor once its last ``FLOOR_WINDOW`` x (dim + 1) evaluations gained at most
-# ``FLOOR_GAIN_SHARE`` of its total decrease.
-FLOOR_WINDOW = 10
-FLOOR_GAIN_SHARE = 1e-6
 # ``micro_slopes`` (cycle 35, ``fract``): along ``MICRO_DIRECTIONS`` directions fixed
 # per dimension, the absolute mirrored second difference at the scales ``MICRO_SCALES``
 # x box width; its log10 slope between neighbouring scales is 2 where the function is
@@ -174,42 +153,15 @@ STALL_BACKTRACK = 0.6
 QN_RESERVE_SHARE = 0.1
 QN_RESERVE_PER_DIM = 20.0
 SCIPY_FD_STEP = 1.4901161193847656e-08  # SLSQP's default ``eps``
-# ``Variant.box_steps`` (the novel-ideas toy): the length unit of the absolute steps
-# in x (finite-difference steps, the scaled BFGS's step range, COBYQA's final radius,
-# STEP's smallest interval, the basin descents' step), as a multiple of their bbob
-# values: the box width / 10. ``minimize`` sets it per call (``set_x_unit``); 1.0
-# (bbob's box, or the option off) multiplies every step by exactly 1. A context
-# variable, so that runs in separate threads (each has its own context) do not share
-# it; a new thread starts at 1.0.
-_X_UNIT: contextvars.ContextVar[float] = contextvars.ContextVar(
-    "amm_optimizer_x_unit", default=1.0
-)
-
-
-def set_x_unit(unit: float) -> None:
-    """Set the step unit of the current context (``minimize`` does, at the start of
-    every call); :func:`x_unit` reads it."""
-    _X_UNIT.set(float(unit))
-
-
-def x_unit() -> float:
-    """The length unit of the absolute steps in x for the current run (1.0 unless
-    ``Variant.box_steps``; see :func:`set_x_unit`)."""
-    return _X_UNIT.get()
 
 
 def _eps_option(fd_step: float | None) -> dict[str, float]:
-    """SLSQP's ``eps`` option: ``fd_step`` (SciPy's default when None) in x units;
-    nothing (SciPy's own default) when that is the default at the bbob scale."""
-    unit = _X_UNIT.get()
-    if unit == 1.0:
-        return {"eps": fd_step} if fd_step is not None else {}
-    return {"eps": (fd_step if fd_step is not None else SCIPY_FD_STEP) * unit}
+    """SLSQP's ``eps`` option: ``fd_step``, or nothing (SciPy's own default)."""
+    return {"eps": fd_step} if fd_step is not None else {}
 
 
 def _step_range() -> tuple[float, float]:
-    unit = _X_UNIT.get()
-    return SCALED_STEP_RANGE[0] * unit, SCALED_STEP_RANGE[1] * unit
+    return SCALED_STEP_RANGE
 
 
 class StallMonitor:
@@ -444,7 +396,6 @@ def run_slsqp_restarts(
     cost: float,
     box: Box,
     evaluations: int,
-    seeds: np.ndarray | None = None,
     ends_out: list[Descent] | None = None,
     max_descents: int | None = None,
     fd_step: float | None = None,
@@ -455,21 +406,14 @@ def run_slsqp_restarts(
     reader: SwitchReader | FlatGradientReader | None = None,
     ridge_after: int = 0,
     ridge_out: list[bool] | None = None,
-    false_success: bool = False,
-    floor_bfgs: str = "",
-    extend_restart: bool = False,
 ) -> EsResult:
     """Spend up to ``evaluations`` on restarted SLSQP from ``x`` (cost ``cost``).
 
-    ``seeds`` (cycle 15, MLSL-style starts after Rinnooy Kan & Timmer; literature
-    report rank 6): candidate restart points, best first. Each restart takes the
-    first unused seed farther than ``SEED_GAP`` of the box width times sqrt(dim)
-    from every earlier descent's end point, and a uniform point once none is left.
-    ``ends_out``, if given, receives a ``Descent`` for every completed descent (not
-    for one cut short by the evaluation budget). ``max_descents``: stop after that
-    many completed descents (cycle 17's single descent before the simplex).
-    ``fd_step``: SLSQP's
-    forward-difference step (SciPy's default 1.49e-8 when None; cycle 20).
+    Each restart starts from a uniform point. ``ends_out``, if given, receives a
+    ``Descent`` for every completed descent (not for one cut short by the evaluation
+    budget). ``max_descents``: stop after that many completed descents (cycle 17's
+    single descent before the simplex). ``fd_step``: SLSQP's forward-difference
+    step (SciPy's default 1.49e-8 when None; cycle 20).
     ``extend_to`` (cycle 21): the first descent may go on past ``evaluations``, up to
     ``extend_to``, while a ``StallMonitor`` reads it as progressing; no restart
     follows it. ``fallback`` (cycle 28): once failed descents outnumber converged
@@ -482,23 +426,6 @@ def run_slsqp_restarts(
     ``ridge_after`` (the f13 toy): when the first descent's ``StallMonitor`` has
     recorded that many iterations, ``ridge_reading`` reads them once (the verdict is
     appended to ``ridge_out``); a ridge stops the call there.
-    ``false_success`` (research, idea #23): a descent that exits with status 0 after
-    at most ``FALSE_SUCCESS_MAX_ITER`` iterations without improving on its start
-    point counts as failed (status -1) in ``ends_out`` and the fallback's count.
-    ``floor_bfgs`` (research, ideas #24 / #32 / #55: a floor stop, then a polish with
-    larger or scaled finite-difference steps; "" off): once the call's first descent
-    gained at most ``FLOOR_GAIN_SHARE`` of its total decrease over its last
-    ``FLOOR_WINDOW`` x (dim + 1) evaluations, it ends there (counted as converged)
-    and ``"bfgs"``: one ``run_scaled_bfgs`` descent (``box_qp``; steps tied to |f| and
-    curvature), ``"cd"``: SLSQP with central differences at ``POLISH_H_SHARE`` x the
-    box width, continues from the best point within the call's evaluations; the
-    restarts then go on as before.
-    ``extend_restart`` (research, the SLSQP-cells toy's ``stagerx``, parked2): with
-    ``extend_to``, when the first descent converged (status 0) before ``evaluations``,
-    the restart after it may go on past ``evaluations`` in the same way (its own
-    ``StallMonitor``, read once at the cap with ``gate_once``; that verdict is not
-    appended to ``gate_out``), so a stage that started in a local minimum can finish
-    one descent elsewhere.
 
     The returned sigma (the scale ATM's tail starts from) is a tenth of the per-axis
     distance the best run travelled from its start, within [1e-8, 0.2] of the box
@@ -517,14 +444,9 @@ def run_slsqp_restarts(
     ends: list[np.ndarray] = []
     statuses: list[int] = []
     fallback_sigma: float | None = None
-    pending = [np.asarray(s, dtype=float) for s in seeds] if seeds is not None else []
-    gap = SEED_GAP * width * np.sqrt(dim)
     run_best: list[float | np.ndarray] = [np.inf, start]
-    first_value = [np.nan]  # ``false_success``: each descent's first evaluation
-    floor_hist: list[float] = []  # ``floor_bfgs``: the first descent's running best
-    floor_window = FLOOR_WINDOW * (dim + 1)
     monitor = (
-        StallMonitor((fd_step if fd_step is not None else SCIPY_FD_STEP) * x_unit())
+        StallMonitor(fd_step if fd_step is not None else SCIPY_FD_STEP)
         if extend_to is not None or ridge_after > 0
         else None
     )
@@ -544,9 +466,7 @@ def run_slsqp_restarts(
 
     def extending() -> bool:
         """Whether the descent now running may go past ``evaluations``."""
-        if not ends:
-            return True
-        return extend_restart and len(ends) == 1 and statuses[0] == 0
+        return not ends
 
     def fun(z: np.ndarray) -> float:
         nonlocal used, best_x, best_cost, best_start
@@ -576,8 +496,7 @@ def run_slsqp_restarts(
         # The c45 candidate's composition order of the first descent's readers (each
         # only when on, so any one alone runs exactly as on its own branch):
         # ``reader`` (small_switch) before the evaluation, the ``StallMonitor`` after
-        # it, then the ridge reading (``ridge_after``, once; a ridge stops the call),
-        # then ``false_success``'s first value and the floor stop (``floor_bfgs``)
+        # it, then the ridge reading (``ridge_after``, once; a ridge stops the call)
         if (
             ridge_after > 0
             and monitor is not None
@@ -590,16 +509,6 @@ def run_slsqp_restarts(
                 ridge_out.append(ridge[0])
             if ridge[0]:
                 raise _SpentError
-        if false_success and np.isnan(first_value[0]):
-            first_value[0] = float(value)
-        if floor_bfgs and not ends:
-            floor_hist.append(float(run_best[0]))
-            k = len(floor_hist)
-            if k > floor_window and k % (dim + 1) == 0:
-                total = floor_hist[0] - floor_hist[-1]
-                recent = floor_hist[-1 - floor_window] - floor_hist[-1]
-                if total > 0 and recent <= FLOOR_GAIN_SHARE * total:
-                    raise _FloorError
         return float(value) if np.isfinite(value) else 1e300
 
     while used < evaluations - dim - 1:
@@ -617,63 +526,14 @@ def run_slsqp_restarts(
                 )
         except _SpentError:
             break
-        except _FloorError:  # ``floor_bfgs``: the first descent sits on its floor
-            res = None
         ends.append(np.asarray(run_best[1]))
-        status = 0 if res is None else int(res.status)
-        if (
-            false_success
-            and res is not None
-            and status == 0
-            and int(res.nit) <= FALSE_SUCCESS_MAX_ITER
-            and not float(run_best[0]) < first_value[0]
-        ):
-            status = -1  # idea #23: a "success" that never left its start
-        first_value[0] = np.nan
+        status = int(res.status)
         statuses.append(status)
         if ends_out is not None:
             ends_out.append(
                 Descent(np.asarray(run_best[1]), float(run_best[0]), status)
             )
         run_best[0] = np.inf
-        if res is None and evaluations - used > dim + 1 and floor_bfgs == "bfgs":
-            # one scaled-FD BFGS descent from the best point
-            fine = run_scaled_bfgs(
-                objective,
-                rng,
-                best_x,
-                best_cost,
-                box,
-                evaluations - used,
-                max_descents=1,
-                box_qp=True,
-            )
-            used += fine.used
-            if fine.cost < best_cost:
-                best_x, best_cost = fine.x, fine.cost
-        elif res is None and evaluations - used > 2 * dim + 1:  # ``"cd"``
-            polish_x = np.array(best_x)
-
-            def charged(point: np.ndarray) -> float:
-                nonlocal used, best_x, best_cost
-                value = objective.evaluate_point(point)
-                if value is None:
-                    raise _SpentError
-                used += 1
-                if value < best_cost:
-                    best_x, best_cost = point.copy(), float(value)
-                return float(value)
-
-            try:
-                _central_polish(
-                    charged,
-                    polish_x,
-                    box,
-                    POLISH_H_SHARE * width,
-                    evaluations - used,
-                )
-            except _SpentError:
-                break
         if max_descents is not None and len(ends) >= max_descents:
             break
         if fallback and failure_majority(statuses):
@@ -685,14 +545,7 @@ def run_slsqp_restarts(
                 best_x, best_cost, fallback_sigma = rest.x, rest.cost, rest.sigma
             break
         start = box.lower + (box.upper - box.lower) * rng.rand(dim)
-        while pending:
-            seed = pending.pop(0)
-            if all(np.linalg.norm(seed - e) > gap for e in ends):
-                start = seed
-                break
         run_best[1] = start
-        if extend_restart and monitor is not None and extending():
-            monitor = StallMonitor(monitor.step)  # the restart's own iterations
     if fallback_sigma is not None:
         return EsResult(best_x, best_cost, fallback_sigma, used)
     travelled = float(np.linalg.norm(best_x - best_start)) / np.sqrt(dim)
@@ -802,10 +655,6 @@ def micro_slopes(
 
 
 class _AbortDescentError(Exception):
-    pass
-
-
-class _FloorError(Exception):
     pass
 
 
@@ -1105,7 +954,6 @@ def run_sampled_restarts(
     box: Box,
     evaluations: int,
     fd_step: float | None = None,
-    polish_per_dim: float = 0.0,
     samples: Any = None,  # (points, values) | None (Any for the callers' **options)
 ) -> EsResult:
     """Restarted SLSQP with sampled starts and a gap-scaled stop (``gal3c``).
@@ -1121,11 +969,6 @@ def run_sampled_restarts(
 
     ``samples`` (the anytime hand-over): points and values evaluated before this
     call, in the sample from the start (they cost nothing here).
-
-    ``polish_per_dim`` (research, idea #33; 0: off): a descent that ends normally
-    (not stopped by the gap rule) below every earlier end and at the incumbent is
-    polished by SLSQP from its end with central differences at ``POLISH_H_SHARE`` x
-    the box width, for at most ``polish_per_dim`` x dim evaluations.
 
     The start is found incrementally (post-freeze, 2026-10-23; the same starts as
     scanning every sample in sorted order against every claimed point, which cost
@@ -1150,7 +993,6 @@ def run_sampled_restarts(
     # index): the order of ``np.argsort(sample_f, kind="stable")``.
     queue: list[tuple[bool, float, int]] = []
     seen: list[int] = []  # per sample: how many claimed points it is clear of
-    end_values: list[float] = []  # every finished descent's best (``polish_per_dim``)
     radius = SAMPLE_GAP_SHARE * width * np.sqrt(dim)
     window = 3 * (dim + 1)
 
@@ -1232,7 +1074,6 @@ def run_sampled_restarts(
                     raise _AbortDescentError
             return value if np.isfinite(value) else 1e300
 
-        aborted = False
         try:
             with quiet_differences():
                 minimize(
@@ -1244,75 +1085,13 @@ def run_sampled_restarts(
                     | _eps_option(fd_step),
                 )
         except _AbortDescentError:
-            aborted = True
+            pass
         except _SpentError:
             break
         claim(np.array(local["x"]))
-        if polish_per_dim > 0:
-            earlier = min(end_values) if end_values else np.inf
-            end_values.append(float(local["best"]))
-            if not aborted and local["best"] < earlier and local["best"] <= best_cost:
-                try:
-                    _central_polish(
-                        evaluate,
-                        np.array(local["x"]),
-                        box,
-                        POLISH_H_SHARE * width,
-                        int(polish_per_dim * dim),
-                    )
-                except _SpentError:
-                    break
     travelled = float(np.linalg.norm(best_x - best_start)) / np.sqrt(dim)
     sigma = float(np.clip(0.1 * travelled, 1e-8 * width, 0.2 * width))
     return EsResult(best_x, best_cost, sigma, used)
-
-
-class _PolishDoneError(Exception):
-    pass
-
-
-def _central_polish(
-    evaluate: Callable[[np.ndarray], float],
-    x: np.ndarray,
-    box: Box,
-    h: float,
-    cap: int,
-) -> None:
-    """SLSQP from ``x`` with central differences at step ``h`` (idea #33).
-
-    ``evaluate`` charges and records every point (and raises when the budget is
-    spent); the polish ends after ``cap`` of its own evaluations.
-    """
-    from scipy.optimize import minimize
-
-    dim = len(x)
-    spent = [0]
-
-    def fun(z: np.ndarray) -> float:
-        if spent[0] >= cap:
-            raise _PolishDoneError
-        spent[0] += 1
-        value = evaluate(np.clip(z, box.lower, box.upper))
-        return value if np.isfinite(value) else 1e300
-
-    def jac(z: np.ndarray) -> np.ndarray:
-        grad = np.empty(dim)
-        for i in range(dim):
-            up, down = np.array(z, dtype=float), np.array(z, dtype=float)
-            up[i] = min(z[i] + h, box.upper[i])
-            down[i] = max(z[i] - h, box.lower[i])
-            grad[i] = (fun(up) - fun(down)) / (up[i] - down[i])
-        return grad
-
-    with contextlib.suppress(_PolishDoneError), quiet_differences():
-        minimize(
-            fun,
-            x,
-            jac=jac,
-            method="SLSQP",
-            bounds=list(zip(box.lower, box.upper, strict=True)),
-            options={"maxiter": cap, "ftol": FTOL},
-        )
 
 
 def quiet_differences() -> np.errstate:
@@ -1382,7 +1161,7 @@ def run_lbfgsb_restarts(
                         "maxcor": LBFGSB_MAXCOR,
                         "ftol": 0.0,
                         "gtol": 0.0,
-                        "eps": fd_step * x_unit(),
+                        "eps": fd_step,
                         "maxfun": evaluations,
                         "maxiter": evaluations,
                     },
@@ -1395,35 +1174,6 @@ def run_lbfgsb_restarts(
     return EsResult(best_x, best_cost, sigma, used)
 
 
-def face_tangent(u: np.ndarray, x: np.ndarray, box: Box, h: float) -> np.ndarray | None:
-    """A unit direction near ``u`` whose mirrored pair ``x +- h v`` stays in the box.
-
-    ``|v_i| <= room_i / h``, with ``room_i`` the distance of ``x_i`` to its nearer
-    face: components of ``u`` above their cap are cut to it (sign kept) and the
-    others rescaled to unit length, repeated until none is above its cap
-    (water-filling). A coordinate on a face gets 0. None when no unit direction
-    fits (too little room in total, e.g. near a corner).
-    """
-    room = np.maximum(np.minimum(x - box.lower, box.upper - x), 0.0)
-    cap = room / h
-    u = np.asarray(u, dtype=float)
-    v: np.ndarray = u.copy()
-    fixed = np.zeros(len(u), dtype=bool)
-    for _ in range(len(u) + 1):
-        over = ~fixed & (np.abs(v) > cap)
-        if not over.any():
-            return v
-        fixed |= over
-        v[fixed] = np.sign(u[fixed]) * cap[fixed]
-        mass = 1.0 - float(np.sum(v[fixed] ** 2))
-        free = ~fixed
-        norm_free = float(np.sum(u[free] ** 2))
-        if mass <= 0.0 or norm_free <= 0.0:
-            return None
-        v[free] = u[free] * np.sqrt(mass / norm_free)
-    return None
-
-
 def curvature_beta(
     objective: CountedObjective,
     rng: np.random.RandomState,
@@ -1431,8 +1181,6 @@ def curvature_beta(
     cost: float,
     box: Box,
     directions: int = BETA_DIRECTIONS,
-    faces: bool = False,
-    pairs_out: list[tuple[float, bool]] | None = None,
 ) -> tuple[float, np.ndarray, float, int] | None:
     """beta at ``x``: the log-log slope of the mirrored loss against the probe scale.
 
@@ -1440,24 +1188,11 @@ def curvature_beta(
     ``BETA_SCALES`` times the box width, clipped onto the box). Returns (beta, best
     point, its value, evaluations used), or None if the objective ran out. beta is
     NaN with fewer than two positive losses.
-
-    ``faces`` (``Variant.probe_faces="tangent"``, the novel-ideas toy): each direction
-    is replaced by :func:`face_tangent` at the largest scale, so no pair is clipped
-    (a direction with no feasible version is kept as drawn). Same draws, same count.
-    ``pairs_out`` (research, parked2), if given, receives each pair's loss and
-    whether clipping broke its mirror (either point moved by the box), in evaluation
-    order. The two compose: ``pairs_out`` reads the directions as probed, so with
-    ``faces`` only a direction kept as drawn can report a clipped pair.
     """
     dim = len(x)
     width = float(np.mean(box.upper - box.lower))
     dirs = rng.randn(directions, dim)
     dirs /= np.linalg.norm(dirs, axis=1, keepdims=True)
-    if faces:
-        for k in range(directions):
-            v = face_tangent(dirs[k], x, box, max(BETA_SCALES) * width)
-            if v is not None:
-                dirs[k] = v
     best_x, best_cost = np.array(x, dtype=float), float(cost)
     used = 0
     losses = []
@@ -1475,15 +1210,6 @@ def curvature_beta(
                     best_x, best_cost = point, float(value)
                 pair.append(float(value))
             loss.append(0.5 * (pair[0] + pair[1]) - float(cost))
-            if pairs_out is not None:
-                step = share * width * u
-                inside = bool(
-                    np.all(x + step >= box.lower)
-                    and np.all(x + step <= box.upper)
-                    and np.all(x - step >= box.lower)
-                    and np.all(x - step <= box.upper)
-                )
-                pairs_out.append((loss[-1], not inside))
         losses.append(float(np.mean(loss)))
     h = np.array(BETA_SCALES)
     l_arr = np.array(losses)
@@ -1494,60 +1220,6 @@ def curvature_beta(
         else float("nan")
     )
     return beta, best_x, best_cost, used
-
-
-KAPPA_SCALES = (0.03, 0.3)
-
-
-def curvature_kappa(
-    objective: CountedObjective,
-    rng: np.random.RandomState,
-    x: np.ndarray,
-    cost: float,
-    box: Box,
-    directions: int = CHEAP_BETA_DIRECTIONS,
-) -> tuple[float, np.ndarray, float, int] | None:
-    """kappa at ``x``: the slope of log median |mirrored loss| between two scales.
-
-    The detector report's (cycle 21) robust form of ``curvature_beta``: mirrored pairs
-    ``x +- h u`` at ``KAPPA_SCALES`` times the box width in ``directions`` random unit
-    directions; the loss of each pair is |(f(x+hu) + f(x-hu)) / 2 - f(x)| and the
-    median over directions replaces the mean of signed losses, so one direction across
-    a ridge or step cannot decide the slope, and the concave windows bbob's T_osz puts
-    into f2, f10 and f11 no longer give NaN. kappa is about 2 for a resolved quadratic
-    and below 1.45 where the function is unresolved at these scales. Returns (kappa,
-    best point, its value, evaluations used), or None if the objective ran out; kappa
-    is NaN only if a median loss is exactly 0 (a plateau at that scale).
-    """
-    dim = len(x)
-    width = float(np.mean(box.upper - box.lower))
-    dirs = rng.randn(directions, dim)
-    dirs /= np.linalg.norm(dirs, axis=1, keepdims=True)
-    best_x, best_cost = np.array(x, dtype=float), float(cost)
-    used = 0
-    medians = []
-    for share in KAPPA_SCALES:
-        loss = []
-        for u in dirs:
-            pair = []
-            for sign in (1.0, -1.0):
-                point = np.clip(x + sign * share * width * u, box.lower, box.upper)
-                value = objective.evaluate_point(point)
-                if value is None:
-                    return None
-                used += 1
-                if value < best_cost:
-                    best_x, best_cost = point, float(value)
-                pair.append(float(value))
-            loss.append(abs(0.5 * (pair[0] + pair[1]) - float(cost)))
-        medians.append(float(np.median(loss)))
-    lo, hi = medians
-    kappa = (
-        float(np.log10(hi / lo) / np.log10(KAPPA_SCALES[1] / KAPPA_SCALES[0]))
-        if lo > 0 and hi > 0 and np.isfinite(lo) and np.isfinite(hi)
-        else float("nan")
-    )
-    return kappa, best_x, best_cost, used
 
 
 def plateau_check(
@@ -1615,17 +1287,14 @@ class QnRoute:
 
     ``api._qn_local_phase`` runs the steps in order; each switch turns one on:
 
-    * ``plateau_check``: tiny mirrored probes first (``plateau_check``); a plateau
-      skips the curvature probe (from ``"qn2"``, Batch 34's f7 fault).
-    * ``staged``: on a smooth reading SLSQP runs for ``QN_LOCAL_SHARE`` of the local
-      budget and the CMA finisher continues from its best point at its hand-over
-      sigma; False: SLSQP for the whole local phase (``"qn"``).
-    * ``capped``: the stage is at most ``QN_LOCAL_CAP_PER_DIM`` x dim (from ``"qn3"``).
-    * ``seeded``: restarts from the best ``SEED_SHARE`` of ATM's archive (``"qn5"``).
-    * ``keep_warm_shape``: the finisher keeps the warm-start shape (not ``"qn2"``).
+    Every route first runs tiny mirrored probes (``plateau_check``; a plateau skips
+    the curvature probe), and on a smooth reading SLSQP runs for ``QN_LOCAL_SHARE`` of
+    the local budget, at most ``QN_LOCAL_CAP_PER_DIM`` x dim, before the CMA finisher
+    continues from its best point at its hand-over sigma (``"qn3"``).
+
     * ``extend``: a stage whose first descent is still running at the cap continues
-      for ``QN_EXTEND_SHARE`` of what is left (``"share"``, ``"qn6"``), for at most
-      another capped stage (``"capped"``, ``"qn7"``), or not (``"none"``).
+      for ``QN_EXTEND_SHARE`` of what is left, for at most another capped stage
+      (``"capped"``, ``"qn7"``), or not (``"none"``).
     * ``basins``: converged descents in separate basins (``multi_basin``) keep
       restarting SLSQP to the end (from ``"qn6"``).
     * ``rugged_steps``: a rugged or plateau reading gives the finisher ``steps``
@@ -1636,20 +1305,15 @@ class QnRoute:
       step ``QN_FD_STEP`` instead of SciPy's (from ``"qn9"``, cycle 20).
     * ``extend_in_descent``: the stage's first descent goes on past the cap while a
       ``StallMonitor`` reads it as progressing, keeping a reserve for the finisher,
-      instead of the separate extension (``"qn10"``, cycle 21).
-    * ``rugged_grow``: the rugged populations grow while the budget is large
-      (``stepsgrow``; ``"qn11"``, cycle 22).
+      instead of the separate extension (cycle 21).
     * ``basins_scipy_step``: the multi-basin SLSQP restarts use SciPy's step, for
       more and cheaper descents (from ``"qn12"``, cycle 24).
-    * ``failures_to_population``: when most descents failed (f12), population
-      CMA-ES restarts take the rest, ranked by ``failures_surrogate`` (``"lq2"``:
-      ``"qn13"``; ``"none"``: ``"qn13n"``; cycle 25).
     * ``rugged_ipop``: a rugged reading with at least ``RUGGED_IPOP_MIN_LEFT_PER_DIM``
       x dim left runs the plateau route's schedule instead of the finisher: IPOP
       populations from a uniform point at sigma0 = box / 5, 4x the default lambda
       doubling per restart (8x from ``RUGGED_IPOP8_MIN_DIM`` with at least
       ``RUGGED_IPOP8_MIN_LEFT_PER_DIM`` x dim left), no protection, to the end
-      (``"qn15"``, cycle 29; COCO leaders report rank 2). ``rugged_ipop_min_dim``:
+      (cycle 29; COCO leaders report rank 2). ``rugged_ipop_min_dim``:
       only from that dimension (``"qn17"``: D >= 20, cycle 31; Batch 55 lost f15-f16
       at D 5 and f18 at D 10, where c31's (1+1)-first path is strong, and no in-state
       probe separates the fractal f23 from Schaffer's f17-f18).
@@ -1675,21 +1339,13 @@ class QnRoute:
       instead of the finisher.
     """
 
-    plateau_check: bool = True
-    staged: bool = True
-    capped: bool = True
-    seeded: bool = False
-    keep_warm_shape: bool = True
     extend: str = "none"
     basins: bool = False
     rugged_steps: bool = False
     plateau_ipop4: bool = False
     fd_step: bool = False
     extend_in_descent: bool = False
-    rugged_grow: bool = False
     basins_scipy_step: bool = False
-    failures_to_population: bool = False
-    failures_surrogate: str = "none"
     rugged_ipop: bool = False
     rugged_ipop_min_dim: int = 0
     cap_gate: bool = False
@@ -1707,10 +1363,8 @@ class QnRoute:
     smooth_bfgs_box_qp: bool = False
 
     def __post_init__(self) -> None:
-        if self.extend not in ("none", "share", "capped"):
-            raise ValueError(
-                f"extend must be none, share or capped, got {self.extend!r}"
-            )
+        if self.extend not in ("none", "capped"):
+            raise ValueError(f"extend must be none or capped, got {self.extend!r}")
 
 
 # ``Variant.cma_local_nonsep``'s SLSQP routes (cycles 13-25). A new route that
@@ -1722,20 +1376,11 @@ _QN18 = replace(_QN17, extend_in_descent=True, cap_gate=True)
 _QN19 = replace(_QN18, second_descent_min_left_per_dim=400.0)
 _QN29 = replace(_QN19, basins_sampled=True, fractal_exempt=True)
 QN_ROUTES: dict[str, QnRoute] = {
-    "qn": QnRoute(plateau_check=False, staged=False, capped=False),
-    "qn2": QnRoute(capped=False, keep_warm_shape=False),
     "qn3": QnRoute(),
-    "qn5": QnRoute(seeded=True),
-    "qn6": QnRoute(extend="share", basins=True, rugged_steps=True),
     "qn7": QnRoute(extend="capped", basins=True, rugged_steps=True),
     "qn8": _QN8,
     "qn9": replace(_QN8, fd_step=True),
-    "qn10": replace(_QN8, extend="none", fd_step=True, extend_in_descent=True),
-    "qn11": replace(_QN8, fd_step=True, rugged_grow=True),
     "qn12": _QN12,
-    "qn13": replace(_QN12, failures_to_population=True, failures_surrogate="lq2"),
-    "qn13n": replace(_QN12, failures_to_population=True),
-    "qn15": replace(_QN12, rugged_ipop=True),
     "qn17": _QN17,
     "qn19": _QN19,
     "qn20": replace(_QN19, basins_sampled=True),

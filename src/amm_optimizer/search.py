@@ -20,6 +20,10 @@ from .profiling import NULL_PROFILER, Profiler
 from .section import SectionRunner
 from .state import SamplerState, SearchState
 
+# The covariance is learned only up to this dimension: from a few samples per
+# iteration it is too slow beyond about 10 (at 20 it cost .03 at 300 x dim).
+COV_MAX_DIM = 10
+
 
 @dataclass
 class SearchOutcome:
@@ -37,9 +41,6 @@ class SearchOutcome:
         Whether the budget ended it.
     widths : tuple of float
         The samplers' final widths (success-rate control only; else empty).
-    width : float
-        The geometric mean of the samplers' final widths (``nan`` for the
-        original sampler, whose widths are a schedule).
     """
 
     x: np.ndarray
@@ -47,7 +48,6 @@ class SearchOutcome:
     restarted: bool
     out_of_budget: bool
     widths: tuple[float, ...] = ()
-    width: float = float("nan")
 
 
 class Search:
@@ -149,27 +149,15 @@ class Search:
                 # search goes on, and any finite value beats the start
                 start_cost = float("inf")
             variant = self._config.variant
-            learn_covariance = (
-                variant.covariance != "none" and n_params <= variant.cov_max_dim
-            )
+            learn_covariance = variant.covariance != "none" and n_params <= COV_MAX_DIM
             state = SearchState(
                 best=x_start,
                 second_best=x_start,
                 previous_cost=start_cost,
                 change_vector=np.zeros(n_params),
                 current_cost=start_cost,
-                scale_moment=(
-                    np.ones(n_params)
-                    if self._config.variant.scale_learning != "none"
-                    else None
-                ),
                 cov=np.eye(n_params) if learn_covariance else None,
                 cov_factor=np.eye(n_params) if learn_covariance else None,
-                cov_path=(
-                    np.zeros(n_params)
-                    if learn_covariance and variant.cov_path != "none"
-                    else None
-                ),
             )
             legacy_stream.burn_directional_pool(
                 rng, n_params, self._config.initial_population
@@ -217,10 +205,5 @@ class Search:
                 tuple(float(np.exp(s.random_growth)) for s in samplers)
                 if self._config.variant.amplitude_control != "legacy"
                 else ()
-            ),
-            width=(
-                float(np.exp(np.mean([s.random_growth for s in samplers])))
-                if self._config.variant.amplitude_control != "legacy"
-                else float("nan")
             ),
         )

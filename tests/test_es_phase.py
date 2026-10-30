@@ -6,7 +6,7 @@ import pytest
 import amm_optimizer as atm
 from amm_optimizer.bounds import Box
 from amm_optimizer.config import Variant
-from amm_optimizer.control import LOG_WIDTH_FLOOR, start_log_widths
+from amm_optimizer.control import LOG_WIDTH_FLOOR, SR_MAX_WIDTH, start_log_widths
 from amm_optimizer.es_phase import run_es_phase
 from amm_optimizer.objective import CountedObjective
 from amm_optimizer.profiling import TimingProfiler
@@ -117,7 +117,7 @@ def test_the_starting_widths_scale_with_the_es_step_size():
     scaled = start_log_widths(ES, 0.01)
     np.testing.assert_allclose(np.array(scaled) - np.array(base), np.log(0.01))
     assert min(start_log_widths(ES, 1e-300)) == LOG_WIDTH_FLOOR
-    assert max(start_log_widths(ES, 1e6)) == pytest.approx(np.log(ES.sr_max_width))
+    assert max(start_log_widths(ES, 1e6)) == pytest.approx(np.log(SR_MAX_WIDTH))
 
 
 @pytest.mark.parametrize(
@@ -126,10 +126,7 @@ def test_the_starting_widths_scale_with_the_es_step_size():
         {"es_phase": "suffix"},
         {"es_fraction": 0.0},
         {"es_fraction": 1.0},
-        {"es_init_factor": -1.0},
         {"es_max_budget_per_dim": 0.0},
-        {"es_small_dim": -1},
-        {"es_small_max_budget_per_dim": 0.0},
     ],
 )
 def test_es_parameters_are_validated(kwargs):
@@ -137,12 +134,12 @@ def test_es_parameters_are_validated(kwargs):
         Variant(**kwargs)
 
 
-# research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_es_needs_the_controller_and_the_box():
     with pytest.raises(ValueError, match="amplitude_control"):
         Variant(es_phase="prefix")
-    assert Variant(es_phase="prefix", amplitude_control="success_rate").needs_box
+    assert Variant(
+        es_phase="prefix", amplitude_control="success_rate_targeted"
+    ).needs_box
     with pytest.raises(ValueError, match="bounds"):
         atm.api.minimize(
             sphere,
@@ -150,7 +147,9 @@ def test_the_es_needs_the_controller_and_the_box():
             200,
             seed=0,
             config=atm.ATMConfig(
-                variant=Variant(es_phase="prefix", amplitude_control="success_rate")
+                variant=Variant(
+                    es_phase="prefix", amplitude_control="success_rate_targeted"
+                )
             ),
         )
 
@@ -213,45 +212,6 @@ def test_the_es_is_skipped_above_the_budget_limit():
 
 
 # research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
-def test_small_dimensions_use_their_own_budget_limit():
-    base = Variant(**{**ES.to_dict(), "es_max_budget_per_dim": 1000.0})
-    small = Variant(
-        **{**base.to_dict(), "es_small_dim": 3, "es_small_max_budget_per_dim": 30.0}
-    )
-
-    def points(variant, dim, budget):
-        seen = []
-
-        def spy(x):
-            seen.append(np.array(x))
-            return sphere(x)
-
-        atm.api.minimize(
-            spy,
-            np.full(dim, -3.0),
-            budget,
-            seed=0,
-            config=atm.ATMConfig(variant=variant),
-            bounds=(-5, 5),
-        )
-        return seen
-
-    def same(a, b):
-        return all(np.array_equal(x, y) for x, y in zip(a, b, strict=True))
-
-    no_es = Variant(**{**ES.to_dict(), "es_phase": "none"})
-    # 3-D, 100 x D: above the small-dimension limit, so ATM alone ...
-    assert same(points(small, 3, 300), points(no_es, 3, 300))
-    # ... 3-D, 20 x D: inside it, so the ES runs ...
-    assert same(points(small, 3, 60), points(base, 3, 60))
-    # ... and 4-D, 100 x D is not a small dimension: the ES runs
-    assert same(points(small, 4, 400), points(base, 4, 400))
-    assert not same(points(small, 4, 400), points(no_es, 4, 400))
-
-
-# research-only options (deprecated in 0.6.0)
-@pytest.mark.filterwarnings("ignore:Variant:FutureWarning")
 def test_the_design_follows_the_factor_and_has_at_least_four_points(monkeypatch):
     import amm_optimizer as atm
     import amm_optimizer.api
@@ -266,13 +226,13 @@ def test_the_design_follows_the_factor_and_has_at_least_four_points(monkeypatch)
     monkeypatch.setattr(atm.api, "run_es_phase", spy)
 
     def design(factor, budget):
-        variant = Variant(**{**ES.to_dict(), "es_init_factor": factor})
+        monkeypatch.setattr(atm.api, "ES_INIT_FACTOR", factor)
         atm.api.minimize(
             sphere,
             np.zeros(3),
             budget,
             seed=0,
-            config=atm.ATMConfig(variant=variant),
+            config=atm.ATMConfig(variant=ES),
             bounds=(-5, 5),
         )
         return seen[-1]
