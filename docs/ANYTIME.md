@@ -63,9 +63,7 @@ except OutOfTime:
 # best["x"], best["f"]: the best point seen when the run was cut
 ```
 
-The benchmark harness takes the mode as `benchmarks/quick_scan.py run --config "preset:c46,variant.anytime=replay"`.
-
-`quick_scan` records for each run the first evaluation that reached each of the 51 targets (`hits`, read with `score_by`), so one run can be scored at every smaller budget.
+As a configuration, the mode is `presets.with_changes("c46", anytime="replay")`. The research harness that measured it (kept in the research archive) recorded for each run the first evaluation that reached each of the 51 targets, so one run can be scored at every smaller budget.
 
 ## What it was measured to do
 

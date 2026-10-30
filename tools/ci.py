@@ -9,8 +9,8 @@ r"""Run the project's checks on this machine, the same ones CI would run.
     python tools/ci.py --keep-going    # do not stop at the first failing step
 
 The tiers are pytest markers (``pyproject.toml``; ``tests/characterisation_cases.py``):
-default deselects ``slow``, ``merge`` and ``research`` (the tests that pin research-only
-options or read the research data), merge deselects ``slow``, full runs everything.
+default deselects ``slow`` and ``merge``, merge deselects ``slow``, full runs
+everything.
 
 It uses the interpreter that runs it (so use the project's virtual
 environment, e.g. ``.venv\Scripts\python tools/ci.py``) and always runs from
@@ -43,7 +43,7 @@ class Step:
 
 TIERS = ("default", "merge", "full")
 MARKERS = {
-    "default": "not slow and not merge and not research",
+    "default": "not slow and not merge",
     "merge": "not slow",
 }
 # Branch coverage the full tier must reach, in percent. Measured on 2026-10-27
