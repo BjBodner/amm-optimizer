@@ -23,6 +23,7 @@ from typing import Any
 import numpy as np
 
 from . import qn_phase
+from ._budget import BudgetedObjective, SpentError
 from .bounds import Box
 from .objective import CountedObjective
 
@@ -32,31 +33,6 @@ MLSL_SIGMA = 2.0  # the critical radius's sigma
 LOCAL_SHARES = (1e-3, 1e-5)  # local_reading's steps, as shares of the box width
 GATE_LCURV, GATE_R2Q = 0.1, 0.5  # the toy's rule G
 DESCENT_FAR = 0.25  # cycle 60: the second descent's start, as a share of the box
-
-
-class _SpentError(Exception):
-    """The objective (or the phase's own budget) ran out."""
-
-
-class _Counted:
-    """``objective`` as a plain function: counts, keeps the best, stops at a cap."""
-
-    def __init__(self, objective: CountedObjective, evaluations: int) -> None:
-        self.objective, self.evaluations = objective, evaluations
-        self.used = 0
-        self.best_x: np.ndarray | None = None
-        self.best_cost = np.inf
-
-    def __call__(self, x: np.ndarray) -> float:
-        if self.used >= self.evaluations:
-            raise _SpentError
-        value = self.objective.evaluate_point(np.asarray(x, dtype=float))
-        if value is None:
-            raise _SpentError
-        self.used += 1
-        if value < self.best_cost:
-            self.best_x, self.best_cost = np.array(x, dtype=float), float(value)
-        return float(value) if np.isfinite(value) else 1e300
 
 
 def design_size(budget: int, dim: int) -> int:
@@ -103,7 +79,7 @@ def rank_quadratic_r2(x: np.ndarray, f: np.ndarray, box: Box) -> float | None:
 
 
 def local_reading(
-    fun: _Counted, x: np.ndarray, fx: float, box: Box
+    fun: BudgetedObjective, x: np.ndarray, fx: float, box: Box
 ) -> tuple[float, float]:
     """(lcurv, flat share) at ``x``: 4 D evaluations (plus one if ``x`` moved inward).
 
@@ -150,7 +126,7 @@ def critical_radius(n: int, box: Box, sigma: float = MLSL_SIGMA) -> float:
     )
 
 
-def _slsqp(fun: _Counted, x: np.ndarray, box: Box) -> tuple[np.ndarray, float]:
+def _slsqp(fun: BudgetedObjective, x: np.ndarray, box: Box) -> tuple[np.ndarray, float]:
     import warnings
 
     from scipy.optimize import OptimizeWarning  # type: ignore[import-untyped]
@@ -173,7 +149,7 @@ def _slsqp(fun: _Counted, x: np.ndarray, box: Box) -> tuple[np.ndarray, float]:
 
 
 def _mlsl_rounds(
-    fun: _Counted, sobol: Any, box: Box, x: np.ndarray, f: np.ndarray, n0: int
+    fun: BudgetedObjective, sobol: Any, box: Box, x: np.ndarray, f: np.ndarray, n0: int
 ) -> None:
     """Rounds of at most ``MLSL_STARTS`` SLSQP descents, then ``n0`` more Sobol points,
     until ``fun`` runs out. A sample point starts a descent when it was not a start
@@ -234,7 +210,7 @@ def multi_basin_route(
     the Schaffers, which read smooth at the probe's scale).
     """
     dim = len(box.lower)
-    fun = _Counted(objective, budget)
+    fun = BudgetedObjective(objective, budget, as_float=True)
     readings: dict[str, float] = {}
     try:
         sobol = _sobol(rng, dim)
@@ -268,7 +244,7 @@ def multi_basin_route(
             assert fun.best_x is not None
             return False, fun.best_x, fun.best_cost, readings
         _mlsl_rounds(fun, sobol, box, x, f, n0)
-    except _SpentError:
+    except SpentError:
         pass
     best_x = (
         fun.best_x

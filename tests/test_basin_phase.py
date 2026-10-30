@@ -70,7 +70,7 @@ def test_the_rank_quadratic_fit_tells_one_basin_from_many():
 )
 def test_the_local_reading(fun, smooth, flat):
     objective, calls = counted(fun, 10_000)
-    f = basin_phase._Counted(objective, 10_000)
+    f = basin_phase.BudgetedObjective(objective, 10_000, as_float=True)
     x = np.array([0.3, -1.7])
     lcurv, flat_share = basin_phase.local_reading(f, x, fun(x), BOX)
     assert (lcurv <= basin_phase.GATE_LCURV) is smooth or fun is steps

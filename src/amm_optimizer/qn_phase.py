@@ -17,6 +17,7 @@ from typing import Any
 
 import numpy as np
 
+from ._budget import SpentError
 from .bounds import Box
 from .es_phase import EsResult
 from .objective import CountedObjective
@@ -355,10 +356,6 @@ class FlatGradientReader:
         return len(v) == self.dim + 1 and all(x == v[0] for x in v)
 
 
-class _SpentError(Exception):
-    pass
-
-
 # ``ridge_reading`` (the f13 toy, ``Variant.prefix_ridge_after``): on f13's sharp
 # ridge every full SLSQP step overshoots across the ridge by a similar factor (the
 # median ratio of actual to predicted decrease at the first trial is -1.7 to -3.0 at
@@ -477,13 +474,13 @@ def run_slsqp_restarts(
             and used < extend_to
             and extend_ok()
         ):
-            raise _SpentError
+            raise SpentError
         point = np.clip(z, box.lower, box.upper)
         if reader is not None and reader.before(point):
-            raise _SpentError
+            raise SpentError
         value = objective.evaluate_point(point)
         if value is None:
-            raise _SpentError
+            raise SpentError
         used += 1
         if reader is not None:
             reader.after(point, float(value))
@@ -508,7 +505,7 @@ def run_slsqp_restarts(
             if ridge_out is not None:
                 ridge_out.append(ridge[0])
             if ridge[0]:
-                raise _SpentError
+                raise SpentError
         return float(value) if np.isfinite(value) else 1e300
 
     while used < evaluations - dim - 1:
@@ -524,7 +521,7 @@ def run_slsqp_restarts(
                     options={"maxiter": evaluations, "ftol": FTOL}
                     | _eps_option(fd_step),
                 )
-        except _SpentError:
+        except SpentError:
             break
         ends.append(np.asarray(run_best[1]))
         status = int(res.status)
@@ -809,10 +806,10 @@ def run_scaled_bfgs(
             if extended[0]:
                 limit[0] = extend_to
         if used >= limit[0]:
-            raise _SpentError
+            raise SpentError
         value = objective.evaluate_point(point)
         if value is None:
-            raise _SpentError
+            raise SpentError
         used += 1
         if value < best_cost:
             best_x, best_cost = point.copy(), float(value)
@@ -912,7 +909,7 @@ def run_scaled_bfgs(
                 first_end = z.copy()
             start = box.lower + (box.upper - box.lower) * rng.rand(dim)
             start_cost = np.inf
-    except _SpentError:
+    except SpentError:
         pass
     travelled = float(np.linalg.norm(first_end - x)) / np.sqrt(dim)
     sigma = float(np.clip(0.1 * travelled, 1e-8 * width, 0.2 * width))
@@ -1016,10 +1013,10 @@ def run_sampled_restarts(
     def evaluate(point: np.ndarray) -> float:
         nonlocal used, best_x, best_cost
         if used >= evaluations:
-            raise _SpentError
+            raise SpentError
         value = objective.evaluate_point(point)
         if value is None:
-            raise _SpentError
+            raise SpentError
         used += 1
         if value < best_cost:
             best_x, best_cost = point.copy(), float(value)
@@ -1036,7 +1033,7 @@ def run_sampled_restarts(
                 sample_f.append(value)
                 sample_x.append(point)
                 seen.append(0)
-        except _SpentError:
+        except SpentError:
             break
         start = None
         while queue:
@@ -1086,7 +1083,7 @@ def run_sampled_restarts(
                 )
         except _AbortDescentError:
             pass
-        except _SpentError:
+        except SpentError:
             break
         claim(np.array(local["x"]))
     travelled = float(np.linalg.norm(best_x - best_start)) / np.sqrt(dim)
@@ -1139,11 +1136,11 @@ def run_lbfgsb_restarts(
     def fun(z: np.ndarray) -> float:
         nonlocal used, best_x, best_cost, best_start
         if used >= evaluations:
-            raise _SpentError
+            raise SpentError
         point = np.clip(z, box.lower, box.upper)
         value = objective.evaluate_point(point)
         if value is None:
-            raise _SpentError
+            raise SpentError
         used += 1
         if value < best_cost:
             best_x, best_cost, best_start = point.copy(), float(value), start
@@ -1166,7 +1163,7 @@ def run_lbfgsb_restarts(
                         "maxiter": evaluations,
                     },
                 )
-        except _SpentError:
+        except SpentError:
             break
         start = box.lower + (box.upper - box.lower) * rng.rand(dim)
     travelled = float(np.linalg.norm(best_x - best_start)) / np.sqrt(dim)

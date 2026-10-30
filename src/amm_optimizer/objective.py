@@ -55,7 +55,7 @@ class _Stop(Exception):  # noqa: N818  (a signal, not an error)
     """Ends a run early (``ftarget`` reached, or the callback raised ``StopIteration``).
 
     Raised from inside ``fun`` by :class:`Watch` and caught by
-    :func:`amm_optimizer.api.minimize`. Like the phases' own ``_SpentError``, no
+    :func:`amm_optimizer.api.minimize`. Like ``_budget.SpentError``, no
     phase catches it, so it unwinds every phase and SciPy call at once.
     ``nrestarts`` is filled in on the way out by the run that knows it.
     """

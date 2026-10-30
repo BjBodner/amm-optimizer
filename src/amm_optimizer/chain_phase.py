@@ -28,6 +28,7 @@ from collections.abc import Callable
 
 import numpy as np
 
+from ._budget import BudgetedObjective, SpentError
 from .bounds import Box, clip
 from .es_phase import EsResult
 from .objective import CountedObjective
@@ -35,31 +36,6 @@ from .objective import CountedObjective
 SEP_TOL = 1e-6  # a pair's additivity residual below this reads additive
 BAND_TOL = 0.02  # f20 0-0.0023, f8 0.089-4.7 (toy dev seeds 90-94, D 5-40)
 GOLD = 0.3819660112501051
-
-
-class _SpentError(Exception):
-    """The objective (or the phase's own budget) ran out."""
-
-
-class _Counted:
-    """``objective`` as a plain function: counts, keeps the best, stops at a cap."""
-
-    def __init__(self, objective: CountedObjective, evaluations: int) -> None:
-        self.objective, self.evaluations = objective, evaluations
-        self.used = 0
-        self.best_x: np.ndarray | None = None
-        self.best_cost = np.inf
-
-    def __call__(self, x: np.ndarray) -> float:
-        if self.used >= self.evaluations:
-            raise _SpentError
-        value = self.objective.evaluate_point(x)
-        if value is None:
-            raise _SpentError
-        self.used += 1
-        if value < self.best_cost:
-            self.best_x, self.best_cost = np.array(x, dtype=float), float(value)
-        return float(value) if np.isfinite(value) else 1e300
 
 
 # ------------------------------------------------------------- readings ----
@@ -79,7 +55,7 @@ def pair_test(
     leave f unchanged are skipped. None when the objective runs out.
     """
     dim = len(x)
-    fun = _Counted(objective, 3 * dim + 1)
+    fun = BudgetedObjective(objective, 3 * dim + 1)
     x = np.array(x, dtype=float)
     t = box.lower + (box.upper - box.lower) * rng.rand(dim)
     try:
@@ -108,7 +84,7 @@ def pair_test(
                     if j - i >= 2:
                         break
                 far.append(residual(int(i), int(j)))
-    except _SpentError:
+    except SpentError:
         return None
     r_adj = max((r for r in adjacent if r is not None), default=0.0)
     r_far = max((r for r in far if r is not None), default=0.0)
@@ -120,7 +96,7 @@ def pair_test(
 
 
 def _band_factors(
-    fun: _Counted, x: np.ndarray, box: Box, h: float
+    fun: BudgetedObjective, x: np.ndarray, box: Box, h: float
 ) -> dict[str, np.ndarray | None]:
     """M's off-diagonal for both orientations of H = M^T D M from one banded FD
     Hessian at ``x`` (central diagonal, forward adjacent mixed terms, 3 D
@@ -191,12 +167,12 @@ def band_consistency(
     zero pivot reads inf. None when the objective runs out.
     """
     dim = len(x)
-    fun = _Counted(objective, 6 * dim)
+    fun = BudgetedObjective(objective, 6 * dim)
     x2 = box.lower + (box.upper - box.lower) * rng.rand(dim)
     try:
         a = _band_factors(fun, x, box, h)
         b = _band_factors(fun, x2, box, h)
-    except _SpentError:
+    except SpentError:
         return None
     spreads = {}
     for order in ("lower", "upper"):
@@ -312,7 +288,7 @@ def _segment(x: np.ndarray, v: np.ndarray, box: Box) -> tuple[float, float]:
 
 # ------------------------------------------------------- the basis ----
 def _fd_hessian(
-    fun: _Counted, x: np.ndarray, fx: float, box: Box, h: float
+    fun: BudgetedObjective, x: np.ndarray, fx: float, box: Box, h: float
 ) -> np.ndarray:
     """Central diagonal, forward off-diagonal; 2 D + D (D - 1) / 2 evaluations.
 
@@ -449,12 +425,14 @@ class _CoordHess:
         self.previous: tuple[np.ndarray, float] | None = None
         self.cycles = 0
 
-    def basis(self, fun: _Counted, x: np.ndarray, fx: float) -> tuple[np.ndarray, bool]:
+    def basis(
+        self, fun: BudgetedObjective, x: np.ndarray, fx: float
+    ) -> tuple[np.ndarray, bool]:
         return decoupling_basis(_fd_hessian(fun, x, fx, self.box, self.h), self.order)
 
     def line(
         self,
-        fun: _Counted,
+        fun: BudgetedObjective,
         x: np.ndarray,
         fx: float,
         v: np.ndarray,
@@ -487,7 +465,7 @@ class _CoordHess:
         return x, fx
 
     def global_sweep(
-        self, fun: _Counted, x: np.ndarray, fx: float, basis: np.ndarray
+        self, fun: BudgetedObjective, x: np.ndarray, fx: float, basis: np.ndarray
     ) -> tuple[np.ndarray, float]:
         for i in range(len(x)):
             lo, hi = _segment(x, basis[:, i], self.box)
@@ -500,7 +478,7 @@ class _CoordHess:
         return x, fx
 
     def local_sweeps(
-        self, fun: _Counted, x: np.ndarray, fx: float, basis: np.ndarray
+        self, fun: BudgetedObjective, x: np.ndarray, fx: float, basis: np.ndarray
     ) -> tuple[np.ndarray, float]:
         dim = len(x)
         width = np.array(
@@ -524,7 +502,7 @@ class _CoordHess:
             if not _progressed(fx, f_sweep):
                 return x, fx
 
-    def solve(self, fun: _Counted, x0: np.ndarray) -> None:
+    def solve(self, fun: BudgetedObjective, x0: np.ndarray) -> None:
         dim = len(x0)
         x = np.array(x0, dtype=float)
         fx = fun(x)
@@ -569,14 +547,14 @@ def run_coord_hess(
     until ``evaluations`` are spent; ``order`` goes to ``decoupling_basis``. Returns
     the best point, its value, sigma 0 and the evaluations used.
     """
-    fun = _Counted(objective, evaluations)
+    fun = BudgetedObjective(objective, evaluations)
     engine = _CoordHess(rng, box, order=order)
     start = np.array(x, dtype=float)
     try:
         while True:
             engine.solve(fun, start)
             start = box.lower + (box.upper - box.lower) * rng.rand(len(x))
-    except _SpentError:
+    except SpentError:
         pass
     best = fun.best_x if fun.best_x is not None else np.array(x, dtype=float)
     return EsResult(best, fun.best_cost, 0.0, fun.used)
