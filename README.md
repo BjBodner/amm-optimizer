@@ -112,17 +112,31 @@ comparison with these on COCO/bbob is on the [website](https://bjbodner.github.i
 
 ## Citation
 
-See [CITATION.cff](CITATION.cff) (GitHub's "Cite this repository" button reads it); the paper's
-reference will be added when it is public. As BibTeX:
+See [CITATION.cff](CITATION.cff) (GitHub's "Cite this repository" button reads it). Please cite the
+paper, which describes the method and its evaluation:
 
 ```bibtex
-@software{bodner_amm_optimizer,
-  author  = {Bodner, Benjamin Jacob},
-  title   = {Adaptive Multi Mode ({AMM}): budget-aware routing of optimizers by online landscape probes},
-  year    = {2026},
-  url     = {https://github.com/BjBodner/amm-optimizer},
-  license = {Apache-2.0},
-  note    = {Python package amm-optimizer}
+@misc{bodner2026amm,
+  author        = {Bodner, Benjamin Jacob},
+  title         = {Adaptive Multi Mode: Budget-Aware Routing of Optimizers By Online Landscape Probes},
+  year          = {2026},
+  eprint        = {2611.06879},
+  archivePrefix = {arXiv},
+  doi           = {10.48550/arXiv.2611.06879}
+}
+```
+
+The code is archived on Zenodo; the DOI [10.5281/zenodo.24090157](https://doi.org/10.5281/zenodo.24090157)
+always resolves to the latest release (each release also has its own version DOI). The ATM sampler that
+AMM grew out of is described in:
+
+```bibtex
+@inproceedings{bodner2019atm,
+  author    = {Bodner, Benjamin},
+  title     = {Benchmarking the {ATM} algorithm on the {BBOB} 2009 noiseless function testbed},
+  booktitle = {Proceedings of the Genetic and Evolutionary Computation Conference Companion},
+  year      = {2019},
+  doi       = {10.1145/3319619.3326802}
 }
 ```
 
