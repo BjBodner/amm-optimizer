@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below (the paper's reference will be added when it is public)."
+message: "If you use this software, please cite the AMM paper (preferred-citation); to cite this exact release, use the software record."
 title: "Adaptive Multi Mode (AMM): budget-aware routing of optimizers by online landscape probes"
 version: 0.7.0
 date-released: "2026-10-30"
@@ -7,11 +7,34 @@ license: Apache-2.0
 type: software
 repository-code: "https://github.com/BjBodner/amm-optimizer"
 url: "https://pypi.org/project/amm-optimizer/"
+doi: "10.5281/zenodo.24090157"   # concept DOI: always resolves to the latest archived release
 authors:
   - family-names: Bodner
     given-names: Benjamin Jacob
+    orcid: "https://orcid.org/0000-0001-8742-4081"
 keywords:
   - black-box optimization
   - derivative-free optimization
   - COCO
   - BBOB
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Bodner
+      given-names: Benjamin Jacob
+      orcid: "https://orcid.org/0000-0001-8742-4081"
+  title: "Adaptive Multi Mode: Budget-Aware Routing of Optimizers By Online Landscape Probes"
+  journal: "arXiv preprint arXiv:2611.06879"
+  year: 2026
+  doi: "10.48550/arXiv.2611.06879"
+  url: "https://arxiv.org/abs/2611.06879"
+references:
+  - type: conference-paper
+    authors:
+      - family-names: Bodner
+        given-names: Benjamin
+    title: "Benchmarking the ATM algorithm on the BBOB 2009 noiseless function testbed"
+    collection-title: "Proceedings of the Genetic and Evolutionary Computation Conference Companion (GECCO '19)"
+    year: 2019
+    doi: "10.1145/3319619.3326802"
+    notes: "The original Adaptive Two Mode (ATM) sampler, which is one of AMM's engines."

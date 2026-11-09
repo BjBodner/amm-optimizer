@@ -1,0 +1,14 @@
+{
+  "title": "amm-optimizer: Adaptive Multi Mode, budget-aware routing of optimizers by online landscape probes",
+  "upload_type": "software",
+  "creators": [
+    {"name": "Bodner, Benjamin Jacob", "orcid": "0000-0001-8742-4081"}
+  ],
+  "keywords": ["black-box optimization", "algorithm selection", "BBOB", "COCO"],
+  "access_right": "open",
+  "license": "apache-2.0",
+  "related_identifiers": [
+    {"relation": "isSupplementTo", "identifier": "10.48550/arXiv.2611.06879", "scheme": "doi"},
+    {"relation": "references", "identifier": "10.1145/3319619.3326802", "scheme": "doi"}
+  ]
+}
